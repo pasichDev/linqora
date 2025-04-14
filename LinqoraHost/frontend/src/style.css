@@ -1,26 +1,29 @@
-html {
-    background-color: rgba(27, 38, 54, 1);
+:root {
+    --ui-background: #1D1C17;
+    --ui-container-background: #25241F;
+    --ui-container-border: #32322A;
+    --ui-container-text: #D3D3D3;
+    --ui-container-text-descript: #8C8B87;
+    --ui-card-icon-container: #2B2A24;
+  }
+
+  .card-box {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px;
+    background-color: var(--ui-container-background);
+    border-radius: 15px;
+    border: 2px solid var(--ui-container-border); 
+    width: 100%;
+    height: 220px;
     text-align: center;
-    color: white;
-}
+  }
 
-body {
-    margin: 0;
-    color: white;
-    font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
-    "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
-    sans-serif;
-}
+  .card-box p{
+    color: var(--ui-container-text);
+    font-weight: 600;
+    font-size: large;
+  }
 
-@font-face {
-    font-family: "Nunito";
-    font-style: normal;
-    font-weight: 400;
-    src: local(""),
-    url("assets/fonts/nunito-v16-latin-regular.woff2") format("woff2");
-}
-
-#app {
-    height: 100vh;
-    text-align: center;
-}
+  
