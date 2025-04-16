@@ -1,11 +1,11 @@
-<script>
+<script lang="ts">
 import {
     SvelteUIProvider,
     AppShell,
-    Header
+    Header,
+
 } from '@svelteuidev/core';
 import Main from './Main.svelte';
-
 import TitleBar from './components/TitleBar.svelte';
 </script>
 
@@ -13,5 +13,9 @@ import TitleBar from './components/TitleBar.svelte';
 
     <AppShell padding={0}>
         <Header slot="header" zIndex={10} height={24} >    <TitleBar /></Header>
-        <slot>   <Main/>	</slot>
-            </AppShell></SvelteUIProvider>
+        <slot>
+
+            <Main/>
+
+                </slot>
+                </AppShell></SvelteUIProvider>

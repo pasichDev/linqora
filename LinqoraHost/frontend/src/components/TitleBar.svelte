@@ -1,7 +1,6 @@
 <script lang="ts">
 import {
     Group,
-    ThemeIcon,
     Button,
     Text,
     Paper
@@ -14,10 +13,6 @@ import {
 } from "carbon-icons-svelte";
 
 const minimize = () => {
-    runtime.WindowMinimise();
-};
-
-const maximize = () => {
     runtime.WindowMinimise();
 };
 

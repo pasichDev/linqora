@@ -34,5 +34,5 @@
     "src/**/*.d.ts",
     "src/**/*.js",
     "src/**/*.svelte"
-  ]
+, "src/components/SpaceCard.sveltef"  ]
 }

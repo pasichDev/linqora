@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 import {
     Space,
     Progress,
@@ -8,66 +8,32 @@ import {
     Badge
 } from '@svelteuidev/core';
 import {
-    onMount
-} from 'svelte';
-import {
-    GetSystemDisk
-} from "../../wailsjs/go/main/App";
+    backend
+} from 'wailsjs/go/models';
 
-let systemDisk = {
-    total_space: '',
-    usage_space: '',
-    model_disk: '',
-    type_disk: ''
-};
+export let systemDiskInfo: backend.SystemDiskInfo;
 
-let usagePercentage = 0;
-const getSystemDiskInfo = async () => {
-    try {
-        console.log('Fetching system info...');
-        const info = await GetSystemDisk();
-        console.log('Fetched info:', info);
-        if (info && info.total_space && info.usage_space && info.model_disk && info.type_disk) {
-            systemDisk = {
-                ...info
-            };
-        usagePercentage = parseFloat(((info.usage_space / info.total_space) * 100).toFixed(2));
-
-        } else {
-            console.error('Invalid data format:', info);
-        }
-    } catch (err) {
-        console.error('Error fetching system info:', err);
-    }
-};
-//<Text weight="medium" color="gray" size={10}>{systemDisk.model_disk}</Text>
-onMount(() => {
-    
-    getSystemDiskInfo();
-   
-});
-
-
-
+$: usagePercentage = (systemDiskInfo.total && !isNaN(systemDiskInfo.usage)) ?
+    ((systemDiskInfo.usage / systemDiskInfo.total) * 100).toFixed(2) :
+    "0.00";
 </script>
 <Box
     css={{
-        padding: '$3 $5',
+    padding: '$3 $5',
     }}>
 
     <Group position='apart'>
         <div>
-            <Text weight={'bold'} size={12}> {systemDisk.model_disk}</Text>
-           <Space h={5}/>
-           <Text weight="medium" color="gray" size={10}>{systemDisk.usage_space} / {systemDisk.total_space} GB</Text>
-          </div>
-      
+            <Text weight={'bold'} size={12}> {systemDiskInfo.model}</Text>
+            <Space h={5}/>
+                <Text weight="medium" color="gray" size={10}>{systemDiskInfo.usage} / {systemDiskInfo.total} GB</Text>
+                </div>
 
-          <Badge size="lg" radius="md" variant="filled" color="gray" style="align-self: center;">
-            {usagePercentage}%
-          </Badge>
-    </Group>
-    <Space h="md" />
-    <Progress value={usagePercentage}  size="md" radius="md" />
-    
-</Box>
+                <Badge size="lg" radius="md" variant="filled" color="gray" style="align-self: center;">
+                    {usagePercentage}%
+                </Badge>
+                </Group>
+                <Space h="md" />
+                <Progress value={parseFloat(usagePercentage)}  size="md" radius="md" />
+
+                </Box>

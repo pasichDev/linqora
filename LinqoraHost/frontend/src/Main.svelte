@@ -1,61 +1,40 @@
-<script>
+<script lang="ts">
 import {
-    Space,
     Stack,
     Divider
 
 } from '@svelteuidev/core';
+
+import CpuCard from './components/CPUCard.svelte';
+import RamCard from './components/RAMCard.svelte';
+import SpaceCard from './components/SpaceCard.svelte';
+import {
+    FetchSystemInfo
+} from "../wailsjs/go/main/App";
 import {
     onMount
 } from 'svelte';
 import {
-    GetSystemInfo
-} from "../wailsjs/go/main/SystemInfoInitial";
-import CpuCard from './components/CPUCard.svelte';
-import SpaceCard from './components/SpaceCard.svelte';
-import RamCard from './components/RAMCard.svelte';
+    backend
+} from 'wailsjs/go/models';
 
-let systemInfo = {
-    system: '',
-    cpu: '',
-    ram_total: '',
-    ram_usage: '',
-};
+let systemInfo: backend.SystemInfoInitial | null = null;
 
-const getSystemInfo = async () => {
-    try {
-        console.log('Fetching system info...');
-        const info = await GetSystemInfo();
-        console.log('Fetched info:', info);
-        if (info && info.system && info.cpu && info.ram_total && info.ram_usage) {
-            systemInfo = {
-                ...info
-            };
-        } else {
-            console.error('Invalid data format:', info);
-        }
-    } catch (err) {
-        console.error('Error fetching system info:', err);
-    }
-};
-
-onMount(() => {
-    console.log('onMount triggered');
-    getSystemInfo();
+onMount(async () => {
+    systemInfo = await FetchSystemInfo();
 });
 </script>
 
 <Stack align="strech">
+    {#if systemInfo}
+    <CpuCard cpuInfo={systemInfo.cpu_info} />
+    <Divider color="dark" />
+    <RamCard
+        ramInfo={systemInfo.ram_info} />
+    <Divider color="dark" />
+    <SpaceCard systemDiskInfo={systemInfo.system_disk} />
+    {:else}
+    <p>Завантаження...</p>
+    {/if}
 
-    <CpuCard
-        valueAtribute = "33%"
-        atribute={systemInfo.cpu}/>
-        <Divider  color="dark" />
-        <RamCard
-            usage = {systemInfo.ram_usage}
-            total = {systemInfo.ram_total}/>
-            <Divider color="dark" />
-            <SpaceCard
-                />
-
-                </Stack>
+</Stack>
