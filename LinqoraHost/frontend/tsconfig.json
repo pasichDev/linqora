@@ -15,7 +15,9 @@
     "checkJs": true,
     "importsNotUsedAsValues": "error",
     "isolatedModules": true,
+    "esModuleInterop": true,
     "resolveJsonModule": true,
+    
   },
   "include": [
     "src/**/*.d.ts",
