@@ -5,8 +5,18 @@ import {
     Header,
 
 } from '@svelteuidev/core';
-import Main from './Main.svelte';
 import TitleBar from './components/TitleBar.svelte';
+import Home from './routes/Home.svelte';
+import Settings from './routes/Settings.svelte';
+import Router, {
+    location
+} from 'svelte-spa-router';
+
+
+const routes = {
+    '/': Home,
+    '/settings': Settings
+};
 </script>
 
 <SvelteUIProvider withGlobalStyles themeObserver={'dark'}>
@@ -15,7 +25,7 @@ import TitleBar from './components/TitleBar.svelte';
         <Header slot="header" zIndex={10} height={24} >    <TitleBar /></Header>
         <slot>
 
-            <Main/>
+            <Router {routes} />
 
-                </slot>
-                </AppShell></SvelteUIProvider>
+        </slot>
+    </AppShell></SvelteUIProvider>

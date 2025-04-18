@@ -27,7 +27,7 @@ const close = () => {
             <Text size="sm" weight="bold">LinqoraHost</Text>
 
             <Group spacing="xs" class="no-drag">
-                <Button variant="subtle" color="gray" size="xs">
+                <Button variant="subtle" color="gray" size="xs" href="#/settings">
                     <SettingsAdjust />
                 </Button>
                 <Button variant="subtle" on:click={minimize} size="xs">

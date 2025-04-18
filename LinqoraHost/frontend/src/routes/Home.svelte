@@ -4,12 +4,12 @@ import {
     Divider
 
 } from '@svelteuidev/core';
-import CpuCard from './components/CPUCard.svelte';
-import RamCard from './components/RAMCard.svelte';
-import SpaceCard from './components/SpaceCard.svelte';
+import CpuCard from '.././components/CPUCard.svelte';
+import RamCard from '.././components/RAMCard.svelte';
+import SpaceCard from '.././components/SpaceCard.svelte';
 import {
     FetchSystemInfo
-} from "../wailsjs/go/main/App";
+} from "../../wailsjs/go/main/App";
 import {
     onMount
 } from 'svelte';
