@@ -19,7 +19,7 @@ $: usagePercentage = (systemDiskInfo.total && !isNaN(systemDiskInfo.usage)) ?
 </script>
 <Box
     css={{
-    padding: '$3 $5',
+    padding: '$0 $8',
     }}>
 
     <Group position='apart'>

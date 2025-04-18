@@ -12,27 +12,29 @@ import {
     backend
 } from 'wailsjs/go/models';
 
-export let ramInfo: backend.RamInfo;
-
-$: usagePercentage = (ramInfo.total && !isNaN(ramInfo.usage)) ?
-    ((ramInfo.usage / ramInfo.total) * 100).toFixed(2) :
-    "0.00";
+export let usage: String;
+export let total: String;
+export let usagePercentage: String;
+export let ramLoad: number[] = [];
 </script>
     <Box
     css={{
-    padding: '$3 $5',
+    padding: '$0 $8',
     }}>
 
     <Group position="apart">
         <div>
             <Text weight="semibold" size="sm">RAM</Text>
             <Space h={5} />
-            <Text weight="medium" color="gray" size={10}>{ramInfo.usage } / {ramInfo.total } GB</Text>
+            <Text weight="medium" color="gray" size={10}>{usage} / {total} GB</Text>
         </div>
 
         <Badge size="lg" radius="md" variant="filled" color="gray" style="align-self: center;">
             {usagePercentage}%
         </Badge>
     </Group>
+
+
+
 
 </Box>

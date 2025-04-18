@@ -6,7 +6,8 @@ import {
     ThemeIcon,
     Text,
     Image,
-    Box
+    Box,
+     Divider
 } from '@svelteuidev/core';
 import IconCpu from '../assets/images/cpu.svg'
 import {
@@ -21,9 +22,9 @@ const labels = ['12:00', '12:01', '12:02', '12:03'];
 const cpuLoad = [5, 30, 60, 35];
 const cpuTemp = [30, 45, 55, 48];
 </script>
-<Box
+<Box 
     css={{
-    padding: '$3 $5',
+    padding: '$0 $8',
     }}>
 
     <Group position="apart">
@@ -46,6 +47,10 @@ const cpuTemp = [30, 45, 55, 48];
             56℃
         </Badge>
     </Group>
+   
+    <Space h="xs" />
+    <CpuChart {labels} {cpuLoad} {cpuTemp} />
+    <Divider color="dark" />
     <Space h="md" />
     <Group position='apart'>
         <Text weight={'medium'} size='xs'>Processes</Text>
@@ -56,6 +61,4 @@ const cpuTemp = [30, 45, 55, 48];
         <Text weight={'medium'} size='xs'>Theads</Text>
         <Text weight={'medium'} size='xs'>2000</Text>
     </Group>
-    <Space h="xs" />
-    <CpuChart {labels} {cpuLoad} {cpuTemp} />
 </Box>

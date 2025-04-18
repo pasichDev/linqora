@@ -5,8 +5,8 @@ import (
 	sysModel "LinqoraHost/backend/model"
 	"math"
 
-	"github.com/jaypipes/ghw"
-	"github.com/pbnjay/memory"
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/mem"
 )
 
 // GetSystemInfo повертає основну системну інформацію:
@@ -20,24 +20,28 @@ func GetSystemInfo() (sysModel.SystemInfoInitial, error) {
 	systemInf := sysModel.NewDefaultSystemInfo()
 
 	// Отримуємо інформацію про процесор
-	cpuInfo, err := ghw.CPU()
-	if err != nil {
-		return systemInf, err
+	cpuArray, cpuError := cpu.Info()
+	if cpuError != nil {
+		return systemInf, cpuError
 	}
 
 	// Якщо є хоча б один процесор, заповнюємо модель, кількість ядер і потоків
-	if len(cpuInfo.Processors) > 0 {
+	if len(cpuArray) > 0 {
+		c := cpuArray[0]
 		systemInf.CpuInfo = sysModel.CpuInfo{
-			Model:   cpuInfo.Processors[0].Model,
-			Cores:   int64(cpuInfo.Processors[0].NumCores),
-			Threads: int64(cpuInfo.Processors[0].NumThreads),
+			Model: c.ModelName,
+			Cores: int64(c.Cores),
 		}
+	}
+
+	v, vMError := mem.VirtualMemory()
+	if vMError != nil {
+		return systemInf, vMError
 	}
 
 	// Отримуємо загальний обсяг і використання оперативної памʼяті (в ГБ, округлено до 2 знаків після коми)
 	systemInf.RamInfo = sysModel.RamInfo{
-		Total: math.Round((float64(memory.TotalMemory())/1024/1024/1024)*100) / 100,
-		Usage: math.Round((float64(memory.TotalMemory()-memory.FreeMemory())/1024/1024/1024)*100) / 100,
+		Total: math.Round((float64(v.Total)/1024/1024/1024)*100) / 100,
 	}
 
 	// Отримуємо інформацію про системний диск
