@@ -7,22 +7,34 @@ import {
     Text,
     Image,
     Box,
-     Divider
+    Divider,
+    Skeleton
 } from '@svelteuidev/core';
 import IconCpu from '../assets/images/cpu.svg'
 import {
-    backend
+    backend,
+    database
 } from 'wailsjs/go/models';
 
 export let cpuInfo: backend.CpuInfo;
-
+export let cpuMetrics: database.CpuMetrics[];
 import CpuChart from './CpuChart.svelte';
+
+let lastMetrics: database.CpuMetric | null;
+
+$: {
+    if (cpuMetrics.length > 0) {
+        lastMetrics = cpuMetrics[cpuMetrics.length - 1]; // Останній елемент масиву
+    } else {
+        lastMetrics = null; // Якщо масив порожній
+    }
+}
 
 const labels = ['12:00', '12:01', '12:02', '12:03'];
 const cpuLoad = [5, 30, 60, 35];
 const cpuTemp = [30, 45, 55, 48];
 </script>
-<Box 
+<Box
     css={{
     padding: '$0 $8',
     }}>
@@ -40,16 +52,28 @@ const cpuTemp = [30, 45, 55, 48];
     </Group>
     <Space h={5} />
     <Group position="left">
+
+        {#if lastMetrics}
+        <Badge size="lg" radius="md" variant="filled" color="teal" style="align-self: center;" >
+           4.2 GHz
+        </Badge>
         <Badge size="lg" radius="md" variant="filled" color="lime" style="align-self: center;">
-            33%
+            {lastMetrics.loadPercent.toFixed(2)}%
         </Badge>
         <Badge size="lg" radius="md" variant="filled" color="cyan" style="align-self: center;" >
-            56℃
+            {lastMetrics.temperature.toFixed(0)}℃
         </Badge>
+       
+        {:else}
+        <Skeleton height={26} width={15} radius="md"   />
+        <Skeleton height={26} width={15} radius="md"   />
+        <Skeleton height={26} width={15} radius="md"   />
+        {/if}
+
     </Group>
-   
+
     <Space h="xs" />
-    <CpuChart {labels} {cpuLoad} {cpuTemp} />
+    <CpuChart cpuMetric={cpuMetrics} />
     <Divider color="dark" />
     <Space h="md" />
     <Group position='apart'>

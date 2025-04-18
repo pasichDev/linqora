@@ -48,9 +48,10 @@ func createTables() error {
 			`CREATE TABLE IF NOT EXISTS %s (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-			usage REAL
+			usage REAL,
 			load_percent REAL
 		);`, TABLE_RAM_METRIC),
+
 		fmt.Sprintf(
 			`CREATE TABLE IF NOT EXISTS %s (
 			key TEXT PRIMARY KEY,
@@ -81,14 +82,69 @@ func ClearTable(tableName string) error {
 	return err
 }
 
-func InsertCPUMetric(m CPUMetric) error {
+func InsertCPUMetric(m CPUMetrics) error {
 	_, err := DB.Exec(`INSERT INTO cpu_metric (temperature, load_percent) VALUES (?, ?)`,
 		m.Temperature, m.LoadPercent)
 	return err
 }
 
-func InsertRAMMetric(m RAMMetric) error {
+func InsertRAMMetric(m RAMMetrics) error {
 	_, err := DB.Exec(`INSERT INTO ram_metric (usage, load_percent) VALUES (?, ?)`,
-		m.LoadPercent)
+		m.Usage, m.LoadPercent)
 	return err
+}
+
+func GetCPUMetrics(count int) ([]CPUMetrics, error) {
+	rows, err := DB.Query(`SELECT id, timestamp, temperature, load_percent FROM cpu_metric ORDER BY timestamp DESC LIMIT ?`, count)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var metrics []CPUMetrics
+	for rows.Next() {
+		var metric CPUMetrics
+
+		// Оновлений rows.Scan для всіх полів
+		if err := rows.Scan(&metric.ID, &metric.Timestamp, &metric.Temperature, &metric.LoadPercent); err != nil {
+			return nil, err
+		}
+
+		metrics = append(metrics, metric)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return metrics, nil
+}
+
+// Оновлений код для отримання всіх RAM-метрик
+func GetRAMMetrics(count int) ([]RAMMetrics, error) {
+	rows, err := DB.Query(`SELECT id, timestamp, usage, load_percent FROM ram_metric ORDER BY timestamp DESC LIMIT ?`, count)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var metrics []RAMMetrics
+	for rows.Next() {
+		var metric RAMMetrics
+		var id int
+		var timestamp string
+
+		// Оновлений rows.Scan для всіх полів
+		if err := rows.Scan(&id, &timestamp, &metric.Usage, &metric.LoadPercent); err != nil {
+			return nil, err
+		}
+
+		metrics = append(metrics, metric)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return metrics, nil
 }

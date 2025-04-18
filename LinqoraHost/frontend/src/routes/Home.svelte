@@ -14,13 +14,18 @@ import {
     onMount
 } from 'svelte';
 import {
-    backend
+    backend, database
 } from 'wailsjs/go/models';
 
 let systemInfo: backend.SystemInfoInitial | null = null;
+let CpuMetrics: database.CpuMetrics[] | null = [];
 
 onMount(async () => {
     systemInfo = await FetchSystemInfo();
+    window.runtime.EventsOn("metrics-update", (data) => {
+      CpuMetrics = data.cpuMetrics;
+      ram = data.ram;
+    });
 });
 
 
@@ -28,25 +33,12 @@ onMount(async () => {
   let cpu = {};
   let ram = {};
 
-  onMount(() => {
-    window.runtime.EventsOn("metrics-update", (data) => {
-      cpu = data.cpu;
-      ram = data.ram;
-    });
-  });
 
 </script>
 
 <Stack align="strech" >
-
-<h2>CPU Metric</h2>
-<ul>
-  <li>Temperature: {cpu.temperature?.toFixed(1)}°C</li>
-  <li>Load: {cpu.loadPercent?.toFixed(1)}%</li>
-</ul>
-
     {#if systemInfo}
-    <CpuCard cpuInfo={systemInfo.cpu_info} />
+    <CpuCard cpuInfo={systemInfo.cpu_info} cpuMetrics={CpuMetrics} />
     <Divider color="dark" />
     <RamCard
         usage={ram.usage?.toFixed(1)}

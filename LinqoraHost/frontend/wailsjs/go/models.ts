@@ -81,3 +81,44 @@ export namespace backend {
 
 }
 
+export namespace database {
+	
+	export class CPUMetrics {
+	    id: number;
+	    timestamp: string;
+	    temperature: number;
+	    loadPercent: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CPUMetrics(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.timestamp = source["timestamp"];
+	        this.temperature = source["temperature"];
+	        this.loadPercent = source["loadPercent"];
+	    }
+	}
+	export class RAMMetrics {
+	    id: number;
+	    timestamp: string;
+	    usage: number;
+	    loadPercent: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new RAMMetrics(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.timestamp = source["timestamp"];
+	        this.usage = source["usage"];
+	        this.loadPercent = source["loadPercent"];
+	    }
+	}
+
+}
+

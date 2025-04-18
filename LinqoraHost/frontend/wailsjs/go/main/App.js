@@ -5,3 +5,11 @@
 export function FetchSystemInfo() {
   return window['go']['main']['App']['FetchSystemInfo']();
 }
+
+export function GetAllCPUMetrics() {
+  return window['go']['main']['App']['GetAllCPUMetrics']();
+}
+
+export function GetAllRAMMetrics() {
+  return window['go']['main']['App']['GetAllRAMMetrics']();
+}

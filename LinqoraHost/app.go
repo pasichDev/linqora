@@ -34,13 +34,13 @@ func (a *App) startSimulationLoop() {
 
 			load, _ := GetCPULoad()
 			temp, _ := GetCPUTemperature()
-			cpu := database.CPUMetric{
+			cpu := database.CPUMetrics{
 				Temperature: temp,
 				LoadPercent: load,
 			}
 
 			v, _ := mem.VirtualMemory()
-			ram := database.RAMMetric{
+			ram := database.RAMMetrics{
 				LoadPercent: v.UsedPercent,
 				Usage:       math.Round((float64(v.Used)/1024/1024/1024)*100) / 100,
 			}
@@ -49,10 +49,24 @@ func (a *App) startSimulationLoop() {
 			_ = database.InsertCPUMetric(cpu)
 			_ = database.InsertRAMMetric(ram)
 
+			// Отримуємо всі CPU метрики
+			cpuMetrics, err := database.GetCPUMetrics(50)
+			if err != nil {
+				log.Fatalf("Error getting CPU metrics: %v", err)
+			}
+
+			/**
+			// Отримуємо всі RAM метрики
+			ramMetrics, err := database.GetAllRAMMetrics()
+			if err != nil {
+				log.Fatalf("Error getting RAM metrics: %v", err)
+			}
+			*/
+
 			// Надсилання в UI
 			runtime.EventsEmit(a.ctx, "metrics-update", map[string]interface{}{
-				"cpu": cpu,
-				"ram": ram,
+				"cpuMetrics": cpuMetrics,
+				"ram":        ram,
 			})
 		}
 	}()
@@ -134,4 +148,12 @@ func GetCPUTemperature() (float64, error) {
 		return sensors[0].Temperature, nil
 	}
 	return 0, nil
+}
+
+func (a *App) GetAllCPUMetrics() database.CPUMetrics {
+	return database.CPUMetrics{}
+}
+
+func (a *App) GetAllRAMMetrics() database.RAMMetrics {
+	return database.RAMMetrics{}
 }
