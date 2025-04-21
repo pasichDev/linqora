@@ -12,7 +12,6 @@ init({
   initialLocale: getLocaleFromNavigator(),
 });
 
-console.log(getLocaleFromNavigator())
 
 const app = new App({
   target: document.getElementById('app')

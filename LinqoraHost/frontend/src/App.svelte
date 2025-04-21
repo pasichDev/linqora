@@ -30,7 +30,7 @@ const routes = {
 
     <AppShell fixed
         navbarOffsetBreakpoint="sm"
-        asideOffsetBreakpoint="sm" padding={5} style="height: 100vh; display: flex; flex-direction: column;">
+        asideOffsetBreakpoint="sm" padding={5} >
 
         <Header slot="header"  height={32} fixed>    <TitleBar /></Header>
         <ShellSection   grow>

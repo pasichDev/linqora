@@ -30,7 +30,6 @@ func GetSystemInfo() (sysModel.SystemInfoInitial, error) {
 		c := cpuArray[0]
 		systemInf.CpuInfo = sysModel.CpuInfo{
 			Model: c.ModelName,
-			Cores: int64(c.Cores),
 		}
 	}
 

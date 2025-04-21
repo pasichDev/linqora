@@ -2,7 +2,8 @@
 import {
     Stack,
     Space,
-    SimpleGrid
+    SimpleGrid,
+    Loader
 
 } from '@svelteuidev/core';
 import CpuCard from '../components/home_widgets/CPUCard.svelte';
@@ -15,46 +16,42 @@ import {
     onMount
 } from 'svelte';
 import {
-    backend, database
+    backend,
+    database
 } from 'wailsjs/go/models';
 
 let systemInfo: backend.SystemInfoInitial | null = null;
 let CpuMetrics: database.CpuMetrics[] | null = [];
 let RamMetrics: database.RamMetrics[] | null = [];
 
-
 onMount(async () => {
     systemInfo = await FetchSystemInfo();
     window.runtime.EventsOn("metrics-update", (data) => {
-      CpuMetrics = data.cpuMetrics;
-      RamMetrics = data.ram;
+        CpuMetrics = data.cpuMetrics;
+        RamMetrics = data.ram;
     });
 });
-
-
-
-
-
 </script>
 
 <Stack align="strech" >
+    <Space/>
+        <SimpleGrid  breakpoints={[{ minWidth: 750, cols: 3, spacing: 'xl' }]} >
 
-    <SimpleGrid  breakpoints={[{ minWidth: 800, cols: 3, spacing: 'xl' }]} >
-        <Space/>
-        {#if systemInfo}
-        <CpuCard cpuInfo={systemInfo.cpu_info} cpuMetrics={CpuMetrics} />
-     
-        <RamCard
-        ramInfo={systemInfo.ram_info}
-          metricInfo={RamMetrics}
+            {#if systemInfo}
+            <CpuCard cpuInfo={systemInfo.cpu_info} cpuMetrics={CpuMetrics} />
 
-          />
-      
-        <SpaceCard systemDiskInfo={systemInfo.system_disk} />
-        {:else}
-        <p>Завантаження...</p>
-        {/if}
-    </SimpleGrid>
- 
+            <RamCard
+                ramInfo={systemInfo.ram_info}
+                metricInfo={RamMetrics}
 
-</Stack>
+                />
+
+                <SpaceCard systemDiskInfo={systemInfo.system_disk} />
+                {:else}
+                <Stack >   <Loader variant='dots'  size={50} />
+                    <p>Завантаження...</p></Stack>
+
+                {/if}
+                </SimpleGrid>
+
+                </Stack>

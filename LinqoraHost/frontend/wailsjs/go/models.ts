@@ -2,7 +2,6 @@ export namespace backend {
 	
 	export class CpuInfo {
 	    model: string;
-	    cores: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new CpuInfo(source);
@@ -11,7 +10,6 @@ export namespace backend {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.model = source["model"];
-	        this.cores = source["cores"];
 	    }
 	}
 	export class RamInfo {
