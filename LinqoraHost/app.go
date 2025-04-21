@@ -13,6 +13,7 @@ import (
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/host"
 	"github.com/shirou/gopsutil/mem"
+	"github.com/shirou/gopsutil/process"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	_ "modernc.org/sqlite"
 )
@@ -34,9 +35,14 @@ func (a *App) startSimulationLoop() {
 
 			load, _ := GetCPULoad()
 			temp, _ := GetCPUTemperature()
+			proc, thrd, _ := getProcessesAndThreads()
+
 			cpu := database.CPUMetrics{
 				Temperature: temp,
 				LoadPercent: load,
+				Processes:   float64(proc),
+				Threads:     float64(thrd),
+				Frequencies: 0,
 			}
 
 			v, _ := mem.VirtualMemory()
@@ -50,23 +56,21 @@ func (a *App) startSimulationLoop() {
 			_ = database.InsertRAMMetric(ram)
 
 			// Отримуємо всі CPU метрики
-			cpuMetrics, err := database.GetCPUMetrics(50)
+			cpuMetrics, err := database.GetCPUMetrics(30)
 			if err != nil {
 				log.Fatalf("Error getting CPU metrics: %v", err)
 			}
 
-			/**
 			// Отримуємо всі RAM метрики
-			ramMetrics, err := database.GetAllRAMMetrics()
+			ramMetrics, err := database.GetRAMMetrics(20)
 			if err != nil {
 				log.Fatalf("Error getting RAM metrics: %v", err)
 			}
-			*/
 
 			// Надсилання в UI
 			runtime.EventsEmit(a.ctx, "metrics-update", map[string]interface{}{
 				"cpuMetrics": cpuMetrics,
-				"ram":        ram,
+				"ram":        ramMetrics,
 			})
 		}
 	}()
@@ -148,6 +152,26 @@ func GetCPUTemperature() (float64, error) {
 		return sensors[0].Temperature, nil
 	}
 	return 0, nil
+}
+
+func getProcessesAndThreads() (int, int, error) {
+	procs, err := process.Processes()
+	if err != nil {
+		return 0, 0, err
+	}
+
+	numProcesses := len(procs)
+	totalThreads := 0
+
+	for _, p := range procs {
+		threads, err := p.NumThreads()
+		if err == nil {
+			totalThreads += int(threads)
+		}
+		// якщо треба — можна логувати/ігнорувати помилки
+	}
+
+	return numProcesses, totalThreads, nil
 }
 
 func (a *App) GetAllCPUMetrics() database.CPUMetrics {

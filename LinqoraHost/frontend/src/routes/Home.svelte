@@ -20,19 +20,19 @@ import {
 
 let systemInfo: backend.SystemInfoInitial | null = null;
 let CpuMetrics: database.CpuMetrics[] | null = [];
+let RamMetrics: database.RamMetrics[] | null = [];
+
 
 onMount(async () => {
     systemInfo = await FetchSystemInfo();
     window.runtime.EventsOn("metrics-update", (data) => {
       CpuMetrics = data.cpuMetrics;
-      ram = data.ram;
+      RamMetrics = data.ram;
     });
 });
 
 
 
-  let cpu = {};
-  let ram = {};
 
 
 </script>
@@ -45,9 +45,9 @@ onMount(async () => {
         <CpuCard cpuInfo={systemInfo.cpu_info} cpuMetrics={CpuMetrics} />
      
         <RamCard
-            usage={ram.usage?.toFixed(1)}
-            total = {systemInfo.ram_info.total}
-            usagePercentage =  {ram.loadPercent?.toFixed(1)}
+        ramInfo={systemInfo.ram_info}
+          metricInfo={RamMetrics}
+
           />
       
         <SpaceCard systemDiskInfo={systemInfo.system_disk} />

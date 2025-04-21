@@ -18,6 +18,7 @@ $: usagePercentage = (systemDiskInfo.total && !isNaN(systemDiskInfo.usage)) ?
     "0.00";
 </script>
 <Card shadow='sm' padding='lg' radius="lg" color="dark">
+   
 
     <Group position='apart'>
         <div>

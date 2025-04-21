@@ -32,31 +32,32 @@ func Init() error {
 
 	return nil
 }
-
 func createTables() error {
-
 	queries := []string{
+		fmt.Sprintf(
+			`CREATE TABLE IF NOT EXISTS %s (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+				temperature REAL,
+				load_percent REAL,
+				processes REAL,
+				threads REAL,
+				freq REAL
+			);`, TABLE_CPU_METRIC),
 
 		fmt.Sprintf(
 			`CREATE TABLE IF NOT EXISTS %s (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-			temperature REAL,
-			load_percent REAL
-		);`, TABLE_CPU_METRIC),
-		fmt.Sprintf(
-			`CREATE TABLE IF NOT EXISTS %s (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-			usage REAL,
-			load_percent REAL
-		);`, TABLE_RAM_METRIC),
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+				usage REAL,
+				load_percent REAL
+			);`, TABLE_RAM_METRIC),
 
 		fmt.Sprintf(
 			`CREATE TABLE IF NOT EXISTS %s (
-			key TEXT PRIMARY KEY,
-			value TEXT
-		);`, TABLE_SETTINGS),
+				key TEXT PRIMARY KEY,
+				value TEXT
+			);`, TABLE_SETTINGS),
 	}
 
 	for _, query := range queries {
@@ -83,8 +84,10 @@ func ClearTable(tableName string) error {
 }
 
 func InsertCPUMetric(m CPUMetrics) error {
-	_, err := DB.Exec(`INSERT INTO cpu_metric (temperature, load_percent) VALUES (?, ?)`,
-		m.Temperature, m.LoadPercent)
+	_, err := DB.Exec(
+		`INSERT INTO cpu_metric (temperature, load_percent, processes, threads, freq) VALUES (?, ?, ?, ?, ?)`,
+		m.Temperature, m.LoadPercent, m.Processes, m.Threads, m.Frequencies,
+	)
 	return err
 }
 
@@ -95,7 +98,11 @@ func InsertRAMMetric(m RAMMetrics) error {
 }
 
 func GetCPUMetrics(count int) ([]CPUMetrics, error) {
-	rows, err := DB.Query(`SELECT id, timestamp, temperature, load_percent FROM cpu_metric ORDER BY timestamp DESC LIMIT ?`, count)
+	rows, err := DB.Query(`
+		SELECT id, timestamp, temperature, load_percent, processes, threads, freq 
+		FROM cpu_metric 
+		ORDER BY timestamp DESC 
+		LIMIT ?`, count)
 	if err != nil {
 		return nil, err
 	}
@@ -105,8 +112,15 @@ func GetCPUMetrics(count int) ([]CPUMetrics, error) {
 	for rows.Next() {
 		var metric CPUMetrics
 
-		// Оновлений rows.Scan для всіх полів
-		if err := rows.Scan(&metric.ID, &metric.Timestamp, &metric.Temperature, &metric.LoadPercent); err != nil {
+		if err := rows.Scan(
+			&metric.ID,
+			&metric.Timestamp,
+			&metric.Temperature,
+			&metric.LoadPercent,
+			&metric.Processes,
+			&metric.Threads,
+			&metric.Frequencies,
+		); err != nil {
 			return nil, err
 		}
 
@@ -131,11 +145,10 @@ func GetRAMMetrics(count int) ([]RAMMetrics, error) {
 	var metrics []RAMMetrics
 	for rows.Next() {
 		var metric RAMMetrics
-		var id int
-		var timestamp string
 
 		// Оновлений rows.Scan для всіх полів
-		if err := rows.Scan(&id, &timestamp, &metric.Usage, &metric.LoadPercent); err != nil {
+		if err := rows.Scan(&metric.ID,
+			&metric.Timestamp, &metric.Usage, &metric.LoadPercent); err != nil {
 			return nil, err
 		}
 

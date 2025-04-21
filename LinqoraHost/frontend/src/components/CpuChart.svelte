@@ -1,39 +1,40 @@
 <script lang="ts">
     import { Line } from 'svelte-chartjs';
-    
     import {
-        Chart as ChartJS,
+        Chart as ChartJS, 
         LineElement,
         PointElement,
         LinearScale,
         CategoryScale,
-        Tooltip
+        Tooltip,
+        Chart
     } from 'chart.js';
-    import {
-     database
-} from 'wailsjs/go/models';
+
+    import { database } from 'wailsjs/go/models';
+
     ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip);
-    
-    export let cpuMetric: database.CpuMetrics[] = []; // Отримуємо масив CpuMetric
-    
-    // Перетворюємо дані з cpuMetric для графіку
-    let labels = [];
-    let cpuLoad = [];
-    let cpuTemp = [];
-    
-    $: {
-        labels = cpuMetric.map((metric) => metric.timestamp);  // Відображаємо мітки часу (або інше поле з вашого об'єкта)
-        cpuLoad = cpuMetric.map((metric) => metric.loadPercent);  // Завантаження процесора
-        cpuTemp = cpuMetric.map((metric) => metric.temperature);  // Температура процесора
+
+    export let cpuMetric: database.CpuMetrics[] = [];
+
+    let chartRef: Chart | null = null;
+
+    $:  metrics = [...cpuMetric].reverse();
+
+    // Оновлення графіку при зміні даних
+    $: if (chartRef && metrics.length > 0) {
+        chartRef.data.labels = metrics.map((m) => m.timestamp);
+        chartRef.data.datasets[0].data = metrics.map((m) => m.loadPercent);
+        chartRef.data.datasets[1].data = metrics.map((m) => m.temperature);
+        chartRef.update();
     }
-    
+
     const options = {
         responsive: true,
         maintainAspectRatio: false,
         elements: {
             line: {
                 borderWidth: 2,
-                tension: 0.8
+                tension: 0.3
             },
             point: {
                 radius: 0
@@ -49,46 +50,52 @@
         },
         scales: {
             x: {
-                display: false,  // Тепер відображаємо мітки по осі X
+                display: false,
                 title: {
                     display: false,
                     text: 'Time'
                 }
             },
             y: {
-                display: true, // Відображаємо ось Y
+                display: true,
                 beginAtZero: true,
                 suggestedMax: 100
             }
+        },
+        animation: {
+            duration: 100,
+            easing: 'easeOutQuart'
         }
     };
-    
+
+    // Дані графіка
     $: data = {
-        labels,
-        datasets: [{
+        labels: metrics.map((m) => m.timestamp),
+        datasets: [
+            {
                 label: 'CPU Load',
-                data: cpuLoad,
-                borderColor: '#82c821', // зелений
-                backgroundColor: 'rgba(130, 200, 33, 0.15)', // зелена заливка
+                data: metrics.map((m) => m.loadPercent),
+                borderColor: '#82c821',
+                backgroundColor: 'rgba(130, 200, 33, 0.15)',
                 fill: true
             },
             {
                 label: 'CPU Temp',
-                data: cpuTemp,
-                borderColor: '#17a9c0', // блакитний
-                backgroundColor: 'rgba(50, 205, 205, 0.15)', // блакитна заливка
+                data: metrics.map((m) => m.temperature),
+                borderColor: '#17a9c0',
+                backgroundColor: 'rgba(50, 205, 205, 0.15)',
                 fill: true
             }
         ]
     };
-    </script>
-    <style>
-    .chart-container {
-        height: 150px;
-    }
-    </style>
-    
-    <div class="chart-container">
-        <Line {data} {options} />
-    </div>
-    
+</script>
+
+<style>
+.chart-container {
+    height: 150px;
+}
+</style>
+
+<div class="chart-container">
+    <Line bind:chart={chartRef} {data} {options} />
+</div>

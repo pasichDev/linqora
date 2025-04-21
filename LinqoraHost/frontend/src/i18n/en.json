@@ -1,6 +1,8 @@
 {
     "settings": "Settings",
     "minimize": "Minimize",
-    "closeApp": "Close Application"
+    "closeApp": "Close Application",
+    "processes": "Processes",
+    "threads": "Threads"
   }
   

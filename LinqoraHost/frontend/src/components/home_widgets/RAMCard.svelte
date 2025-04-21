@@ -4,33 +4,52 @@ import {
     Badge,
     Card,
     Group,
-    Image,
+    Skeleton,
     Text
 } from '@svelteuidev/core';
 import {
-    backend
+    backend, database
 } from 'wailsjs/go/models';
+    import RamChart from '../RAMChart.svelte';
 
-export let usage: String;
-export let total: String;
-export let usagePercentage: String;
-export let ramLoad: number[] = [];
+
+export let ramInfo: backend.RamInfo | null = null;
+export let metricInfo: database.RAMMetrics[] | null = null;
+
+let lastMetrics: database.RAMMetrics | null;
+
+$: {
+    if (metricInfo.length > 0) {
+        lastMetrics = metricInfo.reverse()[metricInfo.length - 1]; 
+    } else {
+        lastMetrics = null; 
+    }
+}
 </script>
 <Card shadow='sm' padding='lg' radius="lg" color="dark">
 
+    {#if ramInfo && lastMetrics}
     <Group position="apart">
         <div>
             <Text weight="semibold" size="sm">RAM</Text>
             <Space h={5} />
-            <Text weight="medium" color="gray" size={10}>{usage} / {total} GB</Text>
+            <Text weight="medium" color="gray" size={10}>{lastMetrics.usage} / {ramInfo.total} GB</Text>
         </div>
 
         <Badge size="lg" radius="md" variant="filled" color="gray" style="align-self: center;">
-            {usagePercentage}%
+            {lastMetrics.loadPercent.toFixed(1)}%
         </Badge>
     </Group>
 
+    {:else}
+    <Group position="apart">
+        <Skeleton height={26} width={60} radius="md"   />
+        <Skeleton height={26} width={15} radius="md"   />
+    </Group>
+    
+    {/if}
 
 
+    <RamChart ramMetric={metricInfo}/>
 
 </Card>

@@ -5,6 +5,9 @@ type CPUMetrics struct {
 	Timestamp   string  `json:"timestamp"`
 	Temperature float64 `json:"temperature"`
 	LoadPercent float64 `json:"loadPercent"`
+	Processes   float64 `json:"processes"`
+	Threads     float64 `json:"threads"`
+	Frequencies float64 `json:"freq"`
 }
 
 type RAMMetrics struct {

@@ -88,6 +88,9 @@ export namespace database {
 	    timestamp: string;
 	    temperature: number;
 	    loadPercent: number;
+	    processes: number;
+	    threads: number;
+	    freq: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new CPUMetrics(source);
@@ -99,6 +102,9 @@ export namespace database {
 	        this.timestamp = source["timestamp"];
 	        this.temperature = source["temperature"];
 	        this.loadPercent = source["loadPercent"];
+	        this.processes = source["processes"];
+	        this.threads = source["threads"];
+	        this.freq = source["freq"];
 	    }
 	}
 	export class RAMMetrics {

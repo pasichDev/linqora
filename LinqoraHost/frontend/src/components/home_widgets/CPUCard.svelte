@@ -27,15 +27,13 @@ let lastMetrics: database.CpuMetric | null;
 
 $: {
     if (cpuMetrics.length > 0) {
-        lastMetrics = cpuMetrics[cpuMetrics.length - 1]; // Останній елемент масиву
+        lastMetrics = cpuMetrics.reverse()[cpuMetrics.length - 1]; // Останній елемент масиву
     } else {
         lastMetrics = null; // Якщо масив порожній
     }
 }
-
 </script>
 <Card shadow='sm' padding='lg' radius="lg" color="dark">
-
     <Group position="apart">
         <div>
             <Text weight="semibold" size="sm">CPU</Text>
@@ -52,7 +50,7 @@ $: {
 
         {#if lastMetrics}
         <Badge size="lg" radius="md" variant="filled" color="teal" style="align-self: center;" >
-           4.2 GHz
+            4.2 GHz
         </Badge>
         <Badge size="lg" radius="md" variant="filled" color="lime" style="align-self: center;">
             {lastMetrics.loadPercent.toFixed(2)}%
@@ -60,7 +58,7 @@ $: {
         <Badge size="lg" radius="md" variant="filled" color="cyan" style="align-self: center;" >
             {lastMetrics.temperature.toFixed(0)}℃
         </Badge>
-       
+
         {:else}
         <Skeleton height={26} width={15} radius="md"   />
         <Skeleton height={26} width={15} radius="md"   />
@@ -70,16 +68,19 @@ $: {
     </Group>
 
     <Space h="xs" />
-    <CpuChart cpuMetric={cpuMetrics} />
+    <CpuChart cpuMetric={cpuMetrics.reverse()} />
     <Divider color="dark" />
     <Space h="md" />
+
+    {#if lastMetrics}
+    {#if lastMetrics.processes !=0}
     <Group position='apart'>
         <Text weight={'medium'} size='xs'>{$_("processes")}</Text>
-        <Text weight={'medium'} size='xs'>519</Text>
-    </Group>
+        <Text weight={'medium'} size='xs'>{lastMetrics.processes}</Text>
+    </Group> {/if}
     <Space h="xs" />
-    <Group position='apart'>
+    {#if lastMetrics.threads !=0}  <Group position='apart'>
         <Text weight={'medium'} size='xs'>{$_("threads")}</Text>
-        <Text weight={'medium'} size='xs'>2000</Text>
-    </Group>
+        <Text weight={'medium'} size='xs'>{lastMetrics.threads}</Text>
+    </Group> {/if} {/if}
 </Card>
