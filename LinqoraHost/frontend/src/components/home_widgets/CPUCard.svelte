@@ -6,19 +6,22 @@ import {
     ThemeIcon,
     Text,
     Image,
-    Box,
     Divider,
-    Skeleton
+    Skeleton,
+    Card
 } from '@svelteuidev/core';
-import IconCpu from '../assets/images/cpu.svg'
+import IconCpu from '../../assets/images/cpu.svg'
 import {
     backend,
     database
 } from 'wailsjs/go/models';
+import {
+    _
+} from 'svelte-i18n';
 
 export let cpuInfo: backend.CpuInfo;
 export let cpuMetrics: database.CpuMetrics[];
-import CpuChart from './CpuChart.svelte';
+import CpuChart from '../CpuChart.svelte';
 
 let lastMetrics: database.CpuMetric | null;
 
@@ -30,14 +33,8 @@ $: {
     }
 }
 
-const labels = ['12:00', '12:01', '12:02', '12:03'];
-const cpuLoad = [5, 30, 60, 35];
-const cpuTemp = [30, 45, 55, 48];
 </script>
-<Box
-    css={{
-    padding: '$0 $8',
-    }}>
+<Card shadow='sm' padding='lg' radius="lg" color="dark">
 
     <Group position="apart">
         <div>
@@ -77,12 +74,12 @@ const cpuTemp = [30, 45, 55, 48];
     <Divider color="dark" />
     <Space h="md" />
     <Group position='apart'>
-        <Text weight={'medium'} size='xs'>Processes</Text>
+        <Text weight={'medium'} size='xs'>{$_("processes")}</Text>
         <Text weight={'medium'} size='xs'>519</Text>
     </Group>
     <Space h="xs" />
     <Group position='apart'>
-        <Text weight={'medium'} size='xs'>Theads</Text>
+        <Text weight={'medium'} size='xs'>{$_("threads")}</Text>
         <Text weight={'medium'} size='xs'>2000</Text>
     </Group>
-</Box>
+</Card>

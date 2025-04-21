@@ -5,8 +5,7 @@ import {
     Card,
     Group,
     Image,
-    Text,
-    Box
+    Text
 } from '@svelteuidev/core';
 import {
     backend
@@ -17,10 +16,7 @@ export let total: String;
 export let usagePercentage: String;
 export let ramLoad: number[] = [];
 </script>
-    <Box
-    css={{
-    padding: '$0 $8',
-    }}>
+<Card shadow='sm' padding='lg' radius="lg" color="dark">
 
     <Group position="apart">
         <div>
@@ -37,4 +33,4 @@ export let ramLoad: number[] = [];
 
 
 
-</Box>
+</Card>

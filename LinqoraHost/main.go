@@ -24,15 +24,15 @@ func main() {
 	*/
 
 	err := wails.Run(&options.App{
-		Title:         "LinqoraHost",
-		Width:         width,
-		Height:        height,
-		MinWidth:      width,
-		MinHeight:     height,
-		MaxWidth:      width,
-		MaxHeight:     height,
-		DisableResize: true, //заборонити зміну розміру
-		Frameless:     true,
+		Title:     "LinqoraHost",
+		Width:     width,
+		Height:    height,
+		MinWidth:  width,
+		MinHeight: height,
+		//MaxWidth:      width,
+		//MaxHeight:     height,
+		//	DisableResize: true, //заборонити зміну розміру
+		Frameless: true,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},

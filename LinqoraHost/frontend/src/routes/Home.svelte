@@ -1,12 +1,13 @@
 <script lang="ts">
 import {
     Stack,
-    Divider
+    Space,
+    SimpleGrid
 
 } from '@svelteuidev/core';
-import CpuCard from '.././components/CPUCard.svelte';
-import RamCard from '.././components/RAMCard.svelte';
-import SpaceCard from '.././components/SpaceCard.svelte';
+import CpuCard from '../components/home_widgets/CPUCard.svelte';
+import RamCard from '../components/home_widgets/RAMCard.svelte';
+import SpaceCard from '../components/home_widgets/SpaceCard.svelte';
 import {
     FetchSystemInfo
 } from "../../wailsjs/go/main/App";
@@ -37,18 +38,23 @@ onMount(async () => {
 </script>
 
 <Stack align="strech" >
-    {#if systemInfo}
-    <CpuCard cpuInfo={systemInfo.cpu_info} cpuMetrics={CpuMetrics} />
-    <Divider color="dark" />
-    <RamCard
-        usage={ram.usage?.toFixed(1)}
-        total = {systemInfo.ram_info.total}
-        usagePercentage =  {ram.loadPercent?.toFixed(1)}
-      />
-    <Divider color="dark" />
-    <SpaceCard systemDiskInfo={systemInfo.system_disk} />
-    {:else}
-    <p>Завантаження...</p>
-    {/if}
+
+    <SimpleGrid  breakpoints={[{ minWidth: 800, cols: 3, spacing: 'xl' }]} >
+        <Space/>
+        {#if systemInfo}
+        <CpuCard cpuInfo={systemInfo.cpu_info} cpuMetrics={CpuMetrics} />
+     
+        <RamCard
+            usage={ram.usage?.toFixed(1)}
+            total = {systemInfo.ram_info.total}
+            usagePercentage =  {ram.loadPercent?.toFixed(1)}
+          />
+      
+        <SpaceCard systemDiskInfo={systemInfo.system_disk} />
+        {:else}
+        <p>Завантаження...</p>
+        {/if}
+    </SimpleGrid>
+ 
 
 </Stack>

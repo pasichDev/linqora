@@ -25,5 +25,9 @@
     font-weight: 600;
     font-size: large;
   }
-
+  
+  html, body, #app {
+    height: 100%;
+    overflow: hidden;
+  }
   

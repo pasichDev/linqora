@@ -25,8 +25,8 @@ const close = () => {
 };
 </script>
 
-<header style="--wails-draggable:drag ">
-    <Paper shadow="md" padding={2} >
+<header style="--wails-draggable:drag">
+    <Paper shadow="md" padding={5} >
         <Group position="apart" >
             <Text size="sm" weight="bold">LinqoraHost</Text>
             <Group spacing="xs" class="no-drag">

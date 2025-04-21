@@ -3,7 +3,7 @@ import {
     Space,
     Progress,
     Group,
-    Box,
+    Card,
     Text,
     Badge
 } from '@svelteuidev/core';
@@ -17,10 +17,7 @@ $: usagePercentage = (systemDiskInfo.total && !isNaN(systemDiskInfo.usage)) ?
     ((systemDiskInfo.usage / systemDiskInfo.total) * 100).toFixed(2) :
     "0.00";
 </script>
-<Box
-    css={{
-    padding: '$0 $8',
-    }}>
+<Card shadow='sm' padding='lg' radius="lg" color="dark">
 
     <Group position='apart'>
         <div>
@@ -36,4 +33,4 @@ $: usagePercentage = (systemDiskInfo.total && !isNaN(systemDiskInfo.usage)) ?
                 <Space h="md" />
                 <Progress value={parseFloat(usagePercentage)}  size="md" radius="md" />
 
-                </Box>
+                </Card>

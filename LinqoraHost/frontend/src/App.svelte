@@ -3,6 +3,7 @@ import {
     SvelteUIProvider,
     AppShell,
     Header,
+    ShellSection
 } from '@svelteuidev/core';
 import TitleBar from './components/TitleBar.svelte';
 import Home from './routes/Home.svelte';
@@ -27,12 +28,14 @@ const routes = {
 
 <SvelteUIProvider withGlobalStyles themeObserver={'dark'}>
 
-    <AppShell padding={0}>
+    <AppShell fixed
+        navbarOffsetBreakpoint="sm"
+        asideOffsetBreakpoint="sm" padding={5} style="height: 100vh; display: flex; flex-direction: column;">
 
-        <Header slot="header" zIndex={10} height={24} >    <TitleBar /></Header>
-        <slot>
+        <Header slot="header"  height={32} fixed>    <TitleBar /></Header>
+        <ShellSection   grow>
 
             <Router {routes} />
 
-        </slot>
+        </ShellSection>
     </AppShell>  </SvelteUIProvider>
