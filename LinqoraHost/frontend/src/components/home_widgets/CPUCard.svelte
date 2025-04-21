@@ -49,9 +49,7 @@ $: {
     <Group position="left">
 
         {#if lastMetrics}
-        <Badge size="lg" radius="md" variant="filled" color="teal" style="align-self: center;" >
-            4.2 GHz
-        </Badge>
+     
         <Badge size="lg" radius="md" variant="filled" color="lime" style="align-self: center;">
             {lastMetrics.loadPercent.toFixed(2)}%
         </Badge>
@@ -60,7 +58,7 @@ $: {
         </Badge>
 
         {:else}
-        <Skeleton height={26} width={15} radius="md"   />
+ 
         <Skeleton height={26} width={15} radius="md"   />
         <Skeleton height={26} width={15} radius="md"   />
         {/if}

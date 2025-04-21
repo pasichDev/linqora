@@ -2,9 +2,9 @@ package backend
 
 // SystemInfoInitial з інформацією про систему
 type SystemInfoInitial struct {
-	CpuInfo    CpuInfo        `json:"cpu_info"`
-	RamInfo    RamInfo        `json:"ram_info"`
-	SystemDisk SystemDiskInfo `json:"system_disk"`
+	CpuInfo    CpuInfo          `json:"cpu_info"`
+	RamInfo    RamInfo          `json:"ram_info"`
+	SystemDisk []SystemDiskInfo `json:"system_disk"`
 }
 
 type SystemDiskInfo struct {
@@ -30,11 +30,13 @@ func NewDefaultSystemInfo() SystemInfoInitial {
 		RamInfo: RamInfo{
 			Total: 0,
 		},
-		SystemDisk: SystemDiskInfo{
-			Total: 0,
-			Usage: 0,
-			Model: "Unknown Disk",
-			Type:  "Unknown",
+		SystemDisk: []SystemDiskInfo{
+			{
+				Total: 0,
+				Usage: 0,
+				Model: "Unknown Disk",
+				Type:  "Unknown",
+			},
 		},
 	}
 }

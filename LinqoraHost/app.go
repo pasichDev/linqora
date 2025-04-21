@@ -48,7 +48,7 @@ func (a *App) startSimulationLoop() {
 			v, _ := mem.VirtualMemory()
 			ram := database.RAMMetrics{
 				LoadPercent: v.UsedPercent,
-				Usage:       math.Round((float64(v.Used)/1024/1024/1024)*100) / 100,
+				Usage:       math.Round((float64(v.Used)/1_000_000_000)*100) / 100,
 			}
 
 			// Запис у БД

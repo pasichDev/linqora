@@ -45,7 +45,7 @@ export namespace backend {
 	export class SystemInfoInitial {
 	    cpu_info: CpuInfo;
 	    ram_info: RamInfo;
-	    system_disk: SystemDiskInfo;
+	    system_disk: SystemDiskInfo[];
 	
 	    static createFrom(source: any = {}) {
 	        return new SystemInfoInitial(source);

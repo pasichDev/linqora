@@ -7,7 +7,10 @@ import {
     Button,
     Text,
     Paper,
-    Tooltip
+    Tooltip,
+
+    Space
+
 } from '@svelteuidev/core';
 import * as runtime from '../../wailsjs/runtime/runtime';
 import {
@@ -28,7 +31,9 @@ const close = () => {
 <header style="--wails-draggable:drag">
     <Paper shadow="md" padding={5} >
         <Group position="apart" >
-            <Text size="sm" weight="bold">LinqoraHost</Text>
+            
+            <div style="padding-left: 10px;">
+            <Text size="sm" weight="bold">LinqoraHost</Text> </div>
             <Group spacing="xs" class="no-drag">
                 <Tooltip label={$_("settings")} openDelay={500}>
                     <Button variant="subtle" color="gray" size="xs" href="#/settings">
