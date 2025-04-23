@@ -9,6 +9,7 @@ require github.com/shirou/gopsutil v3.21.11+incompatible
 require (
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/ebitengine/purego v0.8.2 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/jchv/go-winloader v0.0.0-20210711035445-715c2860da7e // indirect
@@ -44,6 +45,7 @@ require (
 
 require (
 	github.com/go-ole/go-ole v1.3.0 // indirect
+	github.com/shirou/gopsutil/v4 v4.25.3
 	github.com/wailsapp/wails/v2 v2.10.1
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	golang.org/x/sys v0.31.0 // indirect

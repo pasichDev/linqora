@@ -28,7 +28,7 @@ func NewApp() *App {
 func (a *App) startSimulationLoop() {
 	go func() {
 		for {
-			time.Sleep(2 * time.Second)
+			time.Sleep(1 * time.Second)
 
 			modelCpu, cpuMetricErr := cpu.GetCPUMetricsRealTime()
 			modelRam, ramMetricErr := ram.GetRAMMetricsRealTime()

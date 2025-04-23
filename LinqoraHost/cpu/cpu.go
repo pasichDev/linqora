@@ -1,11 +1,13 @@
 package cpu
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/shirou/gopsutil/cpu"
-	"github.com/shirou/gopsutil/host"
 	"github.com/shirou/gopsutil/process"
+	"github.com/shirou/gopsutil/v4/sensors"
 )
 
 type CPUMetrics struct {
@@ -52,23 +54,41 @@ func GetCPULoad() (float64, error) {
 	return 0, nil
 }
 
-// GetCPUTemperature повертає температуру CPU, якщо можливо
+// GetCPUTemperature знаходить найрелевантнішу температуру CPU
 func GetCPUTemperature() (float64, error) {
-	sensors, err := host.SensorsTemperatures()
+	temps, err := sensors.SensorsTemperatures()
 	if err != nil {
 		return 0, err
 	}
-	for _, sensor := range sensors {
-		// Спробуємо знайти щось, що схоже на температуру CPU
-		if sensor.SensorKey == "Package id 0" || sensor.SensorKey == "Tdie" || sensor.SensorKey == "Core 0" {
-			return sensor.Temperature, nil
+
+	var cpuTemp float64
+	var found bool
+
+	// Пріоритетність за сенсорами
+	for _, t := range temps {
+		key := strings.ToLower(t.SensorKey)
+
+		if strings.Contains(key, "tctl") || // AMD Tctl
+			strings.Contains(key, "package") || // Intel Package
+			strings.Contains(key, "core") || // Intel Core
+			strings.Contains(key, "cpu") { // універсально
+
+			// Винятки — ігноруємо "acpitz" як менш точне джерело
+			if strings.Contains(key, "acpitz") {
+				continue
+			}
+
+			cpuTemp = t.Temperature
+			found = true
+			break
 		}
 	}
-	// Якщо не знайшли нічого специфічного — повернемо перший
-	if len(sensors) > 0 {
-		return sensors[0].Temperature, nil
+
+	if !found {
+		return 0, fmt.Errorf("CPU temperature not found")
 	}
-	return 0, nil
+
+	return cpuTemp, nil
 }
 
 func GetProcessesAndThreads() (int, int, error) {
