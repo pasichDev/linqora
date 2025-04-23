@@ -10,11 +10,13 @@
         Chart
     } from 'chart.js';
 
-    import { database } from 'wailsjs/go/models';
+    import {
+    cpu
+} from 'wailsjs/go/models';
 
     ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip);
 
-    export let cpuMetric: database.CpuMetrics[] = [];
+    export let cpuMetric: cpu.CpuMetrics[] = [];
 
     let chartRef: Chart | null = null;
 

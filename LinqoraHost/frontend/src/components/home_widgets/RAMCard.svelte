@@ -8,15 +8,17 @@ import {
     Text
 } from '@svelteuidev/core';
 import {
-    backend, database
+    ram,
+    systeminfo
 } from 'wailsjs/go/models';
-    import RamChart from '../RAMChart.svelte';
+
+    import RamChart from '../charts/RAMChart.svelte';
 
 
-export let ramInfo: backend.RamInfo | null = null;
-export let metricInfo: database.RAMMetrics[] | null = null;
+export let ramInfo: systeminfo.RamInfo | null = null;
+export let metricInfo: ram.RAMMetrics[] | null = null;
 
-let lastMetrics: database.RAMMetrics | null;
+let lastMetrics: ram.RAMMetrics | null;
 
 $: {
     if (metricInfo.length > 0) {

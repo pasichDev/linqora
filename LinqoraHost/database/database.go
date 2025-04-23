@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"log"
 
+	"LinqoraHost/cpu"
+	"LinqoraHost/ram"
+
 	_ "modernc.org/sqlite" // Pure Go SQLite driver
 )
 
@@ -83,7 +86,7 @@ func ClearTable(tableName string) error {
 	return err
 }
 
-func InsertCPUMetric(m CPUMetrics) error {
+func InsertCPUMetric(m cpu.CPUMetrics) error {
 	_, err := DB.Exec(
 		`INSERT INTO cpu_metric (temperature, load_percent, processes, threads, freq) VALUES (?, ?, ?, ?, ?)`,
 		m.Temperature, m.LoadPercent, m.Processes, m.Threads, m.Frequencies,
@@ -91,13 +94,13 @@ func InsertCPUMetric(m CPUMetrics) error {
 	return err
 }
 
-func InsertRAMMetric(m RAMMetrics) error {
+func InsertRAMMetric(m ram.RAMMetrics) error {
 	_, err := DB.Exec(`INSERT INTO ram_metric (usage, load_percent) VALUES (?, ?)`,
 		m.Usage, m.LoadPercent)
 	return err
 }
 
-func GetCPUMetrics(count int) ([]CPUMetrics, error) {
+func GetCPUMetrics(count int) ([]cpu.CPUMetrics, error) {
 	rows, err := DB.Query(`
 		SELECT id, timestamp, temperature, load_percent, processes, threads, freq 
 		FROM cpu_metric 
@@ -108,9 +111,9 @@ func GetCPUMetrics(count int) ([]CPUMetrics, error) {
 	}
 	defer rows.Close()
 
-	var metrics []CPUMetrics
+	var metrics []cpu.CPUMetrics
 	for rows.Next() {
-		var metric CPUMetrics
+		var metric cpu.CPUMetrics
 
 		if err := rows.Scan(
 			&metric.ID,
@@ -134,19 +137,17 @@ func GetCPUMetrics(count int) ([]CPUMetrics, error) {
 	return metrics, nil
 }
 
-// Оновлений код для отримання всіх RAM-метрик
-func GetRAMMetrics(count int) ([]RAMMetrics, error) {
+func GetRAMMetrics(count int) ([]ram.RAMMetrics, error) {
 	rows, err := DB.Query(`SELECT id, timestamp, usage, load_percent FROM ram_metric ORDER BY timestamp DESC LIMIT ?`, count)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var metrics []RAMMetrics
+	var metrics []ram.RAMMetrics
 	for rows.Next() {
-		var metric RAMMetrics
+		var metric ram.RAMMetrics
 
-		// Оновлений rows.Scan для всіх полів
 		if err := rows.Scan(&metric.ID,
 			&metric.Timestamp, &metric.Usage, &metric.LoadPercent); err != nil {
 			return nil, err
@@ -160,4 +161,17 @@ func GetRAMMetrics(count int) ([]RAMMetrics, error) {
 	}
 
 	return metrics, nil
+}
+
+func ClearMetreicsTables() error {
+	tables := []string{TABLE_RAM_METRIC, TABLE_CPU_METRIC}
+
+	for _, table := range tables {
+		err := ClearTable(table)
+		if err != nil {
+			return fmt.Errorf("failed to clear table %s: %w", table, err)
+		}
+	}
+
+	return nil
 }

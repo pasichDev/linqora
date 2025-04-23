@@ -18,11 +18,11 @@ import type {
     ScatterDataPoint
 } from 'chart.js';
 import {
-    database
+    ram
 } from 'wailsjs/go/models';
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip);
 
-export let ramMetric: database.RAMMetrics[] = [];
+export let ramMetric: ram.RAMMetrics[] = [];
 
 
 let chartRef: Chart<"line", (number | ScatterDataPoint)[], unknown> | null = null;

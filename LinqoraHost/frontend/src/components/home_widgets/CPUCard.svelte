@@ -12,18 +12,19 @@ import {
 } from '@svelteuidev/core';
 import IconCpu from '../../assets/images/cpu.svg'
 import {
-    backend,
-    database
+    cpu,
+    systeminfo
 } from 'wailsjs/go/models';
+
 import {
     _
 } from 'svelte-i18n';
 
-export let cpuInfo: backend.CpuInfo;
-export let cpuMetrics: database.CpuMetrics[];
-import CpuChart from '../CpuChart.svelte';
+export let cpuInfo: systeminfo.CpuInfo;
+export let cpuMetrics: cpu.CpuMetrics[];
+import CpuChart from '../charts/CpuChart.svelte';
 
-let lastMetrics: database.CpuMetric | null;
+let lastMetrics: cpu.CpuMetric | null;
 
 $: {
     if (cpuMetrics.length > 0) {
