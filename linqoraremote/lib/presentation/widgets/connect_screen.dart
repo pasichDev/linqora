@@ -5,9 +5,7 @@ import 'package:loading_animation_widget/loading_animation_widget.dart';
 import '../controllers/device_home_controller.dart';
 
 class ConnectScreen extends StatelessWidget {
-  final String codeDevice;
-
-  const ConnectScreen({super.key, required this.codeDevice});
+  const ConnectScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +20,25 @@ class ConnectScreen extends StatelessWidget {
           size: 60,
         ),
         const SizedBox(height: 30),
-        Obx(() => Text("Підключення ${controller.deviceCode.value}")),
+        Obx(
+          () =>
+              controller.mdnsConnectingStatus.value  ==
+                  MDnsStatus.connected
+                  ? Text(
+                    "Знайдено пристрій з кодом: ${controller.deviceCode.value} \n Встановлюємо з'єднання через WebSocket...",
+                    textAlign: TextAlign.center,
+                  )
+                  : controller.mdnsConnectingStatus.value ==
+                      MDnsStatus.connecting
+                  ? Obx(
+                    () => Text(
+                      "Пошук пристрою з кодом: ${controller.deviceCode.value}...\nБудь ласка, зачекайте.",
+                      textAlign: TextAlign.center,
+                    ),
+                  )
+                  : SizedBox(),
+        ),
+
         const SizedBox(height: 40),
         OutlinedButton(
           onPressed: () => controller.cancelConnection(),

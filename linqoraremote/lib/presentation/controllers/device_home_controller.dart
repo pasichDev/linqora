@@ -5,6 +5,8 @@ import '../../data/models/discovered_service.dart';
 import '../../data/providers/mdns_provider.dart';
 import '../../data/providers/websocket_provider.dart';
 
+enum MDnsStatus { connecting, connected, cancel, ws }
+
 class DeviceHomeController extends GetxController {
   final MDnsProvider mdnsProvider;
   final WebSocketProvider webSocketProvider;
@@ -15,11 +17,11 @@ class DeviceHomeController extends GetxController {
   });
 
   final RxList<DiscoveredService> devices = <DiscoveredService>[].obs;
-  final RxBool isConnecting = true.obs;
   final RxBool isConnected = false.obs;
   final RxString selectedDeviceIp = ''.obs;
   final RxString deviceCode = '0'.obs;
   final RxInt selectedMenuIndex = (-1).obs;
+  final Rx<MDnsStatus> mdnsConnectingStatus = MDnsStatus.connecting.obs;
 
   @override
   void onInit() {
@@ -38,30 +40,36 @@ class DeviceHomeController extends GetxController {
   }
 
   void startDiscovery() async {
-    isConnecting.value = true;
+    mdnsConnectingStatus.value = MDnsStatus.connecting;
     var mErrorDiscovery = false;
-
+    mdnsProvider.onConnected = () {
+      mdnsConnectingStatus.value = MDnsStatus.connected;
+    };
+    mdnsProvider.onEmpty = () {
+      mErrorDiscovery = false;
+      mdnsConnectingStatus.value = MDnsStatus.cancel;
+    };
     try {
       devices.value = await mdnsProvider.discoverDevices(deviceCode.value);
       if (devices.isNotEmpty && devices[0].address != null) {
         connectToDevice(devices[0].address!);
       } else {
-        isConnecting.value = false;
+        mdnsConnectingStatus.value = MDnsStatus.cancel;
         mErrorDiscovery = true;
       }
     } catch (e) {
       if (kDebugMode) {
         print('Помилка при пошуку пристроїв: $e');
       }
-      isConnecting.value = false;
+      mdnsConnectingStatus.value = MDnsStatus.cancel;
       mErrorDiscovery = true;
     }
 
     if (mErrorDiscovery) {
       Get.back(result: {'status': 'cancel'});
       Get.snackbar(
-        'Втрачено з\'єднання',
         'Пристрій недоступний',
+        'Встановити з\'єднання з пристроєм не вдалося',
         snackPosition: SnackPosition.BOTTOM,
       );
     }
@@ -72,31 +80,26 @@ class DeviceHomeController extends GetxController {
 
     webSocketProvider.onConnected = () {
       isConnected.value = true;
-      isConnecting.value = false;
+      mdnsConnectingStatus.value = MDnsStatus.ws;
     };
 
     webSocketProvider.onDisconnected = () {
       isConnected.value = false;
-      Get.back(result: {'status': 'cancel'});
-      Get.snackbar(
-        'Втрачено з\'єднання',
-        'Пристрій недоступний',
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      if (mdnsConnectingStatus.value == MDnsStatus.ws) {
+        Get.back(result: {'status': 'cancel'});
+        Get.snackbar(
+          'Втрачено з\'єднання',
+          'Пристрій недоступний',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
     };
-
-    /* webSocketProvider.onError = (error) {
-      isConnected.value = false;
-      Get.snackbar('Помилка з\'єднання', 'Сталася помилка: $error');
-    };
-
-    */
 
     webSocketProvider.connect(ip, 8070);
   }
 
   void cancelConnection() {
-    isConnecting.value = false;
+    mdnsConnectingStatus.value = MDnsStatus.cancel;
     Get.back(result: {'status': 'cancel'});
   }
 

@@ -5,6 +5,9 @@ import 'package:multicast_dns/multicast_dns.dart';
 import '../models/discovered_service.dart';
 
 class MDnsProvider {
+  Function()? onConnected;
+  Function()? onEmpty;
+
   Future<void> enableMulticast() async {
     const wifiMulticastChannel = MethodChannel('android.net.wifi.WifiManager');
     try {
@@ -37,6 +40,7 @@ class MDnsProvider {
       if (kDebugMode) {
         print('Знайшов PTR: ${ptr.domainName}');
       }
+      onConnected?.call();
       await for (final SrvResourceRecord srv in client
           .lookup<SrvResourceRecord>(
             ResourceRecordQuery.service(ptr.domainName),
@@ -55,6 +59,9 @@ class MDnsProvider {
       }
     }
 
+    if (devices.isEmpty) {
+      onEmpty?.call();
+    }
     client.stop();
     return devices;
   }
