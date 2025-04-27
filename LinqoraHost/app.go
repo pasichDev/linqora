@@ -79,7 +79,7 @@ func (a *App) startWebSocketServer() {
 
 func registerMDNSService() {
 	// Реєструємо mDNS сервіс
-	server, err := zeroconf.Register("monitor-test", "_monitor._tcp", "local.", 8070, nil, nil)
+	server, err := zeroconf.Register("monitor-test", "_222222._tcp", "local.", 8070, nil, nil)
 	if err != nil {
 		log.Fatal("mDNS registration failed:", err)
 	}
