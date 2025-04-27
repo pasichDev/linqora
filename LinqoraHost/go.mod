@@ -4,10 +4,15 @@ go 1.23.0
 
 toolchain go1.23.8
 
-require github.com/shirou/gopsutil v3.21.11+incompatible
+require (
+	github.com/gorilla/websocket v1.5.3
+	github.com/grandcat/zeroconf v1.0.0
+	github.com/shirou/gopsutil v3.21.11+incompatible
+)
 
 require (
 	github.com/bep/debounce v1.2.1 // indirect
+	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/ebitengine/purego v0.8.2 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
@@ -21,6 +26,7 @@ require (
 	github.com/leaanthony/u v1.1.1 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/miekg/dns v1.1.27 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pkg/errors v0.9.1 // indirect
