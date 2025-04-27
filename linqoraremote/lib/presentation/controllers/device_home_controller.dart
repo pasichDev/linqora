@@ -23,6 +23,7 @@ class DeviceHomeController extends GetxController {
   final RxInt selectedMenuIndex = (-1).obs;
   final Rx<MDnsStatus> mdnsConnectingStatus = MDnsStatus.connecting.obs;
 
+
   @override
   void onInit() {
     super.onInit();

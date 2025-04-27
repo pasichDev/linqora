@@ -26,13 +26,6 @@ class DashboardScreen extends StatelessWidget {
       if (controller.selectedMenuIndex.value >= 0) {
         return Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => controller.selectMenuItem(-1),
-              ),
-            ),
             Expanded(
               child: menuOptions[controller.selectedMenuIndex.value]['view'],
             ),

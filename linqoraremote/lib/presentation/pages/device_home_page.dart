@@ -16,14 +16,16 @@ class DeviceHomePage extends GetView<DeviceHomeController> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.transparent,
         title: const Text('Назва пристрою'),
-        centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () async {
-            if (controller.isConnected.value) {
+            if (controller.selectedMenuIndex.value != -1) {
+              controller.selectMenuItem(-1);
+              return;
+            }
+            if (controller.isConnected.value &&
+                controller.selectedMenuIndex.value == -1) {
               final result = await Get.dialog<bool>(
                 AlertDialog(
                   title: const Text('Підтвердження'),

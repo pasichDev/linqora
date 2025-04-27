@@ -43,9 +43,9 @@ class ConnectScreen extends StatelessWidget {
         OutlinedButton(
           onPressed: () => controller.cancelConnection(),
           style: OutlinedButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            foregroundColor: Theme.of(context).colorScheme.onPrimary,
-            minimumSize: const Size(120, 50),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            foregroundColor: Theme.of(context).colorScheme.onError,
+            minimumSize: const Size(80, 40),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
