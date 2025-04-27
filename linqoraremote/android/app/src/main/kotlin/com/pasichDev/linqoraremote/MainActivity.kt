@@ -1,4 +1,4 @@
-package com.example.linqoraremote
+package com.pasichDev.linqoraremote
 
 import io.flutter.embedding.android.FlutterActivity
 
