@@ -3,14 +3,15 @@ package main
 import (
 	"LinqoraHost/internal/config"
 	"LinqoraHost/internal/metrics"
+	"bufio"
 	"fmt"
-	"log"
 	"math/rand"
 	"os"
 	"os/signal"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -29,6 +30,10 @@ var (
 	// Глобальні змінні для флагів
 	port     int
 	authCode string
+	server   *LinqoraHost.Server // Глобальна змінна для доступу до сервера
+	stopCh   chan struct{}       // Канал для сигналу зупинки
+	restart  chan struct{}       // Канал для сигналу перезапуску
+	serverMu sync.Mutex          // М'ютекс для безпечного доступу до сервера
 
 	// Головна команда
 	rootCmd = &cobra.Command{
@@ -56,6 +61,10 @@ func init() {
 	// Додаємо флаги
 	rootCmd.Flags().IntVarP(&port, "port", "p", 8070, "Порт для WebSocket сервера")
 	rootCmd.Flags().StringVarP(&authCode, "code", "c", "", "Код автентифікації (6 цифр)")
+
+	// Ініціалізуємо канали
+	stopCh = make(chan struct{})
+	restart = make(chan struct{})
 }
 
 // Перевіряє, чи рядок складається тільки з 6 цифр
@@ -71,6 +80,123 @@ func generateAuthCode() string {
 	return strconv.Itoa(code)
 }
 
+// startCommandProcessor запускає обробник команд з консолі
+func startCommandProcessor() {
+	scanner := bufio.NewScanner(os.Stdin)
+	fmt.Println("Введіть команду (help - для списку команд):")
+
+	for {
+		if scanner.Scan() {
+			command := scanner.Text()
+			processCommand(command)
+		} else {
+			break
+		}
+	}
+}
+
+// processCommand обробляє введену команду
+func processCommand(command string) {
+	command = strings.TrimSpace(strings.ToLower(command))
+	args := strings.Fields(command)
+
+	if len(args) == 0 {
+		return
+	}
+
+	switch args[0] {
+	case "help", "?":
+		showHelp()
+	case "restart":
+		restartServer()
+	case "stop", "exit", "quit":
+		stopServer()
+	case "send":
+		if len(args) > 1 {
+			sendFile(args[1:])
+		} else {
+			fmt.Println("Використання: send <шлях_до_файлу>")
+		}
+	case "code", "changecode":
+		if len(args) > 1 {
+			changeCode(args[1])
+		} else {
+			fmt.Println("Використання: code <новий_код>")
+		}
+	case "status":
+		showStatus()
+	default:
+		fmt.Println("Невідома команда. Введіть 'help' для списку команд.")
+	}
+}
+
+// showHelp виводить список доступних команд
+func showHelp() {
+	fmt.Println("Доступні команди:")
+	fmt.Println("  help, ?      - Показати цей список команд")
+	fmt.Println("  restart      - Перезапустити сервер")
+	fmt.Println("  stop, exit   - Зупинити сервер і вийти")
+	fmt.Println("  send <файл>  - Передати файл")
+	fmt.Println("  code <код>   - Змінити код автентифікації")
+	fmt.Println("  status       - Показати статус сервера")
+}
+
+// restartServer перезапускає сервер
+func restartServer() {
+	fmt.Println("Перезапуск сервера...")
+
+	// Сигнал для перезапуску сервера
+	restart <- struct{}{}
+}
+
+// stopServer зупиняє сервер
+func stopServer() {
+	fmt.Println("Зупинення сервера...")
+
+	// Сигнал для зупинки сервера
+	close(stopCh)
+}
+
+// sendFile обробляє команду передачі файлу
+func sendFile(args []string) {
+	if len(args) < 1 {
+		fmt.Println("Не вказано шлях до файлу")
+		return
+	}
+
+	filePath := args[0]
+	fmt.Printf("Підготовка до передачі файлу: %s\n", filePath)
+	fmt.Println("Функція передачі файлів ще не реалізована.")
+}
+
+// changeCode змінює код автентифікації
+func changeCode(newCode string) {
+	if !isValidAuthCode(newCode) {
+		fmt.Println("Помилка: Код автентифікації повинен складатися з 6 цифр")
+		return
+	}
+
+	fmt.Printf("Зміна коду автентифікації на: %s\n", newCode)
+	fmt.Println("Необхідно перезапустити сервер для застосування змін.")
+	fmt.Print("Перезапустити зараз? (y/n): ")
+
+	scanner := bufio.NewScanner(os.Stdin)
+	if scanner.Scan() && strings.ToLower(scanner.Text()) == "y" {
+		authCode = newCode
+		restartServer()
+	}
+}
+
+// showStatus показує поточний статус сервера
+func showStatus() {
+	fmt.Println("====================================================")
+	fmt.Println("                 СТАТУС СЕРВЕРА                     ")
+	fmt.Println("====================================================")
+	fmt.Printf("Порт:             %d\n", port)
+	fmt.Printf("Код автентифікації: %s\n", authCode)
+	fmt.Println("Сервер активний: Так")
+}
+
 func runServer(cmd *cobra.Command, args []string) {
 	// Виводимо заголовок
 	fmt.Println("====================================================")
@@ -83,6 +209,7 @@ func runServer(cmd *cobra.Command, args []string) {
 	codeStr := authCode
 	if codeStr == "" {
 		codeStr = generateAuthCode()
+		authCode = codeStr // Зберігаємо для глобального доступу
 	} else if !isValidAuthCode(codeStr) {
 		fmt.Println("Помилка: Код автентифікації повинен складатися з 6 цифр")
 		os.Exit(1)
@@ -90,7 +217,7 @@ func runServer(cmd *cobra.Command, args []string) {
 
 	// Вивід додаткової системної інформації
 	fmt.Printf("Хост IP:     %s\n", deviceInfo.IP)
-	fmt.Printf("Порт:        %s\n", deviceInfo.PORT)
+	fmt.Printf("Порт:        %d\n", port)
 	fmt.Printf("ОС:          %s\n", deviceInfo.OS)
 	fmt.Println("═════════════════════════════════════════════════")
 	fmt.Printf("КОД АВТЕНТИФІКАЦІЇ:          %s\n", codeStr)
@@ -111,47 +238,82 @@ func runServer(cmd *cobra.Command, args []string) {
 	fmt.Println(strings.Repeat("─", 50))
 	fmt.Println()
 
-	// Створюємо конфігурацію сервера
-	cfg := &config.ServerConfig{
-		Port:       port,
-		MDNSName:   "linqora_host",
-		MDNSType:   "_" + codeStr + "._tcp",
-		MDNSDomain: "local.",
-		ValidDeviceIDs: map[string]bool{
-			codeStr: true,
-		},
-		MetricsInterval: 2 * 1000000000, // 2 секунди в наносекундах
-	}
+	// Запускаємо обробник команд у окремій горутині
+	go startCommandProcessor()
 
-	// Повідомлення про підготовку до запуску
-	fmt.Println("Підготовка до запуску сервера...")
-	fmt.Println("Натисніть Ctrl+C для виходу")
-	fmt.Println()
-
-	// Створюємо новий сервер
-	server := LinqoraHost.NewServer(cfg)
-
-	// Обробка сигналів для коректного завершення
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
-
-	// Запускаємо сервер у goroutine
-	go func() {
-		if err := server.Start(); err != nil {
-			log.Fatalf("Server error: %v", err)
+	// Запускаємо сервер у циклі для можливості перезапуску
+	for {
+		// Створюємо конфігурацію сервера
+		cfg := &config.ServerConfig{
+			Port:       port,
+			MDNSName:   "linqora_host",
+			MDNSType:   "_" + codeStr + "._tcp",
+			MDNSDomain: "local.",
+			ValidDeviceIDs: map[string]bool{
+				codeStr: true,
+			},
+			MetricsInterval: 2 * 1000000000, // 2 секунди в наносекундах
 		}
-	}()
 
-	fmt.Println(strings.Repeat("─", 50))
-	fmt.Println()
+		// Повідомлення про підготовку до запуску
+		fmt.Println("Підготовка до запуску сервера...")
+		fmt.Println()
 
-	// Очікуємо на сигнал завершення
-	<-sigCh
-	fmt.Println("\nВимикання сервера...")
+		// Створюємо новий сервер
+		serverMu.Lock()
+		server = LinqoraHost.NewServer(cfg)
+		serverMu.Unlock()
 
-	// Зупиняємо сервер
-	server.Shutdown()
-	fmt.Println("Сервер зупинено")
+		// Обробка сигналів для коректного завершення
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+
+		// Запускаємо сервер у goroutine
+		serverErrCh := make(chan error, 1)
+		go func() {
+			err := server.Start()
+			if err != nil {
+				serverErrCh <- err
+			}
+		}()
+
+		fmt.Println("Сервер запущено. Очікування команд або підключень...")
+		fmt.Println(strings.Repeat("─", 50))
+		fmt.Println()
+
+		// Очікуємо на сигнали
+		select {
+		case <-stopCh:
+			fmt.Println("\nВимикання сервера...")
+			serverMu.Lock()
+			server.Shutdown()
+			serverMu.Unlock()
+			fmt.Println("Сервер зупинено")
+			return // Виходимо з програми
+
+		case <-restart:
+			fmt.Println("\nПерезапуск сервера...")
+			serverMu.Lock()
+			server.Shutdown()
+			serverMu.Unlock()
+			fmt.Println("Сервер зупинено, підготовка до перезапуску...")
+			continue // Продовжуємо цикл для перезапуску
+
+		case <-sigCh:
+			fmt.Println("\nОтримано сигнал переривання...")
+			serverMu.Lock()
+			server.Shutdown()
+			serverMu.Unlock()
+			fmt.Println("Сервер зупинено")
+			return // Виходимо з програми
+
+		case err := <-serverErrCh:
+			fmt.Printf("\nПомилка сервера: %v\n", err)
+			fmt.Println("Спроба перезапустити сервер через 5 секунд...")
+			time.Sleep(5 * time.Second)
+			continue // Продовжуємо цикл для перезапуску
+		}
+	}
 }
 
 func main() {
