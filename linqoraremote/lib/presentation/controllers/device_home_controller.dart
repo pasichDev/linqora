@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
@@ -22,7 +24,6 @@ class DeviceHomeController extends GetxController {
   final RxString deviceCode = '0'.obs;
   final RxInt selectedMenuIndex = (-1).obs;
   final Rx<MDnsStatus> mdnsConnectingStatus = MDnsStatus.connecting.obs;
-
 
   @override
   void onInit() {
@@ -76,7 +77,7 @@ class DeviceHomeController extends GetxController {
     }
   }
 
-  void connectToDevice(String ip) {
+  Future<void> connectToDevice(String ip) async {
     selectedDeviceIp.value = ip;
 
     webSocketProvider.onConnected = () {
@@ -96,8 +97,39 @@ class DeviceHomeController extends GetxController {
       }
     };
 
-    webSocketProvider.connect(ip, 8070);
+    await webSocketProvider.connect(ip, 8070);
+
+    final authenticated = await webSocketProvider.authenticate(
+      deviceCode.value,
+    );
+    if (!authenticated) {
+      if (kDebugMode) {
+        print('Авторизація не вдалася');
+      }
+      await webSocketProvider.disconnect();
+      return;
+    }
+
+    print('Успішно авторизовано!');
+
+    /*
+    // Реєструємо обробник для отримання метрик
+    webSocketProvider.registerHandler('metrics', (data) {
+      print('Отримано нові метрики: ${data['data']}');
+    });
+
+    // Приєднуємося до кімнати метрик
+    await webSocketProvider.joinRoom('metrics');
+    print('Приєднано до кімнат: ${webSocketProvider.joinedRooms}');
+
+
+     */
+    // Приєднуємося до кімнати керування
+    //  await webSocketProvider.joinRoom('control');
+    //  print('Приєднано до кімнат: ${webSocketProvider.joinedRooms}');
   }
+
+
 
   void cancelConnection() {
     mdnsConnectingStatus.value = MDnsStatus.cancel;

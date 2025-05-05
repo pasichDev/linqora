@@ -9,6 +9,9 @@ import '../widgets/dashboard_screen.dart';
  * Якщо користувач відмінив підключення повернути на попереднє повідомлення і відобразити сповіщення снакбар
  * також якщо більше 10 сек підключення не працює повернути на попредню з помилкою
  */
+
+
+
 class DeviceHomePage extends GetView<DeviceHomeController> {
   const DeviceHomePage({super.key});
 

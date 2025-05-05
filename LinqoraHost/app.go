@@ -1,4 +1,4 @@
-package main
+package LinqoraHost
 
 import (
 	"LinqoraHost/cpu"
