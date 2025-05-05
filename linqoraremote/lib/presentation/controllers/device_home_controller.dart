@@ -259,9 +259,9 @@ class DeviceHomeController extends GetxController {
             );
           }
 
+          webSocketProvider.setAuthenticated(true);
           webSocketProvider.joinRoom('auth');
           completer.complete(true);
-          webSocketProvider.setAuthenticated(true);
         } else {
           final message = data['message'] as String;
           if (kDebugMode) {
