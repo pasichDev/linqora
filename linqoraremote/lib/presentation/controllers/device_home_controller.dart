@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../../data/models/discovered_service.dart';
+import '../../data/models/metrics.dart';
 import '../../data/providers/mdns_provider.dart';
 import '../../data/providers/websocket_provider.dart';
 
@@ -24,6 +25,29 @@ class DeviceHomeController extends GetxController {
   final RxString deviceCode = '0'.obs;
   final RxInt selectedMenuIndex = (-1).obs;
   final Rx<MDnsStatus> mdnsConnectingStatus = MDnsStatus.connecting.obs;
+
+
+  // Масиви для зберігання останніх 20 метрик
+  final RxList<double> temperatures = <double>[].obs;
+  final RxList<double> cpuLoads = <double>[].obs;
+  final RxList<double> ramUsages = <double>[].obs;
+
+  // Поточні значення метрик
+  final Rx<CPUMetrics?> currentCPUMetrics = Rx<CPUMetrics?>(null);
+  final Rx<RAMMetrics?> currentRAMMetrics = Rx<RAMMetrics?>(null);
+
+  // Максимальна кількість записів для зберігання
+  static const int maxMetricsCount = 20;
+
+
+  // Методи для отримання даних у UI
+  List<double> getTemperatures() => temperatures.toList();
+  List<double> getCPULoads() => cpuLoads.toList();
+  List<double> getRAMUsages() => ramUsages.toList();
+
+  CPUMetrics? getCurrentCPUMetrics() => currentCPUMetrics.value;
+  RAMMetrics? getCurrentRAMMetrics() => currentRAMMetrics.value;
+
 
   @override
   void onInit() {
@@ -112,24 +136,40 @@ class DeviceHomeController extends GetxController {
 
     print('Успішно авторизовано!');
 
-    /*
-    // Реєструємо обробник для отримання метрик
+  }
+
+
+  void joinMetricsRoom() async{
     webSocketProvider.registerHandler('metrics', (data) {
-      print('Отримано нові метрики: ${data['data']}');
+      final metricsData = data['data'] as Map<String, dynamic>;
+
+      final cpuData = metricsData['cpuMetrics'] as Map<String, dynamic>;
+      final ramData = metricsData['ramMetrics'] as Map<String, dynamic>;
+
+      // Оновлюємо поточні метрики
+      currentCPUMetrics.value = CPUMetrics.fromJson(cpuData);
+      currentRAMMetrics.value = RAMMetrics.fromJson(ramData);
+
+      // Оновлюємо масиви для графіків
+      _updateMetricsArrays(
+        currentCPUMetrics.value!.temperature,
+        currentCPUMetrics.value!.loadPercent,
+        currentRAMMetrics.value!.usage,
+      );
     });
 
     // Приєднуємося до кімнати метрик
     await webSocketProvider.joinRoom('metrics');
-    print('Приєднано до кімнат: ${webSocketProvider.joinedRooms}');
-
-
-     */
-    // Приєднуємося до кімнати керування
-    //  await webSocketProvider.joinRoom('control');
-    //  print('Приєднано до кімнат: ${webSocketProvider.joinedRooms}');
   }
 
+  void leaveMetricsRoom() async{
+    webSocketProvider.leaveRoom('metrics');
+    webSocketProvider.removeHandler('metrics');
 
+    currentCPUMetrics.value = null;
+    currentRAMMetrics.value = null;
+
+  }
 
   void cancelConnection() {
     mdnsConnectingStatus.value = MDnsStatus.cancel;
@@ -139,4 +179,26 @@ class DeviceHomeController extends GetxController {
   void selectMenuItem(int index) {
     selectedMenuIndex.value = index;
   }
+
+
+  void _updateMetricsArrays(double temperature, double cpuLoad, double ramUsage) {
+    // Оновлення масиву температур
+    if (temperatures.length >= maxMetricsCount) {
+      temperatures.removeAt(0);
+    }
+    temperatures.add(temperature);
+
+    // Оновлення масиву навантаження CPU
+    if (cpuLoads.length >= maxMetricsCount) {
+      cpuLoads.removeAt(0);
+    }
+    cpuLoads.add(cpuLoad);
+
+    // Оновлення масиву використання RAM
+    if (ramUsages.length >= maxMetricsCount) {
+      ramUsages.removeAt(0);
+    }
+    ramUsages.add(ramUsage);
+  }
+
 }

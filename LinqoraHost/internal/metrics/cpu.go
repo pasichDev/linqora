@@ -1,7 +1,8 @@
-package cpu
+package metrics
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -11,16 +12,13 @@ import (
 )
 
 type CPUMetrics struct {
-	ID          int     `json:"id"`
-	Timestamp   string  `json:"timestamp"`
 	Temperature float64 `json:"temperature"`
 	LoadPercent float64 `json:"loadPercent"`
 	Processes   float64 `json:"processes"`
 	Threads     float64 `json:"threads"`
-	Frequencies float64 `json:"freq"`
 }
 
-func GetCPUMetricsRealTime() (CPUMetrics, error) {
+func GetCPUMetrics() (CPUMetrics, error) {
 	cpu := CPUMetrics{}
 
 	load, loadErr := GetCPULoad()
@@ -43,13 +41,13 @@ func GetCPUMetricsRealTime() (CPUMetrics, error) {
 
 // GetCPULoad повертає відсоток завантаження CPU
 func GetCPULoad() (float64, error) {
-	// отримуємо навантаження за 1 секунду
 	percentages, err := cpu.Percent(1*time.Second, false)
 	if err != nil {
 		return 0, err
 	}
 	if len(percentages) > 0 {
-		return percentages[0], nil
+		// Округляем до 2 знаков после запятой
+		return math.Round(percentages[0]*100) / 100, nil
 	}
 	return 0, nil
 }

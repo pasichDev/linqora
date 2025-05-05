@@ -22,7 +22,7 @@ func GetRamMetrics() (RamMetrics, error) {
 	}
 
 	ram := RamMetrics{
-		LoadPercent: v.UsedPercent,
+		LoadPercent: math.Round(v.UsedPercent*100) / 100,
 		Usage:       math.Round((float64(v.Used)/1_000_000_000)*100) / 100,
 	}
 	return ram, nil

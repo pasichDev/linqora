@@ -92,7 +92,7 @@ class WebSocketProvider {
         final success = data['success'] as bool;
         if (success) {
           _isAuthenticated = true;
-          systemInfo = data['systemInfo'] as Map<String, dynamic>;
+          systemInfo = data['authInfomation'] as Map<String, dynamic>;
           if (kDebugMode) {
             print('Авторизація успішна. Інформація про систему: $systemInfo');
           }
@@ -199,7 +199,7 @@ class WebSocketProvider {
     }
   }
 
-/*
+  /*
   // Надіслати команду керування курсором
   Future<bool> sendCursorCommand(int x, int y, int action) async {
     if (!_isConnected || !_isAuthenticated || _channel == null) {
@@ -258,20 +258,27 @@ class WebSocketProvider {
   // Обробка вхідних повідомлень
   void _handleMessage(dynamic message) {
     try {
-      final data = jsonDecode(message as String) as Map<String, dynamic>;
-      final messageType = data['type'] as String?;
+      if (message == null) return;
 
+      final dynamic decodedMessage = jsonDecode(message.toString());
+      if (decodedMessage is! Map<String, dynamic>) {
+        if (kDebugMode) {
+          print('Отримано некоректне повідомлення: $message');
+        }
+        return;
+      }
+
+      final messageType = decodedMessage['type'] as String?;
       if (messageType != null && _messageHandlers.containsKey(messageType)) {
-        // Викликаємо відповідний обробник
-        _messageHandlers[messageType]!(data);
+        _messageHandlers[messageType]!(decodedMessage);
       } else {
         if (kDebugMode) {
-          print('Отримано повідомлення типу $messageType: $data');
+          print('Отримано повідомлення типу $messageType: $decodedMessage');
         }
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Помилка обробки повідомлення: $e');
+        print('Помилка обробки повідомлення: $e\nПовідомлення: $message');
       }
     }
   }

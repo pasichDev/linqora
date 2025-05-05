@@ -3,14 +3,30 @@ import 'package:get/get.dart';
 
 import '../controllers/device_home_controller.dart';
 
-class StatisticsView extends StatelessWidget {
+class StatisticsView extends StatefulWidget {
   const StatisticsView({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final controller = Get.find<DeviceHomeController>();
-    final messages = controller.webSocketProvider.messages;
+  State<StatisticsView> createState() => _StatisticsViewState();
+}
 
+class _StatisticsViewState extends State<StatisticsView> {
+  late DeviceHomeController controller;
+  @override
+  void initState() {
+    super.initState();
+    controller = Get.find<DeviceHomeController>();
+    controller.joinMetricsRoom();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    controller.leaveMetricsRoom();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       children: [
         Padding(
@@ -21,17 +37,24 @@ class StatisticsView extends StatelessWidget {
           ),
         ),
         Expanded(
-          child: Obx(
-            () =>
-                messages.isEmpty
-                    ? const Center(child: Text('Немає даних'))
-                    : ListView.builder(
-                      itemCount: messages.length,
-                      itemBuilder: (context, index) {
-                        return ListTile(title: Text(messages[index]));
-                      },
-                    ),
-          ),
+          child: Obx(() {
+            final cpuMetrics = controller.getCurrentCPUMetrics();
+            final ramMetrics = controller.getCurrentRAMMetrics();
+
+            if (cpuMetrics == null || ramMetrics == null) {
+              return Center(child: CircularProgressIndicator());
+            }
+
+            return Column(
+              children: [
+                Text('CPU Temperature: ${cpuMetrics.temperature}°C'),
+                Text('CPU Load: ${cpuMetrics.loadPercent}%'),
+                Text('RAM Usage: ${ramMetrics.usage}GB'),
+                Text('RAM Load: ${ramMetrics.loadPercent}%'),
+           
+              ],
+            );
+          }),
         ),
       ],
     );
