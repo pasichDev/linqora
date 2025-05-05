@@ -54,7 +54,7 @@ class DeviceHomeController extends GetxController {
     try {
       devices.value = await mdnsProvider.discoverDevices(deviceCode.value);
       if (devices.isNotEmpty && devices[0].address != null) {
-        connectToDevice(devices[0].address!);
+        connectToDevice(devices[0].address!, int.parse(devices[0].port!));
       } else {
         mdnsConnectingStatus.value = MDnsStatus.cancel;
         mErrorDiscovery = true;
@@ -77,7 +77,7 @@ class DeviceHomeController extends GetxController {
     }
   }
 
-  Future<void> connectToDevice(String ip) async {
+  Future<void> connectToDevice(String ip, int port) async {
     selectedDeviceIp.value = ip;
 
     webSocketProvider.onConnected = () {
@@ -97,7 +97,7 @@ class DeviceHomeController extends GetxController {
       }
     };
 
-    await webSocketProvider.connect(ip, 8070);
+    await webSocketProvider.connect(ip, port);
 
     final authenticated = await webSocketProvider.authenticate(
       deviceCode.value,
