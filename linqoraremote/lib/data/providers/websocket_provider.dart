@@ -67,8 +67,11 @@ class WebSocketProvider {
     }
   }
 
+  /**
+   * Перенести цей метод в home controller
+   */
   // Авторизація на сервері
-  Future<bool> authenticate(String deviceCode) async {
+  Future<bool> authenticate(String deviceCode)  async {
     _deviceCode = deviceCode;
     var deviceName = await getDeviceName();
     if (!_isConnected || _channel == null) {
@@ -199,7 +202,7 @@ class WebSocketProvider {
     }
   }
 
-  /*
+
   // Надіслати команду керування курсором
   Future<bool> sendCursorCommand(int x, int y, int action) async {
     if (!_isConnected || !_isAuthenticated || _channel == null) {
@@ -232,7 +235,7 @@ class WebSocketProvider {
     }
   }
 
- */
+
 
   // Відключення від WebSocket сервера
   Future<void> disconnect() async {
@@ -316,7 +319,17 @@ class WebSocketProvider {
   }
 
   void close() {
-    _channel?.sink.close();
-    _channel = null;
+    for (var room in _joinedRooms.toList()) {
+      leaveRoom(room);
+    }
+    // Закрываем WebSocket соединение
+    if (_channel != null) {
+      _channel = null;
+    }
+
+    _isConnected = false;
+    _deviceCode = null;
+    _messageHandlers.clear();
+    _joinedRooms.clear();
   }
 }

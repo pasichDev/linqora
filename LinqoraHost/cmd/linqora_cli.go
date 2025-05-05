@@ -20,6 +20,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+/**
+sudo apt-get install libx11-dev xorg-dev libxtst-dev xsel xclip
+реалізувати перевірку чи встановлені необхідін пакети
+*/
+
 var (
 	// Глобальні змінні для флагів
 	port     int

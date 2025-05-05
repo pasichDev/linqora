@@ -10,10 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gorilla/websocket"
-
 	"LinqoraHost/internal/config"
+	"LinqoraHost/internal/handler"
 	"LinqoraHost/internal/metrics"
+
+	"github.com/gorilla/websocket"
 )
 
 // WSServer WebSocket сервер
@@ -125,6 +126,8 @@ func (s *WSServer) handleClientMessage(client *Client, msg *ClientMessage) {
 		s.handleLeaveRoomMessage(client, msg)
 	case "cursor_command":
 		s.handleCursorCommandMessage(client, msg)
+	//case "cursor_command":
+
 	default:
 		log.Printf("Unknown message type: %s", msg.Type)
 	}
@@ -182,17 +185,38 @@ func (s *WSServer) handleLeaveRoomMessage(client *Client, msg *ClientMessage) {
 
 // handleCursorCommandMessage обробляє команди керування курсором
 func (s *WSServer) handleCursorCommandMessage(client *Client, msg *ClientMessage) {
-	var cursorCmd CursorCommand
-	if err := json.Unmarshal(msg.Data, &cursorCmd); err != nil {
+	var data map[string]interface{}
+	if err := json.Unmarshal(msg.Data, &data); err != nil {
 		log.Printf("Error unmarshaling cursor command: %v", err)
 		return
 	}
 
-	// Відправляємо команду обробнику курсора
-	//s.cursorHandler.ProcessCommand(&cursorCmd)
+	x, ok1 := data["x"].(float64)
+	y, ok2 := data["y"].(float64)
+	action, ok3 := data["action"].(float64)
 
-	log.Printf("Received cursor command from %s: x=%d, y=%d, action=%d",
-		client.DeviceName, cursorCmd.X, cursorCmd.Y, cursorCmd.Action)
+	if !ok1 || !ok2 || !ok3 {
+		log.Printf("Invalid cursor command format from %s", client.DeviceName)
+		return
+	}
+
+	// Увеличиваем чувствительность и округляем
+	intX := int(x * 3) // Увеличили множитель
+	intY := int(y * 3)
+	intAction := int(action)
+
+	// Игнорируем слишком маленькие движения при перемещении
+	if intAction == 0 && abs(intX) < 2 && abs(intY) < 2 {
+		return
+	}
+
+	handler.HandleMouseCommand(intX, intY, intAction)
+}
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
 
 // BroadcastMetrics відправляє метрики всім клієнтам у кімнаті metrics

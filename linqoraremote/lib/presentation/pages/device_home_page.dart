@@ -10,8 +10,6 @@ import '../widgets/dashboard_screen.dart';
  * також якщо більше 10 сек підключення не працює повернути на попредню з помилкою
  */
 
-
-
 class DeviceHomePage extends GetView<DeviceHomeController> {
   const DeviceHomePage({super.key});
 
@@ -19,7 +17,17 @@ class DeviceHomePage extends GetView<DeviceHomeController> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Назва пристрою'),
+        title: Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Назва пристрою',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const Text('Назва пристрою', style: TextStyle(fontSize: 12)),
+          ],
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () async {

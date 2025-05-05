@@ -62,6 +62,9 @@ class DeviceHomeController extends GetxController {
   @override
   void onClose() {
     webSocketProvider.close();
+
+
+
     super.onClose();
   }
 
@@ -171,6 +174,16 @@ class DeviceHomeController extends GetxController {
 
   }
 
+
+  void joinMouseRoom() async{
+    webSocketProvider.registerHandler('control', (data) {
+
+    });
+
+    // Приєднуємося до кімнати метрик
+    await webSocketProvider.joinRoom('control');
+  }
+
   void cancelConnection() {
     mdnsConnectingStatus.value = MDnsStatus.cancel;
     Get.back(result: {'status': 'cancel'});
@@ -200,5 +213,7 @@ class DeviceHomeController extends GetxController {
     }
     ramUsages.add(ramUsage);
   }
+
+
 
 }

@@ -51,7 +51,6 @@ class _StatisticsViewState extends State<StatisticsView> {
                 Text('CPU Load: ${cpuMetrics.loadPercent}%'),
                 Text('RAM Usage: ${ramMetrics.usage}GB'),
                 Text('RAM Load: ${ramMetrics.loadPercent}%'),
-           
               ],
             );
           }),

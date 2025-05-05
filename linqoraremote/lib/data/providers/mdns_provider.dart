@@ -23,6 +23,7 @@ class MDnsProvider {
       }
     }
   }
+
   Future<List<DiscoveredService>> discoverDevices(String deviceCode) async {
     List<DiscoveredService> devices = [];
     await enableMulticast();
@@ -42,17 +43,17 @@ class MDnsProvider {
       onConnected?.call();
       await for (final SrvResourceRecord srv in client
           .lookup<SrvResourceRecord>(
-        ResourceRecordQuery.service(ptr.domainName),
-      )) {
+            ResourceRecordQuery.service(ptr.domainName),
+          )) {
         await for (final IPAddressResourceRecord ip in client
             .lookup<IPAddressResourceRecord>(
-          ResourceRecordQuery.addressIPv4(srv.target),
-        )) {
+              ResourceRecordQuery.addressIPv4(srv.target),
+            )) {
           devices.add(
             DiscoveredService(
               name: ptr.domainName,
               address: ip.address.address,
-              port: srv.port.toString(),  // Add the port from the SRV record
+              port: srv.port.toString(), // Add the port from the SRV record
             ),
           );
 
@@ -67,7 +68,7 @@ class MDnsProvider {
       onEmpty?.call();
     }
 
-     client.stop();
+    client.stop();
     return devices;
   }
 }
