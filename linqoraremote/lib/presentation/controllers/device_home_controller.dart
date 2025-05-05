@@ -81,10 +81,7 @@ class DeviceHomeController extends GetxController {
 
   /// Починає пошук пристроїв з підтримкою повторних спроб
   void startDiscovery() async {
-    // Скидаємо лічильник спроб при початку нового пошуку
     _discoveryAttempts = 0;
-
-    // Запускаємо першу спробу пошуку
     _performDiscovery();
   }
 
@@ -254,7 +251,6 @@ class DeviceHomeController extends GetxController {
       webSocketProvider.registerHandler('auth_response', (data) {
         final success = data['success'] as bool;
         if (success) {
-          webSocketProvider.setAuthenticated(true);
           authInformation.value = AuthResponse.fromJson(data).authInformation;
 
           if (kDebugMode) {
@@ -265,6 +261,7 @@ class DeviceHomeController extends GetxController {
 
           webSocketProvider.joinRoom('auth');
           completer.complete(true);
+          webSocketProvider.setAuthenticated(true);
         } else {
           final message = data['message'] as String;
           if (kDebugMode) {
