@@ -36,10 +36,10 @@ type SystemInfo struct {
 
 // AuthResponse відповідь на авторизацію
 type AuthResponse struct {
-	Type           string         `json:"type"`
-	Success        bool           `json:"success"`
-	Message        string         `json:"message,omitempty"`
-	AuthInfomation AuthInfomation `json:"authInfomation,omitempty"`
+	Type            string          `json:"type"`
+	Success         bool            `json:"success"`
+	Message         string          `json:"message,omitempty"`
+	AuthInformation AuthInformation `json:"authInfomation,omitempty"`
 }
 
 // MetricsMessage повідомлення з метриками
@@ -49,7 +49,7 @@ type MetricsMessage struct {
 }
 
 // AuthInfomation містить інформацію про систему яка не буде змінюватись
-type AuthInfomation struct {
+type AuthInformation struct {
 	OS                 string  `json:"os"`
 	Hostname           string  `json:"hostname"`
 	CpuModel           int     `json:"cpuModel"`

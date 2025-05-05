@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 
 /// Model representing system information for authentication
@@ -6,7 +5,7 @@ class AuthInformation {
   final String os;
   final String hostname;
   final int cpuModel; // Number of CPU cores
-  final int virtualMemoryTotal;
+  final double virtualMemoryTotal; // Changed to double to match the 33.53 value
 
   AuthInformation({
     required this.os,
@@ -18,21 +17,28 @@ class AuthInformation {
   /// Convert the model to a JSON map
   Map<String, dynamic> toJson() {
     return {
-      'OS': os,
-      'Hostname': hostname,
-      'CpuModel': cpuModel,
-      'VirtualMemoryTotal': virtualMemoryTotal,
+      'os': os,
+      'hostname': hostname,
+      'cpuModel': cpuModel,
+      'virtualMemoryTotal': virtualMemoryTotal,
     };
   }
 
   /// Create an instance from a JSON map
   factory AuthInformation.fromJson(Map<String, dynamic> json) {
     return AuthInformation(
-      os: json['OS'] as String,
-      hostname: json['Hostname'] as String,
-      cpuModel: json['CpuModel'] as int,
-      virtualMemoryTotal: json['VirtualMemoryTotal'] as int,
+      os: json['os'] as String,
+      hostname: json['hostname'] as String,
+      cpuModel: json['cpuModel'] as int,
+      virtualMemoryTotal: (json['virtualMemoryTotal'] is int)
+          ? (json['virtualMemoryTotal'] as int).toDouble()
+          : json['virtualMemoryTotal'] as double,
     );
+  }
+
+  @override
+  String toString() {
+    return 'OS: $os, Hostname: $hostname, CPU Cores: $cpuModel, Memory: ${virtualMemoryTotal}GB';
   }
 }
 
@@ -51,18 +57,18 @@ class AuthResponse {
   /// Convert the model to a JSON map
   Map<String, dynamic> toJson() {
     return {
-      'Type': type,
-      'Success': success,
-      'AuthInfomation': authInformation.toJson(),
+      'type': type,
+      'success': success,
+      'authInfomation': authInformation.toJson(), // Keep the original spelling in the output
     };
   }
 
   /// Create an instance from a JSON map
   factory AuthResponse.fromJson(Map<String, dynamic> json) {
     return AuthResponse(
-      type: json['Type'] as String,
-      success: json['Success'] as bool,
-      authInformation: AuthInformation.fromJson(json['AuthInfomation'] as Map<String, dynamic>),
+      type: json['type'] as String, // Changed from 'Type' to 'type'
+      success: json['success'] as bool, // Changed from 'Success' to 'success'
+      authInformation: AuthInformation.fromJson(json['authInfomation'] as Map<String, dynamic>), // Changed from 'AuthInfomation' to 'authInfomation'
     );
   }
 

@@ -22,7 +22,6 @@ class WebSocketProvider {
   final Set<String> _joinedRooms = {};
   bool _isConnected = false;
   bool _isAuthenticated = false;
-  Map<String, dynamic>? systemInfo;
   StreamSubscription? _subscription;
 
   String? _deviceCode;

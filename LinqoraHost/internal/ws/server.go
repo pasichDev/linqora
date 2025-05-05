@@ -151,7 +151,7 @@ func (s *WSServer) handleAuthMessage(client *Client, msg *ClientMessage) {
 	deviceInfo := metrics.GetDeviceInfo()
 
 	// Формуємо відповідь з характеристиками системи
-	systemInfo := AuthInfomation{
+	authInformation := AuthInformation{
 		OS:                 deviceInfo.OS,
 		Hostname:           deviceInfo.Hostname,
 		CpuModel:           runtime.NumCPU(),
@@ -159,9 +159,9 @@ func (s *WSServer) handleAuthMessage(client *Client, msg *ClientMessage) {
 	}
 
 	response := AuthResponse{
-		Type:           "auth_response",
-		Success:        true,
-		AuthInfomation: systemInfo,
+		Type:            "auth_response",
+		Success:         true,
+		AuthInformation: authInformation,
 	}
 
 	responseJSON, _ := json.Marshal(response)

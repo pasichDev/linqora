@@ -17,19 +17,38 @@ class DeviceHomePage extends GetView<DeviceHomeController> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Назва пристрою',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            const Text('Назва пристрою', style: TextStyle(fontSize: 12)),
-          ],
+        title: Obx(
+          () =>
+              controller.devices.isEmpty ||
+                      controller.authInformation.value == null
+                  ? SizedBox()
+                  : Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        controller.authInformation.value?.hostname ?? "",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      Text(
+                        "${controller.devices.first.address ?? ""}:${controller.devices.first.port ?? ""}",
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: Obx(
+            () => Icon(
+              controller.isConnected.value &&
+                      controller.selectedMenuIndex.value == -1
+                  ? Icons.close
+                  : Icons.arrow_back,
+            ),
+          ),
           onPressed: () async {
             if (controller.selectedMenuIndex.value != -1) {
               controller.selectMenuItem(-1);
@@ -70,7 +89,8 @@ class DeviceHomePage extends GetView<DeviceHomeController> {
           () =>
               controller.mdnsConnectingStatus.value == MDnsStatus.connecting ||
                       controller.mdnsConnectingStatus.value ==
-                          MDnsStatus.connected
+                          MDnsStatus.connected ||
+                      controller.mdnsConnectingStatus.value == MDnsStatus.retry
                   ? ConnectScreen()
                   : controller.isConnected.value
                   ? DashboardScreen()

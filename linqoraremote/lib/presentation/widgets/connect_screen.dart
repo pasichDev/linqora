@@ -22,14 +22,14 @@ class ConnectScreen extends StatelessWidget {
         const SizedBox(height: 30),
         Obx(
           () =>
-              controller.mdnsConnectingStatus.value  ==
-                  MDnsStatus.connected
+              controller.mdnsConnectingStatus.value == MDnsStatus.connected
                   ? Text(
                     "Знайдено пристрій з кодом: ${controller.deviceCode.value} \n Встановлюємо з'єднання через WebSocket...",
                     textAlign: TextAlign.center,
                   )
                   : controller.mdnsConnectingStatus.value ==
-                      MDnsStatus.connecting
+                          MDnsStatus.connecting ||
+                      controller.mdnsConnectingStatus.value == MDnsStatus.retry
                   ? Obx(
                     () => Text(
                       "Пошук пристрою з кодом: ${controller.deviceCode.value}...\nБудь ласка, зачекайте.",
