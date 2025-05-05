@@ -6,7 +6,8 @@ import 'package:get/get.dart';
 import 'package:web_socket_channel/status.dart' as status;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import '../../device_info.dart';
+import '../enums/type_messages_ws.dart';
+import '../models/ws_message.dart';
 
 class WebSocketProvider {
   WebSocketChannel? _channel;
@@ -26,19 +27,27 @@ class WebSocketProvider {
 
   String? _deviceCode;
 
+  get getDeviceCode => _deviceCode;
+
   // Перевірка стану підключення
   bool get isConnected => _isConnected;
 
   // Перевірка стану авторизації
   bool get isAuthenticated => _isAuthenticated;
 
+  void setAuthenticated(bool isAuthenticated) {
+    _isAuthenticated = isAuthenticated;
+  }
+
   // Отримання списку кімнат, до яких приєднаний клієнт
   Set<String> get joinedRooms => Set.from(_joinedRooms);
+
   void send(String message) {
     _channel?.sink.add(message);
   }
 
-  Future<bool> connect(String ip, int port) async {
+  Future<bool> connect(String ip, int port, String deviceCode) async {
+    _deviceCode = deviceCode;
     final wsUrl = 'ws://$ip:$port/ws';
     try {
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
@@ -67,75 +76,8 @@ class WebSocketProvider {
     }
   }
 
-  /**
-   * Перенести цей метод в home controller
-   */
-  // Авторизація на сервері
-  Future<bool> authenticate(String deviceCode)  async {
-    _deviceCode = deviceCode;
-    var deviceName = await getDeviceName();
-    if (!_isConnected || _channel == null) {
-      if (kDebugMode) {
-        print('Неможливо авторизуватися: відсутнє підключення');
-      }
-      return false;
-    }
-    // Відправляємо запит на авторизацію
-    final authMessage = {
-      'type': 'auth',
-      'deviceCode': deviceCode,
-      'data': {'deviceName': deviceName},
-    };
-    try {
-      // Реєструємо обробник відповіді на авторизацію
-      final completer = Completer<bool>();
-
-      // Тимчасовий обробник для авторизації
-      _messageHandlers['auth_response'] = (data) {
-        final success = data['success'] as bool;
-        if (success) {
-          _isAuthenticated = true;
-          systemInfo = data['authInfomation'] as Map<String, dynamic>;
-          if (kDebugMode) {
-            print('Авторизація успішна. Інформація про систему: $systemInfo');
-          }
-
-          // Додаємо клієнта до кімнати auth автоматично (сервер це робить)
-          _joinedRooms.add('auth');
-
-          completer.complete(true);
-        } else {
-          final message = data['message'] as String;
-          if (kDebugMode) {
-            print('Помилка авторизації: $message');
-          }
-          completer.complete(false);
-        }
-
-        // Видаляємо тимчасовий обробник
-        _messageHandlers.remove('auth_response');
-      };
-
-      // Відправляємо повідомлення авторизації
-      _channel!.sink.add(jsonEncode(authMessage));
-
-      Timer(Duration(seconds: 10), () {
-        if (!completer.isCompleted) {
-          completer.complete(false);
-          _messageHandlers.remove('auth_response');
-          if (kDebugMode) {
-            print('Таймаут авторизації');
-          }
-        }
-      });
-
-      return await completer.future;
-    } catch (e) {
-      if (kDebugMode) {
-        print('Помилка під час авторизації: $e');
-      }
-      return false;
-    }
+  void sendMessage(dynamic message) {
+    _channel!.sink.add(jsonEncode(message));
   }
 
   // Приєднатися до кімнати
@@ -150,13 +92,12 @@ class WebSocketProvider {
     }
 
     try {
-      final message = {
-        'type': 'join_room',
-        'deviceCode': _deviceCode,
-        'room': roomName,
-      };
+      final WsMessage joinRoomMessage = WsMessage(
+        type: TypeMessageWs.join_room.value,
+        deviceCode: _deviceCode!,
+      )..setField('room', roomName);
 
-      _channel!.sink.add(jsonEncode(message));
+      _channel!.sink.add(jsonEncode(joinRoomMessage));
       _joinedRooms.add(roomName);
       if (kDebugMode) {
         print('Приєднано до кімнати: $roomName');
@@ -180,15 +121,20 @@ class WebSocketProvider {
       }
       return false;
     }
+    if (_deviceCode == null) {
+      if (kDebugMode) {
+        print('Device code не авторизовано');
+      }
+      return false;
+    }
 
     try {
-      final message = {
-        'type': 'leave_room',
-        'deviceCode': _deviceCode,
-        'room': roomName,
-      };
+      final WsMessage leaveRoomMessage = WsMessage(
+        type: TypeMessageWs.leave_room.value,
+        deviceCode: _deviceCode!,
+      )..setField('room', roomName);
 
-      _channel!.sink.add(jsonEncode(message));
+      _channel!.sink.add(jsonEncode(leaveRoomMessage));
       _joinedRooms.remove(roomName);
       if (kDebugMode) {
         print('Вихід з кімнати: $roomName');
@@ -202,18 +148,21 @@ class WebSocketProvider {
     }
   }
 
-
   // Надіслати команду керування курсором
   Future<bool> sendCursorCommand(int x, int y, int action) async {
     if (!_isConnected || !_isAuthenticated || _channel == null) {
-      print(
-        'Неможливо надіслати команду курсора: клієнт не підключений або не авторизований',
-      );
+      if (kDebugMode) {
+        print(
+          'Неможливо надіслати команду курсора: клієнт не підключений або не авторизований',
+        );
+      }
       return false;
     }
 
     if (!_joinedRooms.contains('control')) {
-      print('Необхідно спочатку приєднатися до кімнати control');
+      if (kDebugMode) {
+        print('Необхідно спочатку приєднатися до кімнати control');
+      }
       return false;
     }
 
@@ -221,7 +170,7 @@ class WebSocketProvider {
       final cursorData = {'x': x, 'y': y, 'action': action};
 
       final message = {
-        'type': 'cursor_command',
+        'type': TypeMessageWs.cursor_command.value,
         'deviceCode': _deviceCode,
         'room': 'control',
         'data': cursorData,
@@ -230,12 +179,12 @@ class WebSocketProvider {
       _channel!.sink.add(jsonEncode(message));
       return true;
     } catch (e) {
-      print('Помилка надсилання команди курсора: $e');
+      if (kDebugMode) {
+        print('Помилка надсилання команди курсора: $e');
+      }
       return false;
     }
   }
-
-
 
   // Відключення від WebSocket сервера
   Future<void> disconnect() async {

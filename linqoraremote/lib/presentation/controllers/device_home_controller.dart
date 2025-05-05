@@ -3,10 +3,13 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
+import '../../data/enums/type_messages_ws.dart';
 import '../../data/models/discovered_service.dart';
 import '../../data/models/metrics.dart';
+import '../../data/models/ws_message.dart';
 import '../../data/providers/mdns_provider.dart';
 import '../../data/providers/websocket_provider.dart';
+import '../../utils/device_info.dart';
 
 enum MDnsStatus { connecting, connected, cancel, ws }
 
@@ -19,13 +22,13 @@ class DeviceHomeController extends GetxController {
     required this.webSocketProvider,
   });
 
-  final RxList<DiscoveredService> devices = <DiscoveredService>[].obs;
   final RxBool isConnected = false.obs;
+  final Rx<MDnsStatus> mdnsConnectingStatus = MDnsStatus.connecting.obs;
+
+  final RxList<DiscoveredService> devices = <DiscoveredService>[].obs;
   final RxString selectedDeviceIp = ''.obs;
   final RxString deviceCode = '0'.obs;
   final RxInt selectedMenuIndex = (-1).obs;
-  final Rx<MDnsStatus> mdnsConnectingStatus = MDnsStatus.connecting.obs;
-
 
   // Масиви для зберігання останніх 20 метрик
   final RxList<double> temperatures = <double>[].obs;
@@ -39,7 +42,6 @@ class DeviceHomeController extends GetxController {
   // Максимальна кількість записів для зберігання
   static const int maxMetricsCount = 20;
 
-
   // Методи для отримання даних у UI
   List<double> getTemperatures() => temperatures.toList();
   List<double> getCPULoads() => cpuLoads.toList();
@@ -47,7 +49,6 @@ class DeviceHomeController extends GetxController {
 
   CPUMetrics? getCurrentCPUMetrics() => currentCPUMetrics.value;
   RAMMetrics? getCurrentRAMMetrics() => currentRAMMetrics.value;
-
 
   @override
   void onInit() {
@@ -62,9 +63,6 @@ class DeviceHomeController extends GetxController {
   @override
   void onClose() {
     webSocketProvider.close();
-
-
-
     super.onClose();
   }
 
@@ -124,11 +122,9 @@ class DeviceHomeController extends GetxController {
       }
     };
 
-    await webSocketProvider.connect(ip, port);
+    await webSocketProvider.connect(ip, port, deviceCode.value);
 
-    final authenticated = await webSocketProvider.authenticate(
-      deviceCode.value,
-    );
+    final authenticated = await authenticate();
     if (!authenticated) {
       if (kDebugMode) {
         print('Авторизація не вдалася');
@@ -138,11 +134,77 @@ class DeviceHomeController extends GetxController {
     }
 
     print('Успішно авторизовано!');
-
   }
 
+  // Авторизація на сервері
+  Future<bool> authenticate() async {
+    var deviceName = await getDeviceName();
+    if (!webSocketProvider.isConnected ||
+        !isConnected.value ||
+        mdnsConnectingStatus.value != MDnsStatus.ws) {
+      if (kDebugMode) {
+        print('Неможливо авторизуватися: відсутнє підключення');
+      }
+      return false;
+    }
 
-  void joinMetricsRoom() async{
+    final WsMessage authMessage = WsMessage(
+      type: TypeMessageWs.auth.value,
+      deviceCode: deviceCode.value,
+    )..setField('data', {'deviceName': deviceName});
+
+    try {
+      // Реєструємо обробник відповіді на авторизацію
+      final completer = Completer<bool>();
+
+      // Тимчасовий обробник для авторизації
+      webSocketProvider.registerHandler('auth_response', (data) {
+        final success = data['success'] as bool;
+        if (success) {
+          webSocketProvider.setAuthenticated(true);
+          var systemInfo = data['authInfomation'] as Map<String, dynamic>;
+          if (kDebugMode) {
+            print(
+              'Авторизація успішна. \n Інформація про систему: $systemInfo',
+            );
+          }
+
+          webSocketProvider.joinRoom('auth');
+          completer.complete(true);
+        } else {
+          final message = data['message'] as String;
+          if (kDebugMode) {
+            print('Помилка авторизації: $message');
+          }
+          completer.complete(false);
+        }
+
+        // Видаляємо тимчасовий обробник
+        webSocketProvider.removeHandler('auth_response');
+      });
+      // Відправляємо повідомлення авторизації
+      webSocketProvider.sendMessage(authMessage);
+
+      Timer(Duration(seconds: 10), () {
+        if (!completer.isCompleted) {
+          completer.complete(false);
+          webSocketProvider.removeHandler('auth_response');
+          if (kDebugMode) {
+            print('Таймаут авторизації');
+          }
+        }
+      });
+
+      return await completer.future;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Помилка під час авторизації: $e');
+      }
+      return false;
+    }
+  }
+
+  void joinMetricsRoom() async {
     webSocketProvider.registerHandler('metrics', (data) {
       final metricsData = data['data'] as Map<String, dynamic>;
 
@@ -165,20 +227,16 @@ class DeviceHomeController extends GetxController {
     await webSocketProvider.joinRoom('metrics');
   }
 
-  void leaveMetricsRoom() async{
+  void leaveMetricsRoom() async {
     webSocketProvider.leaveRoom('metrics');
     webSocketProvider.removeHandler('metrics');
 
     currentCPUMetrics.value = null;
     currentRAMMetrics.value = null;
-
   }
 
-
-  void joinMouseRoom() async{
-    webSocketProvider.registerHandler('control', (data) {
-
-    });
+  void joinMouseRoom() async {
+    webSocketProvider.registerHandler('control', (data) {});
 
     // Приєднуємося до кімнати метрик
     await webSocketProvider.joinRoom('control');
@@ -193,8 +251,11 @@ class DeviceHomeController extends GetxController {
     selectedMenuIndex.value = index;
   }
 
-
-  void _updateMetricsArrays(double temperature, double cpuLoad, double ramUsage) {
+  void _updateMetricsArrays(
+    double temperature,
+    double cpuLoad,
+    double ramUsage,
+  ) {
     // Оновлення масиву температур
     if (temperatures.length >= maxMetricsCount) {
       temperatures.removeAt(0);
@@ -213,7 +274,4 @@ class DeviceHomeController extends GetxController {
     }
     ramUsages.add(ramUsage);
   }
-
-
-
 }
