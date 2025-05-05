@@ -76,7 +76,7 @@ func GetCPUTemperature() (float64, error) {
 				continue
 			}
 
-			cpuTemp = t.Temperature
+			cpuTemp = math.Round(t.Temperature*100) / 100
 			found = true
 			break
 		}
