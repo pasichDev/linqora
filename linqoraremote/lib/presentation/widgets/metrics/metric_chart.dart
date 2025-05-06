@@ -12,68 +12,65 @@ class MetricChart extends StatelessWidget {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 16),
-            SizedBox(
-              height: metricsData.length <= 5 ? 100 : 100,
-              child:
-                  metricsData.length <= 5
-                      ? Column(
-                        children: [
-                          LoadingAnimationWidget.stretchedDots(
-                            color: Colors.white,
-                            size: 70,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 16),
+          SizedBox(
+            height: metricsData.length <= 5 ? 100 : 100,
+            child:
+                metricsData.length <= 5
+                    ? Column(
+                      children: [
+                        LoadingAnimationWidget.stretchedDots(
+                          color: Colors.white,
+                          size: 70,
+                        ),
+                        Text(
+                          "Зачекайте, замало даних для відображення графіка",
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ],
+                    )
+                    : LineChart(
+                      LineChartData(
+                        gridData: FlGridData(show: true),
+                        titlesData: FlTitlesData(
+                          rightTitles: AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
                           ),
-                          Text(
-                            "Зачекайте, замало даних для відображення графіка",
-                            style: const TextStyle(fontSize: 14),
+                          topTitles: AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                        ),
+                        borderData: FlBorderData(show: false),
+                        lineBarsData: [
+                          LineChartBarData(
+                            spots:
+                                metricsData
+                                    .asMap()
+                                    .entries
+                                    .map(
+                                      (e) => FlSpot(
+                                        e.key.toDouble(),
+                                        e.value.toDouble(),
+                                      ),
+                                    )
+                                    .toList(),
+                            isCurved: true,
+                            color: Theme.of(context).colorScheme.primary,
+                            barWidth: 2,
+                            dotData: FlDotData(show: false),
                           ),
                         ],
-                      )
-                      : LineChart(
-                        LineChartData(
-                          gridData: FlGridData(show: true),
-                          titlesData: FlTitlesData(
-                            rightTitles: AxisTitles(
-                              sideTitles: SideTitles(showTitles: false),
-                            ),
-                            topTitles: AxisTitles(
-                              sideTitles: SideTitles(showTitles: false),
-                            ),
-                            bottomTitles: AxisTitles(
-                              sideTitles: SideTitles(showTitles: false),
-                            ),
-                          ),
-                          borderData: FlBorderData(show: false),
-                          lineBarsData: [
-                            LineChartBarData(
-                              spots:
-                                  metricsData
-                                      .asMap()
-                                      .entries
-                                      .map(
-                                        (e) => FlSpot(
-                                          e.key.toDouble(),
-                                          e.value.toDouble(),
-                                        ),
-                                      )
-                                      .toList(),
-                              isCurved: true,
-                              color: Theme.of(context).colorScheme.primary,
-                              barWidth: 2,
-                              dotData: FlDotData(show: false),
-                            ),
-                          ],
-                        ),
                       ),
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
+                    ),
+          ),
+          const SizedBox(height: 16),
+        ],
       ),
     );
   }

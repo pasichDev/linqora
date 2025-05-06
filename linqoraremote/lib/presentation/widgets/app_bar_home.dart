@@ -32,7 +32,7 @@ class AppBarHomePage extends GetView<DeviceHomeController>
                     ),
                     Text(
                       "${controller.devices.first.address ?? ""}:${controller.devices.first.port ?? ""}",
-                      style: TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8)),
                     ),
                   ],
                 ),
