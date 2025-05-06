@@ -4,13 +4,19 @@ import 'dart:convert';
 class AuthInformation {
   final String os;
   final String hostname;
-  final int cpuModel;
+  final String cpuModel;
+  final double cpuFrequency;
+  final int cpuPhysicalCores;
+  final int cpuLogicalCores;
   final double virtualMemoryTotal;
 
   AuthInformation({
     required this.os,
     required this.hostname,
     required this.cpuModel,
+    required this.cpuFrequency,
+    required this.cpuPhysicalCores,
+    required this.cpuLogicalCores,
     required this.virtualMemoryTotal,
   });
 
@@ -20,6 +26,9 @@ class AuthInformation {
       'os': os,
       'hostname': hostname,
       'cpuModel': cpuModel,
+      'cpuFrequency': cpuFrequency,
+      'physicalCores': cpuPhysicalCores,
+      'logicalCores': cpuLogicalCores,
       'virtualMemoryTotal': virtualMemoryTotal,
     };
   }
@@ -29,17 +38,22 @@ class AuthInformation {
     return AuthInformation(
       os: json['os'] as String,
       hostname: json['hostname'] as String,
-      cpuModel: json['cpuModel'] as int,
-      virtualMemoryTotal:
-          (json['virtualMemoryTotal'] is int)
-              ? (json['virtualMemoryTotal'] as int).toDouble()
-              : json['virtualMemoryTotal'] as double,
+      cpuModel: json['cpuModel'] as String,
+      cpuFrequency: json['cpuFrequency'] is int
+          ? (json['cpuFrequency'] as int).toDouble()
+          : json['cpuFrequency'] as double,
+      cpuPhysicalCores: json['physicalCores'] as int,
+      cpuLogicalCores: json['logicalCores'] as int,
+      virtualMemoryTotal: json['virtualMemoryTotal'] is int
+          ? (json['virtualMemoryTotal'] as int).toDouble()
+          : json['virtualMemoryTotal'] as double,
     );
   }
 
   @override
   String toString() {
-    return 'OS: $os, Hostname: $hostname, CPU Cores: $cpuModel, Memory: ${virtualMemoryTotal}GB';
+    return 'OS: $os, Hostname: $hostname, CPU: $cpuModel ($cpuFrequency MHz), '
+        'Cores: $cpuPhysicalCores/$cpuLogicalCores, Memory: ${virtualMemoryTotal}GB';
   }
 }
 

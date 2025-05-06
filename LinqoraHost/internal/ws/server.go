@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"runtime"
 	"sync"
 	"time"
 
@@ -147,15 +146,24 @@ func (s *WSServer) handleAuthMessage(client *Client, msg *ClientMessage) {
 	// Отримуємо характеристики системи
 	ramTotal, _ := metrics.GetRamTotal()
 
+	// Отримуємо характеристики системи
+	cpuModel, _ := metrics.GetCPUModel()
+
 	// Отримуємо інформацію про пристрій
 	deviceInfo := metrics.GetDeviceInfo()
+
+	freq, _ := metrics.GetCPUFrequency()
+	cores, threads, _ := metrics.GetCPUCoresAndThreads()
 
 	// Формуємо відповідь з характеристиками системи
 	authInformation := AuthInformation{
 		OS:                 deviceInfo.OS,
 		Hostname:           deviceInfo.Hostname,
-		CpuModel:           runtime.NumCPU(),
+		CpuModel:           cpuModel,
 		VirtualMemoryTotal: ramTotal,
+		CpuPhysicalCores:   cores,
+		CpuLogicalCores:    threads,
+		CpuFrequency:       freq,
 	}
 
 	response := AuthResponse{
