@@ -10,16 +10,16 @@ class MetricsController extends GetxController {
 
   static const int maxMetricsCount = 20;
 
-  final temperatures = <double>[].obs;
-  final cpuLoads = <double>[].obs;
-  final ramUsages = <double>[].obs;
+  final temperatures = <int>[].obs;
+  final cpuLoads = <int>[].obs;
+  final ramUsagesPercent = <int>[].obs;
 
   final currentCPUMetrics = Rx<CPUMetrics?>(null);
   final currentRAMMetrics = Rx<RAMMetrics?>(null);
 
-  List<double> getTemperatures() => temperatures.toList();
-  List<double> getCPULoads() => cpuLoads.toList();
-  List<double> getRAMUsages() => ramUsages.toList();
+  List<int> getTemperatures() => temperatures.toList();
+  List<int> getCPULoads() => cpuLoads.toList();
+  List<int> getRAMUsagesPercent() => ramUsagesPercent.toList();
 
   CPUMetrics? getCurrentCPUMetrics() => currentCPUMetrics.value;
   RAMMetrics? getCurrentRAMMetrics() => currentRAMMetrics.value;
@@ -44,7 +44,7 @@ class MetricsController extends GetxController {
     _updateMetricsArrays(
       currentCPUMetrics.value!.temperature,
       currentCPUMetrics.value!.loadPercent,
-      currentRAMMetrics.value!.usage,
+      currentRAMMetrics.value!.loadPercent,
     );
   }
 
@@ -53,17 +53,17 @@ class MetricsController extends GetxController {
     currentRAMMetrics.value = null;
     temperatures.clear();
     cpuLoads.clear();
-    ramUsages.clear();
+    ramUsagesPercent.clear();
   }
 
-  void _updateMetricsArrays(double temperature, double cpuLoad, double ramUsage) {
+  void _updateMetricsArrays(int temperature, int cpuLoad, int ramUsage) {
     if (temperatures.length >= maxMetricsCount) temperatures.removeAt(0);
     temperatures.add(temperature);
 
     if (cpuLoads.length >= maxMetricsCount) cpuLoads.removeAt(0);
     cpuLoads.add(cpuLoad);
 
-    if (ramUsages.length >= maxMetricsCount) ramUsages.removeAt(0);
-    ramUsages.add(ramUsage);
+    if (ramUsagesPercent.length >= maxMetricsCount) ramUsagesPercent.removeAt(0);
+    ramUsagesPercent.add(ramUsage);
   }
 }

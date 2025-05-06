@@ -47,7 +47,7 @@ func GetCPULoad() (float64, error) {
 	}
 	if len(percentages) > 0 {
 		// Округляем до 2 знаков после запятой
-		return math.Round(percentages[0]*100) / 100, nil
+		return math.Round(percentages[0]), nil
 	}
 	return 0, nil
 }
@@ -76,7 +76,7 @@ func GetCPUTemperature() (float64, error) {
 				continue
 			}
 
-			cpuTemp = math.Round(t.Temperature*100) / 100
+			cpuTemp = math.Round(t.Temperature)
 			found = true
 			break
 		}

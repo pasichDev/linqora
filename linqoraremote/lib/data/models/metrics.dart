@@ -1,6 +1,6 @@
 class CPUMetrics {
-  final double temperature;
-  final double loadPercent;
+  final int temperature;
+  final int loadPercent;
   final int processes;
   final int threads;
 
@@ -13,8 +13,8 @@ class CPUMetrics {
 
   factory CPUMetrics.fromJson(Map<String, dynamic> json) {
     return CPUMetrics(
-      temperature: json['temperature'] as double,
-      loadPercent: json['loadPercent'] as double,
+      temperature: json['temperature'] as int,
+      loadPercent: json['loadPercent'] as int,
       processes: json['processes'] as int,
       threads: json['threads'] as int,
     );
@@ -23,7 +23,7 @@ class CPUMetrics {
 
 class RAMMetrics {
   final double usage;
-  final double loadPercent;
+  final int loadPercent;
 
   RAMMetrics({
     required this.usage,
@@ -33,7 +33,7 @@ class RAMMetrics {
   factory RAMMetrics.fromJson(Map<String, dynamic> json) {
     return RAMMetrics(
       usage: json['usage'] as double,
-      loadPercent: json['loadPercent'] as double,
+      loadPercent: json['loadPercent'] as int,
     );
   }
 }

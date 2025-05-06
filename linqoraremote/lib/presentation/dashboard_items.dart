@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:linqoraremote/presentation/widgets/mouse_control_view.dart';
-import 'package:linqoraremote/presentation/widgets/statistics_view.dart';
+import 'package:linqoraremote/presentation/widgets/monitoring_view.dart';
 
 class MenuOption {
   final String title;
@@ -16,9 +16,9 @@ class MenuOption {
 
 final menuOptions = [
   MenuOption(
-    title: 'Статистика',
-    icon: Icons.bar_chart,
-    view: StatisticsView(),
+    title: 'Моніторинг',
+    icon: Icons.monitor_heart_outlined,
+    view: MonitoringView(),
   ),
   MenuOption(
     title: 'Керування мишкою',
