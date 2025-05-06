@@ -6,7 +6,6 @@ import 'package:get/get.dart';
 import '../../data/enums/type_messages_ws.dart';
 import '../../data/models/auth_response.dart';
 import '../../data/models/discovered_service.dart';
-import '../../data/models/metrics.dart';
 import '../../data/models/ws_message.dart';
 import '../../data/providers/mdns_provider.dart';
 import '../../data/providers/websocket_provider.dart';
@@ -18,7 +17,6 @@ enum MDnsStatus { connecting, connected, cancel, ws, retry }
 class DeviceHomeController extends GetxController {
   final MDnsProvider mdnsProvider;
   final WebSocketProvider webSocketProvider;
-
   final MetricsController metricsController;
 
   DeviceHomeController({
@@ -29,31 +27,14 @@ class DeviceHomeController extends GetxController {
 
   final RxBool isConnected = false.obs;
   final Rx<MDnsStatus> mdnsConnectingStatus = MDnsStatus.connecting.obs;
-
   final RxList<DiscoveredService> devices = <DiscoveredService>[].obs;
   final RxString deviceCode = '0'.obs;
   final RxInt selectedMenuIndex = (-1).obs;
-
-  // Інформація яку отримуємо при авторизації
   final Rx<AuthInformation?> authInformation = Rx<AuthInformation?>(null);
 
-  // Масиви для зберігання останніх 20 метрик
-  final RxList<double> temperatures = <double>[].obs;
-  final RxList<double> cpuLoads = <double>[].obs;
-  final RxList<double> ramUsages = <double>[].obs;
-
-  // Поточні значення метрик
-  final Rx<CPUMetrics?> currentCPUMetrics = Rx<CPUMetrics?>(null);
-  final Rx<RAMMetrics?> currentRAMMetrics = Rx<RAMMetrics?>(null);
-
-  // Максимальна кількість записів для зберігання
-  static const int maxMetricsCount = 20;
-
-  // Параметри для повторних спроб
+  // Maximum retry attempts
   static const int maxRetryAttempts = 2;
   static const Duration retryDelay = Duration(seconds: 3);
-
-  // Кількість спроб пошуку
   int _discoveryAttempts = 0;
   Timer? _retryTimer;
 
@@ -64,6 +45,7 @@ class DeviceHomeController extends GetxController {
     if (args != null) {
       deviceCode.value = args['deviceCode'] ?? '';
     }
+    _setupMDnsProvider();
     startDiscovery();
   }
 
@@ -71,85 +53,89 @@ class DeviceHomeController extends GetxController {
   void onClose() {
     webSocketProvider.close();
     _retryTimer?.cancel();
-
+    mdnsProvider.dispose();
     super.onClose();
   }
 
-  /// Починає пошук пристроїв з підтримкою повторних спроб
-  void startDiscovery() async {
+  void _setupMDnsProvider() {
+    mdnsProvider.onStatusChanged = (status, {String? message}) {
+      switch (status) {
+        case DiscoveryStatus.started:
+          mdnsConnectingStatus.value = MDnsStatus.connecting;
+          break;
+        case DiscoveryStatus.deviceFound:
+          mdnsConnectingStatus.value = MDnsStatus.connected;
+          break;
+        case DiscoveryStatus.empty:
+        case DiscoveryStatus.timeout:
+          _handleEmptyOrTimeout();
+          break;
+        case DiscoveryStatus.error:
+          _handleDiscoveryError(message);
+          break;
+        case DiscoveryStatus.completed:
+          // Handled in discovery result
+          break;
+      }
+    };
+  }
+
+  void startDiscovery() {
     _discoveryAttempts = 0;
     _performDiscovery();
   }
 
-  /// Виконує спробу пошуку пристроїв через mDNS
   void _performDiscovery() async {
     _discoveryAttempts++;
-
     if (kDebugMode) {
-      print('Спроба пошуку #$_discoveryAttempts');
+      print('Discovery attempt #$_discoveryAttempts');
     }
-
-    mdnsConnectingStatus.value = MDnsStatus.connecting;
-    var errorDiscovery = false;
-
-    mdnsProvider.onConnected = () {
-      mdnsConnectingStatus.value = MDnsStatus.connected;
-    };
-
-    mdnsProvider.onEmpty = () {
-      errorDiscovery = true;
-      mdnsConnectingStatus.value = MDnsStatus.cancel;
-
-      // Якщо це була не остання спроба, переходимо в статус retry
-      if (_discoveryAttempts < maxRetryAttempts) {
-        mdnsConnectingStatus.value = MDnsStatus.retry;
-      }
-    };
 
     try {
       devices.value = await mdnsProvider.discoverDevices(deviceCode.value);
 
       if (devices.isNotEmpty && devices[0].address != null) {
-        connectToDevice(devices.first);
+        await connectToDevice(devices.first);
       } else {
-        errorDiscovery = true;
-        mdnsConnectingStatus.value = MDnsStatus.cancel;
-
-        // Якщо це була не остання спроба, переходимо в статус retry
-        if (_discoveryAttempts < maxRetryAttempts) {
-          mdnsConnectingStatus.value = MDnsStatus.retry;
-        }
+        _handleEmptyOrTimeout();
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Помилка при пошуку пристроїв (спроба #$_discoveryAttempts): $e');
+        print(
+          'Error during device discovery (attempt #$_discoveryAttempts): $e',
+        );
       }
-
-      errorDiscovery = true;
-      mdnsConnectingStatus.value = MDnsStatus.cancel;
-
-      // Якщо це була не остання спроба, переходимо в статус retry
-      if (_discoveryAttempts < maxRetryAttempts) {
-        mdnsConnectingStatus.value = MDnsStatus.retry;
-      }
+      _handleDiscoveryError('Discovery error: $e');
     }
+  }
 
-    // Якщо була помилка і не перевищили максимальну кількість спроб
-    if (errorDiscovery && _discoveryAttempts < maxRetryAttempts) {
+  void _handleEmptyOrTimeout() {
+    if (_discoveryAttempts < maxRetryAttempts) {
+      mdnsConnectingStatus.value = MDnsStatus.retry;
       _scheduleRetry();
-    } else if (errorDiscovery) {
+    } else {
+      mdnsConnectingStatus.value = MDnsStatus.cancel;
       _handleDiscoveryFailure();
     }
   }
 
-  /// Планує повторну спробу пошуку
+  void _handleDiscoveryError(String? message) {
+    if (_discoveryAttempts < maxRetryAttempts) {
+      mdnsConnectingStatus.value = MDnsStatus.retry;
+      _scheduleRetry();
+    } else {
+      mdnsConnectingStatus.value = MDnsStatus.cancel;
+      _handleDiscoveryFailure();
+    }
+    if (message != null) {
+      Get.snackbar('Error', message, snackPosition: SnackPosition.BOTTOM);
+    }
+  }
+
   void _scheduleRetry() {
     if (kDebugMode) {
-      print(
-        'Планування повторної спроби пошуку через ${retryDelay.inSeconds} секунд',
-      );
+      print('Scheduling retry in ${retryDelay.inSeconds} seconds');
     }
-
     _retryTimer?.cancel();
     _retryTimer = Timer(retryDelay, () {
       if (mdnsConnectingStatus.value == MDnsStatus.retry) {
@@ -158,21 +144,18 @@ class DeviceHomeController extends GetxController {
     });
   }
 
-  /// Обробляє остаточну невдачу пошуку після всіх спроб
   void _handleDiscoveryFailure() {
     if (kDebugMode) {
-      print('Усі спроби пошуку невдалі ($maxRetryAttempts спроб)');
+      print('All discovery attempts failed ($maxRetryAttempts attempts)');
     }
-
     Get.back(result: {'status': 'cancel'});
     Get.snackbar(
-      'Пристрій недоступний',
-      'Встановити з\'єднання з пристроєм не вдалося після $maxRetryAttempts спроб',
+      'Device Unavailable',
+      'Connection failed after $maxRetryAttempts attempts',
       snackPosition: SnackPosition.BOTTOM,
     );
   }
 
-  /// Запускає повторну спробу пошуку вручну
   void retryDiscovery() {
     if (_discoveryAttempts < maxRetryAttempts) {
       _performDiscovery();
@@ -192,8 +175,8 @@ class DeviceHomeController extends GetxController {
       if (mdnsConnectingStatus.value == MDnsStatus.ws) {
         Get.back(result: {'status': 'cancel'});
         Get.snackbar(
-          'Втрачено з\'єднання',
-          'LinqoraHost неактивний',
+          'Connection Lost',
+          'LinqoraHost is inactive',
           snackPosition: SnackPosition.BOTTOM,
         );
       }
@@ -205,73 +188,50 @@ class DeviceHomeController extends GetxController {
         int.parse(device.port!),
         deviceCode.value,
       );
+
+      final authenticated = await authenticate();
+      if (!authenticated) {
+        if (kDebugMode) {
+          print('Authentication failed');
+        }
+        await webSocketProvider.disconnect();
+      }
     } else {
       await webSocketProvider.disconnect();
-      return;
-    }
-
-    final authenticated = await authenticate();
-    if (!authenticated) {
-      if (kDebugMode) {
-        print('Авторизація не вдалася');
-      }
-      await webSocketProvider.disconnect();
-      return;
-    }
-
-    if (kDebugMode) {
-      print('Успішно авторизовано!');
     }
   }
 
-  // Авторизація на сервері
   Future<bool> authenticate() async {
     var deviceName = await getDeviceName();
     if (!webSocketProvider.isConnected ||
         !isConnected.value ||
         mdnsConnectingStatus.value != MDnsStatus.ws) {
       if (kDebugMode) {
-        print('Неможливо авторизуватися: відсутнє підключення');
+        print('Cannot authenticate: no connection');
       }
       return false;
     }
 
-    final WsMessage authMessage = WsMessage(
-      type: TypeMessageWs.auth.value,
-      deviceCode: deviceCode.value,
-    )..setField('data', {'deviceName': deviceName});
-
     try {
-      // Реєструємо обробник відповіді на авторизацію
       final completer = Completer<bool>();
+      final authMessage = WsMessage(
+        type: TypeMessageWs.auth.value,
+        deviceCode: deviceCode.value,
+      )..setField('data', {'deviceName': deviceName});
 
-      // Тимчасовий обробник для авторизації
       webSocketProvider.registerHandler('auth_response', (data) {
         final success = data['success'] as bool;
         if (success) {
           authInformation.value = AuthResponse.fromJson(data).authInformation;
-
-          if (kDebugMode) {
-            print(
-              'Авторизація успішна. \nІнформація про систему: ${authInformation.value}',
-            );
-          }
-
           webSocketProvider.setAuthenticated(true);
           webSocketProvider.joinRoom('auth');
           completer.complete(true);
         } else {
-          final message = data['message'] as String;
-          if (kDebugMode) {
-            print('Помилка авторизації: $message');
-          }
           completer.complete(false);
         }
-
-        // Видаляємо тимчасовий обробник
         webSocketProvider.removeHandler('auth_response');
       });
-      // Відправляємо повідомлення авторизації
+
       webSocketProvider.sendMessage(authMessage);
 
       Timer(Duration(seconds: 10), () {
@@ -280,9 +240,6 @@ class DeviceHomeController extends GetxController {
           webSocketProvider.removeHandler('auth_response');
           webSocketProvider.close();
           cancelConnection();
-          if (kDebugMode) {
-            print('Таймаут авторизації');
-          }
         }
       });
 
@@ -290,19 +247,8 @@ class DeviceHomeController extends GetxController {
     } catch (e) {
       webSocketProvider.close();
       cancelConnection();
-      if (kDebugMode) {
-        print('Помилка під час авторизації: $e');
-      }
       return false;
     }
-  }
-
-  ///  Move to MouseController
-  void joinMouseRoom() async {
-    webSocketProvider.registerHandler('control', (data) {});
-
-    // Приєднуємося до кімнати метрик
-    await webSocketProvider.joinRoom('control');
   }
 
   void cancelConnection() {

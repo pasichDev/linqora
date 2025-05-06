@@ -10,7 +10,7 @@ class MouseControlView extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = Get.find<DeviceHomeController>();
     final sensitivity = 1.0; // Множитель чувствительности
-    controller.joinMouseRoom();
+   // controller.joinMouseRoom();
 
     return Column(
       children: [
