@@ -21,7 +21,7 @@ class AppBarHomePage extends GetView<DeviceHomeController>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      controller.selectedMenuIndex == -1
+                      controller.selectedMenuIndex.value == -1
                           ? controller.authInformation.value?.hostname ?? ""
                           : menuOptions[controller.selectedMenuIndex.value]
                               .title,
@@ -61,7 +61,7 @@ class AppBarHomePage extends GetView<DeviceHomeController>
                 ),
                 actions: [
                   TextButton(
-                    onPressed: () => {controller.cancelConnection()},
+                    onPressed: () => {Get.back(result: false)},
                     child: const Text('Скасувати'),
                   ),
                   TextButton(
