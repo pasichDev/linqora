@@ -10,6 +10,10 @@ type ServerConfig struct {
 	MDNSDomain      string          // Домен mDNS сервісу
 	ValidDeviceIDs  map[string]bool // Перелік дозволених deviceCode
 	MetricsInterval time.Duration   // Інтервал надсилання метрик
+
+	EnableTLS bool   // Включити TLS
+	CertFile  string // Шлях до файлу сертифікату
+	KeyFile   string // Шлях до файлу ключа
 }
 
 // DefaultConfig повертає конфігурацію за замовчуванням

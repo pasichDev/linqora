@@ -24,24 +24,23 @@ import (
 /**
 sudo apt-get install libx11-dev xorg-dev libxtst-dev xsel xclip
 реалізувати перевірку чи встановлені необхідін пакети
+реалізувати перевірку сертифікатів при запску гуі і просто
 */
 
 var (
-	// Глобальні змінні для флагів
 	port     int
 	authCode string
-	server   *LinqoraHost.Server // Глобальна змінна для доступу до сервера
-	stopCh   chan struct{}       // Канал для сигналу зупинки
-	restart  chan struct{}       // Канал для сигналу перезапуску
-	serverMu sync.Mutex          // М'ютекс для безпечного доступу до сервера
+	server   *LinqoraHost.Server
+	stopCh   chan struct{}
+	restart  chan struct{}
+	serverMu sync.Mutex
 
 	// Головна команда
 	rootCmd = &cobra.Command{
 		Use:   "linqora",
 		Short: "Linqora Host Server - сервер для віддаленого керування пристроями",
-		Long: `Linqora Host Server - сервер для віддаленого керування пристроями.
-Запускає WebSocket сервер та mDNS для виявлення пристроїв.`,
-		Run: runServer,
+		Long:  `Linqora Host Server - сервер для моніторингу та віддаленого керування пристроями.`,
+		Run:   runServer,
 	}
 )
 
@@ -61,6 +60,10 @@ func init() {
 	// Додаємо флаги
 	rootCmd.Flags().IntVarP(&port, "port", "p", 8070, "Порт для WebSocket сервера")
 	rootCmd.Flags().StringVarP(&authCode, "code", "c", "", "Код автентифікації (6 цифр)")
+
+	rootCmd.Flags().BoolP("notls", "s", false, "Enable TLS/SSL for WebSocket")
+	rootCmd.Flags().String("cert", "./certs/dev-certs/cert.pem", "Path to the TLS certificate file")
+	rootCmd.Flags().String("key", "./certs/dev-certs/key.pem", "Path to the TLS key file")
 
 	// Ініціалізуємо канали
 	stopCh = make(chan struct{})
@@ -241,6 +244,38 @@ func runServer(cmd *cobra.Command, args []string) {
 	// Запускаємо обробник команд у окремій горутині
 	go startCommandProcessor()
 
+	// Отримуємо значення TLS-прапорців
+	disableTLS, _ := cmd.Flags().GetBool("notls")
+	enableTLS := !disableTLS
+	certFile, _ := cmd.Flags().GetString("cert")
+	keyFile, _ := cmd.Flags().GetString("key")
+
+	// Перевіряємо наявність сертифікатів, якщо TLS увімкнено
+	if enableTLS {
+		certExists := true
+		keyExists := true
+
+		if _, err := os.Stat(certFile); os.IsNotExist(err) {
+			certExists = false
+			fmt.Printf("Увага: Файл сертифіката %s не знайдено\n", certFile)
+		}
+
+		if _, err := os.Stat(keyFile); os.IsNotExist(err) {
+			keyExists = false
+			fmt.Printf("Увага: Файл ключа %s не знайдено\n", keyFile)
+		}
+
+		// Если файлов нет, автоматически выключаем TLS
+		if !certExists || !keyExists {
+			fmt.Println("TLS автоматично вимкнено через відсутність сертифікатів")
+			enableTLS = false
+		} else {
+			fmt.Println("TLS увімкнено. Використовується захищений WebSocket (WSS).")
+		}
+	} else {
+		fmt.Println("TLS вимкнено. Використовується незахищений WebSocket (WS).")
+	}
+
 	// Запускаємо сервер у циклі для можливості перезапуску
 	for {
 		// Створюємо конфігурацію сервера
@@ -253,6 +288,9 @@ func runServer(cmd *cobra.Command, args []string) {
 				codeStr: true,
 			},
 			MetricsInterval: 2 * 1000000000, // 2 секунди в наносекундах
+			EnableTLS:       enableTLS,
+			CertFile:        certFile,
+			KeyFile:         keyFile,
 		}
 
 		// Повідомлення про підготовку до запуску

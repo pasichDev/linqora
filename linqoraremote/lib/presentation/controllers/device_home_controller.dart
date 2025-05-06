@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
+import '../../core/constants/constants.dart';
 import '../../data/enums/type_messages_ws.dart';
 import '../../data/models/auth_response.dart';
 import '../../data/models/discovered_service.dart';
@@ -37,6 +38,7 @@ class DeviceHomeController extends GetxController {
   static const Duration retryDelay = Duration(seconds: 3);
   int _discoveryAttempts = 0;
   Timer? _retryTimer;
+
 
   @override
   void onInit() {
@@ -95,7 +97,7 @@ class DeviceHomeController extends GetxController {
       devices.value = await mdnsProvider.discoverDevices(deviceCode.value);
 
       if (devices.isNotEmpty && devices[0].address != null) {
-        await connectToDevice(devices.first);
+        await connectToDevice(devices[0].copyWith(authCode: deviceCode.value));
       } else {
         _handleEmptyOrTimeout();
       }
@@ -183,11 +185,20 @@ class DeviceHomeController extends GetxController {
     };
 
     if (device.address != null && device.port != null) {
-      await webSocketProvider.connect(
-        device.address!,
-        int.parse(device.port!),
-        deviceCode.value,
+      final isWsConnect = await webSocketProvider.connect(
+        device,
+        allowSelfSigned: allowSelfSigned,
       );
+
+      if (!isWsConnect) {
+        await webSocketProvider.disconnect();
+        Get.snackbar(
+          'Ws connect failed',
+          'Please check your device online and try again.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        cancelConnection();
+      }
 
       final authenticated = await authenticate();
       if (!authenticated) {
@@ -195,6 +206,12 @@ class DeviceHomeController extends GetxController {
           print('Authentication failed');
         }
         await webSocketProvider.disconnect();
+        Get.snackbar(
+          'Authentication failed',
+          'Please check your device code and try again.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        cancelConnection();
       }
     } else {
       await webSocketProvider.disconnect();

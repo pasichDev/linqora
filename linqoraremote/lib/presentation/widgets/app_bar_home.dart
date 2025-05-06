@@ -30,9 +30,37 @@ class AppBarHomePage extends GetView<DeviceHomeController>
                         fontSize: 16,
                       ),
                     ),
-                    Text(
-                      "${controller.devices.first.address ?? ""}:${controller.devices.first.port ?? ""}",
-                      style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8)),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        if (controller.devices.value.first.supportsTLS == true) ...[
+                          Icon(
+                            Icons.lock_outlined,
+                            size: 12,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          SizedBox(width: 2),
+                          Text(
+                            "(TSL)",
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                          SizedBox(width: 2),
+                        ],
+
+                        Text(
+                          "${controller.devices.first.address ?? ""}:${controller.devices.first.port ?? ""}",
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withOpacity(0.8),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

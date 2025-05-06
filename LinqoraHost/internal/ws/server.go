@@ -54,8 +54,21 @@ func (s *WSServer) Start(ctx context.Context) error {
 
 	// Запускаємо HTTP сервер у goroutine
 	go func() {
+		var err error
 		log.Printf("WebSocket server started at :%d", s.config.Port)
-		if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+
+		if s.config.EnableTLS {
+			// Запускаємо з TLS (WSS)
+			err = s.httpServer.ListenAndServeTLS(
+				s.config.CertFile,
+				s.config.KeyFile,
+			)
+		} else {
+			// Звичайний запуск без TLS (WS)
+			err = s.httpServer.ListenAndServe()
+		}
+
+		if err != nil && err != http.ErrServerClosed {
 			log.Fatalf("WebSocket server failed: %v", err)
 		}
 	}()

@@ -38,6 +38,12 @@ func (s *MDNSService) Start(ctx context.Context) error {
 		txt = append(txt, fmt.Sprintf("ip=%s", ip))
 	}
 
+	if s.config.EnableTLS {
+		txt = append(txt, "tls=true")
+	} else {
+		txt = append(txt, "tls=false")
+	}
+
 	// Реєструємо сервіс
 	server, err := zeroconf.Register(
 		s.config.MDNSName,
@@ -54,8 +60,9 @@ func (s *MDNSService) Start(ctx context.Context) error {
 
 	s.server = server
 
-	log.Printf("mDNS service registered: %s.%s.%s on port %d",
-		s.config.MDNSName, s.config.MDNSType, s.config.MDNSDomain, s.config.Port)
+	log.Printf("mDNS service registered: %s.%s.%s on port %d (TLS: %v)",
+		s.config.MDNSName, s.config.MDNSType, s.config.MDNSDomain,
+		s.config.Port, s.config.EnableTLS)
 
 	// Очікуємо на завершення контексту
 	<-ctx.Done()

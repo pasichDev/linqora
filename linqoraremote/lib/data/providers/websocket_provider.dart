@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
+import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/status.dart' as status;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../enums/type_messages_ws.dart';
+import '../models/discovered_service.dart';
 import '../models/ws_message.dart';
 
 class WebSocketProvider {
@@ -23,6 +26,8 @@ class WebSocketProvider {
   bool _isConnected = false;
   bool _isAuthenticated = false;
   StreamSubscription? _subscription;
+
+  // bool _useTSL= false;
 
   String? _deviceCode;
 
@@ -45,11 +50,85 @@ class WebSocketProvider {
     _channel?.sink.add(message);
   }
 
-  Future<bool> connect(String ip, int port, String deviceCode) async {
-    _deviceCode = deviceCode;
-    final wsUrl = 'ws://$ip:$port/ws';
+  // get isTSLConnect => _useTSL;
+
+  /*
+  Future<bool> _isTSLConnect(
+    DiscoveredService device,
+    bool allowSelfSigned,
+  ) async {
     try {
-      _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+      final socket = await Socket.connect(
+        device.address,
+        int.parse(device.port ?? ""),
+        timeout: Duration(seconds: 2),
+      );
+      await socket.close();
+
+      // check TSL
+      final secureContext = SecurityContext();
+      try {
+        final secureSocket = await SecureSocket.connect(
+          device.address,
+          int.parse(device.port ?? ""),
+          context: secureContext,
+          timeout: Duration(seconds: 2),
+          onBadCertificate: (_) => allowSelfSigned,
+        );
+        await secureSocket.close();
+        return true; // TSL работает
+      } catch (e) {
+        return false; // TSL не работает
+      }
+    } catch (_) {}
+    return false;
+  }
+
+
+   */
+  Future<bool> connect(
+    DiscoveredService device, {
+    bool allowSelfSigned = true,
+  }) async {
+    if (device.address == null || device.port == null) {
+      if (kDebugMode) {
+        print('Invalid device address or port');
+      }
+      return false;
+    }
+    print('Подключение к ${device.supportsTLS} ');
+    final protocol = device.supportsTLS ? 'wss' : 'ws';
+    final wsUrl = '$protocol://${device.address}:${device.port}/ws';
+
+    if (kDebugMode) {
+      print('Подключение к $wsUrl');
+    }
+    _deviceCode = device.authCode;
+
+    try {
+      if (device.supportsTLS) {
+        try {
+          final client =
+              HttpClient()..badCertificateCallback = (_, __, ___) => true;
+          final webSocket = await WebSocket.connect(
+            wsUrl,
+            customClient: client,
+          );
+          _channel = IOWebSocketChannel(webSocket);
+
+          if (kDebugMode) {
+            print('Подключено через самоподписанный TSL сертификат');
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('Ошибка подключения через самоподписанный сертификат: $e');
+            print('Пробуем обычное подключение...');
+          }
+          _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+        }
+      } else {
+        _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+      }
 
       _subscription = _channel!.stream.listen(
         (message) {
@@ -62,10 +141,10 @@ class WebSocketProvider {
       );
 
       _isConnected = true;
+      onConnected?.call();
       if (kDebugMode) {
         print('WebSocket підключено ');
       }
-      onConnected?.call();
       return true;
     } catch (e) {
       if (kDebugMode) {

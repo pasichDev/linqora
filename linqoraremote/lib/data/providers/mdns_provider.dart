@@ -103,12 +103,24 @@ class MDnsProvider {
 
           onStatusChanged?.call(DiscoveryStatus.deviceFound);
 
-          // Look up SRV records for the PTR
           await for (final SrvResourceRecord srv in _client!
               .lookup<SrvResourceRecord>(
                 ResourceRecordQuery.service(ptr.domainName),
               )) {
-            // Look up IP addresses for the SRV target
+            bool supportsTLS = false;
+
+            await for (final TxtResourceRecord txt in _client!
+                .lookup<TxtResourceRecord>(
+                  ResourceRecordQuery.text(ptr.domainName),
+                )) {
+              // Правильная проверка текстовой записи
+              final txtString = txt.text.toString();
+              if (txtString.contains('tls=true')) {
+                supportsTLS = true;
+              }
+            }
+
+            // Теперь обрабатываем IP-адреса и создаем устройства
             await for (final IPAddressResourceRecord ip in _client!
                 .lookup<IPAddressResourceRecord>(
                   ResourceRecordQuery.addressIPv4(srv.target),
@@ -117,12 +129,15 @@ class MDnsProvider {
                 name: ptr.domainName,
                 address: ip.address.address,
                 port: srv.port.toString(),
+                supportsTLS: supportsTLS,
               );
 
               devices.add(device);
 
               if (kDebugMode) {
-                print('Found device: ${ip.address.address}:${srv.port}');
+                print(
+                  'Found device: ${ip.address.address}:${srv.port} (TLS support: $supportsTLS)',
+                );
               }
             }
           }
