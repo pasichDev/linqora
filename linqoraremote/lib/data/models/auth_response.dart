@@ -4,8 +4,8 @@ import 'dart:convert';
 class AuthInformation {
   final String os;
   final String hostname;
-  final int cpuModel; // Number of CPU cores
-  final double virtualMemoryTotal; // Changed to double to match the 33.53 value
+  final int cpuModel;
+  final double virtualMemoryTotal;
 
   AuthInformation({
     required this.os,
@@ -30,9 +30,10 @@ class AuthInformation {
       os: json['os'] as String,
       hostname: json['hostname'] as String,
       cpuModel: json['cpuModel'] as int,
-      virtualMemoryTotal: (json['virtualMemoryTotal'] is int)
-          ? (json['virtualMemoryTotal'] as int).toDouble()
-          : json['virtualMemoryTotal'] as double,
+      virtualMemoryTotal:
+          (json['virtualMemoryTotal'] is int)
+              ? (json['virtualMemoryTotal'] as int).toDouble()
+              : json['virtualMemoryTotal'] as double,
     );
   }
 
@@ -59,16 +60,18 @@ class AuthResponse {
     return {
       'type': type,
       'success': success,
-      'authInfomation': authInformation.toJson(), // Keep the original spelling in the output
+      'authInfomation': authInformation.toJson(),
     };
   }
 
   /// Create an instance from a JSON map
   factory AuthResponse.fromJson(Map<String, dynamic> json) {
     return AuthResponse(
-      type: json['type'] as String, // Changed from 'Type' to 'type'
-      success: json['success'] as bool, // Changed from 'Success' to 'success'
-      authInformation: AuthInformation.fromJson(json['authInfomation'] as Map<String, dynamic>), // Changed from 'AuthInfomation' to 'authInfomation'
+      type: json['type'] as String,
+      success: json['success'] as bool,
+      authInformation: AuthInformation.fromJson(
+        json['authInfomation'] as Map<String, dynamic>,
+      ),
     );
   }
 

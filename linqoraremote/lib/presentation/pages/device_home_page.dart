@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:linqoraremote/presentation/widgets/app_bar_home.dart';
 
 import '../controllers/device_home_controller.dart';
 import '../widgets/connect_screen.dart';
@@ -16,73 +17,7 @@ class DeviceHomePage extends GetView<DeviceHomeController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Obx(
-          () =>
-              controller.devices.isEmpty ||
-                      controller.authInformation.value == null
-                  ? SizedBox()
-                  : Column(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        controller.authInformation.value?.hostname ?? "",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      Text(
-                        "${controller.devices.first.address ?? ""}:${controller.devices.first.port ?? ""}",
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ],
-                  ),
-        ),
-        leading: IconButton(
-          icon: Obx(
-            () => Icon(
-              controller.isConnected.value &&
-                      controller.selectedMenuIndex.value == -1
-                  ? Icons.close
-                  : Icons.arrow_back,
-            ),
-          ),
-          onPressed: () async {
-            if (controller.selectedMenuIndex.value != -1) {
-              controller.selectMenuItem(-1);
-              return;
-            }
-            if (controller.isConnected.value &&
-                controller.selectedMenuIndex.value == -1) {
-              final result = await Get.dialog<bool>(
-                AlertDialog(
-                  title: const Text('Підтвердження'),
-                  content: const Text(
-                    'Ви впевнені, що хочете розірвати з\'єднання?',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Get.back(result: false),
-                      child: const Text('Скасувати'),
-                    ),
-                    TextButton(
-                      onPressed: () => Get.back(result: true),
-                      child: const Text('Так'),
-                    ),
-                  ],
-                ),
-              );
-              if (result == true) {
-                controller.cancelConnection();
-              }
-            } else {
-              controller.cancelConnection();
-            }
-          },
-        ),
-      ),
+      appBar: AppBarHomePage(),
       body: SizedBox(
         width: double.infinity,
         child: Obx(
