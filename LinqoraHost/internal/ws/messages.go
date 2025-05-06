@@ -52,6 +52,9 @@ type MetricsMessage struct {
 type AuthInformation struct {
 	OS                 string  `json:"os"`
 	Hostname           string  `json:"hostname"`
-	CpuModel           int     `json:"cpuModel"`
+	CpuModel           string  `json:"cpuModel"`
+	CpuFrequency       float64 `json:"cpuFrequency"`
+	CpuPhysicalCores   int     `json:"physicalCores"`
+	CpuLogicalCores    int     `json:"logicalCores"`
 	VirtualMemoryTotal float64 `json:"virtualMemoryTotal"`
 }

@@ -108,3 +108,52 @@ func GetProcessesAndThreads() (int, int, error) {
 
 	return numProcesses, totalThreads, nil
 }
+
+func GetCPUModel() (string, error) {
+
+	// Отримуємо інформацію про процесор
+	cpuArray, cpuError := cpu.Info()
+	if cpuError != nil {
+		return "Unkown", cpuError
+	}
+
+	// Якщо є хоча б один процесор, заповнюємо модель, кількість ядер і потоків
+	if len(cpuArray) > 0 {
+		c := cpuArray[0]
+		return c.ModelName, nil
+	}
+
+	return "Unkown", nil
+}
+
+// GetCPUFrequency повертає частоту процесора в МГц
+func GetCPUFrequency() (float64, error) {
+	cpuInfo, err := cpu.Info()
+	if err != nil {
+		return 0, err
+	}
+
+	if len(cpuInfo) == 0 {
+		return 0, fmt.Errorf("не вдалося отримати інформацію про процесор")
+	}
+
+	// Округляємо до 2 знаків після коми
+	return math.Round(cpuInfo[0].Mhz*100) / 100, nil
+}
+
+// GetCPUCoresAndThreads повертає кількість фізичних ядер та логічних потоків
+func GetCPUCoresAndThreads() (int, int, error) {
+	// Отримуємо кількість логічних ядер (потоків)
+	logicalCores, err := cpu.Counts(true)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	// Отримуємо кількість фізичних ядер
+	physicalCores, err := cpu.Counts(false)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return physicalCores, logicalCores, nil
+}
