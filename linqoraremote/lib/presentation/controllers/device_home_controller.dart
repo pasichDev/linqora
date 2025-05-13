@@ -11,19 +11,16 @@ import '../../data/models/ws_message.dart';
 import '../../data/providers/mdns_provider.dart';
 import '../../data/providers/websocket_provider.dart';
 import '../../utils/device_info.dart';
-import 'metrics_controller.dart';
 
 enum MDnsStatus { connecting, connected, cancel, ws, retry }
 
 class DeviceHomeController extends GetxController {
   final MDnsProvider mdnsProvider;
   final WebSocketProvider webSocketProvider;
-  final MetricsController metricsController;
 
   DeviceHomeController({
     required this.mdnsProvider,
     required this.webSocketProvider,
-    required this.metricsController,
   });
 
   final RxBool isConnected = false.obs;
@@ -38,7 +35,6 @@ class DeviceHomeController extends GetxController {
   static const Duration retryDelay = Duration(seconds: 3);
   int _discoveryAttempts = 0;
   Timer? _retryTimer;
-
 
   @override
   void onInit() {

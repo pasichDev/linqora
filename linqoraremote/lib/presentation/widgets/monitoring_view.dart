@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:linqoraremote/presentation/controllers/metrics_controller.dart';
-import 'package:loading_animation_widget/loading_animation_widget.dart';
+import 'package:linqoraremote/presentation/widgets/loading_view.dart';
 
 import 'metrics/metric_card.dart';
 import 'metrics/metric_chart.dart';
@@ -61,12 +61,7 @@ class _MonitoringViewState extends State<MonitoringView>
               final ramMetrics = metricsController.getCurrentRAMMetrics();
 
               if (cpuMetrics == null || ramMetrics == null) {
-                return Center(
-                  child: LoadingAnimationWidget.fourRotatingDots(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    size: 80,
-                  ),
-                );
+                return LoadingView();
               }
 
               return AnimatedOpacity(

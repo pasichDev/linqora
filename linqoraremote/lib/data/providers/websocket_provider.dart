@@ -226,6 +226,47 @@ class WebSocketProvider {
     }
   }
 
+  // Отправить команду управления мультимедиа
+  Future<bool> sendMediaCommand(int action, int value) async {
+    if (!_isConnected || !_isAuthenticated || _channel == null) {
+      if (kDebugMode) {
+        print(
+          'Неможливо надіслати медіа команду: клієнт не підключений або не авторизований',
+        );
+      }
+      return false;
+    }
+
+    if (!_joinedRooms.contains(TypeMessageWs.media.value)) {
+      if (kDebugMode) {
+        print(
+          'Необхідно спочатку приєднатися до кімнати ${TypeMessageWs.media.value}',
+        );
+      }
+      return false;
+    }
+
+    try {
+      // final mediaData = {'action': action};
+      final mediaData = {'action': action, 'value': value};
+
+      final message = {
+        'type': TypeMessageWs.media.value,
+        'deviceCode': _deviceCode,
+        'room': TypeMessageWs.media.value,
+        'data': mediaData,
+      };
+
+      _channel!.sink.add(jsonEncode(message));
+      return true;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Помилка відправки медіа команди: $e');
+      }
+      return false;
+    }
+  }
+
   // Надіслати команду керування курсором
   Future<bool> sendCursorCommand(int x, int y, int action) async {
     if (!_isConnected || !_isAuthenticated || _channel == null) {

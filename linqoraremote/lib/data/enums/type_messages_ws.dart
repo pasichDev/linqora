@@ -1,4 +1,10 @@
-enum TypeMessageWs { auth, join_room, leave_room, cursor_command }
+enum TypeMessageWs {
+  auth,
+  join_room,
+  leave_room,
+  cursor_command,
+  media,
+}
 
 extension TypeMessageWsExtension on TypeMessageWs {
   String get value {

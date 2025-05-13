@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:linqoraremote/presentation/widgets/mouse_control_view.dart';
 import 'package:linqoraremote/presentation/widgets/monitoring_view.dart';
+import 'package:linqoraremote/presentation/widgets/mouse_control_view.dart';
+
+import 'widgets/media_view.dart';
 
 class MenuOption {
   final String title;
@@ -25,4 +27,5 @@ final menuOptions = [
     icon: Icons.mouse,
     view: MouseControlView(),
   ),
+  MenuOption(title: 'Медіа', icon: Icons.volume_up, view: MediaScreenView()),
 ];

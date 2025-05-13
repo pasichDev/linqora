@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:linqoraremote/data/models/auth_response.dart';
+import 'package:linqoraremote/presentation/widgets/shimmer_effect.dart';
 
 import '../controllers/device_home_controller.dart';
 import '../dashboard_items.dart';
@@ -139,45 +140,13 @@ class HostInfoCardSkeleton extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            _buildShimmer(context, height: 18, width: 120),
+            ShimmerEffect(height: 18, width: 120),
             const SizedBox(height: 8),
-            _buildShimmer(context, height: 14, width: double.infinity),
+            ShimmerEffect(height: 14, width: double.infinity),
             const SizedBox(height: 8),
-            _buildShimmer(context, height: 14, width: 100),
+            ShimmerEffect(height: 14, width: 100),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildShimmer(
-    BuildContext context, {
-    required double height,
-    required double width,
-  }) {
-    return Container(
-      height: height,
-      width: width,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: ShaderMask(
-        blendMode: BlendMode.srcATop,
-        shaderCallback: (bounds) {
-          return LinearGradient(
-            colors: [
-              Colors.transparent,
-              Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
-              Colors.transparent,
-            ],
-            stops: const [0.0, 0.5, 1.0],
-            begin: const Alignment(-1.0, -0.5),
-            end: const Alignment(1.0, 0.5),
-            tileMode: TileMode.clamp,
-          ).createShader(bounds);
-        },
-        child: const SizedBox.expand(),
       ),
     );
   }
