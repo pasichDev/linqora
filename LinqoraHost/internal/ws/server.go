@@ -11,6 +11,7 @@ import (
 
 	"LinqoraHost/internal/config"
 	"LinqoraHost/internal/handler"
+	"LinqoraHost/internal/media"
 	"LinqoraHost/internal/metrics"
 
 	"github.com/gorilla/websocket"
@@ -51,7 +52,6 @@ func (s *WSServer) Start(ctx context.Context) error {
 		Addr:    fmt.Sprintf(":%d", s.config.Port),
 		Handler: mux,
 	}
-
 	// Запускаємо HTTP сервер у goroutine
 	go func() {
 		var err error
@@ -75,6 +75,7 @@ func (s *WSServer) Start(ctx context.Context) error {
 
 	// Очікуємо на завершення контексту
 	<-ctx.Done()
+	//	mediaMonitor.Stop()
 	return s.Shutdown()
 }
 
@@ -138,7 +139,8 @@ func (s *WSServer) handleClientMessage(client *Client, msg *ClientMessage) {
 		s.handleLeaveRoomMessage(client, msg)
 	case "cursor_command":
 		s.handleCursorCommandMessage(client, msg)
-	//case "cursor_command":
+	case "media":
+		s.handleMediaCommand(client, msg)
 
 	default:
 		log.Printf("Unknown message type: %s", msg.Type)
@@ -196,12 +198,18 @@ func (s *WSServer) handleAuthMessage(client *Client, msg *ClientMessage) {
 
 // handleJoinRoomMessage обробляє повідомлення приєднання до кімнати
 func (s *WSServer) handleJoinRoomMessage(client *Client, msg *ClientMessage) {
+	// Добавляем клиента в комнату
 	s.roomManager.AddClientToRoom(msg.Room, client)
 }
 
 // handleLeaveRoomMessage обробляє повідомлення виходу з кімнати
 func (s *WSServer) handleLeaveRoomMessage(client *Client, msg *ClientMessage) {
 	s.roomManager.RemoveClientFromRoom(msg.Room, client)
+}
+
+// GetRoomManager повертає менеджер кімнат
+func (s *WSServer) GetRoomManager() *RoomManager {
+	return s.roomManager
 }
 
 // handleCursorCommandMessage обробляє команди керування курсором
@@ -233,6 +241,7 @@ func (s *WSServer) handleCursorCommandMessage(client *Client, msg *ClientMessage
 
 	handler.HandleMouseCommand(intX, intY, intAction)
 }
+
 func abs(x int) int {
 	if x < 0 {
 		return -x
@@ -240,8 +249,16 @@ func abs(x int) int {
 	return x
 }
 
-// BroadcastMetrics відправляє метрики всім клієнтам у кімнаті metrics
 func (s *WSServer) BroadcastMetrics(metricsData []byte) {
+	// Сначала проверяем, есть ли клиенты в комнате "metrics"
+	metricsRoom := s.roomManager.GetRoom("metrics")
+	if metricsRoom == nil || metricsRoom.ClientCount() == 0 {
+		// Комната не существует или пуста
+		//log.Printf("No clients in metrics room, skipping broadcast")
+		return
+	}
+
+	// Продолжаем только если есть клиенты в комнате
 	message := MetricsMessage{
 		Type: "metrics",
 		Data: json.RawMessage(metricsData),
@@ -253,10 +270,72 @@ func (s *WSServer) BroadcastMetrics(metricsData []byte) {
 		return
 	}
 
+	// Отправляем сообщение клиентам в комнате
 	s.roomManager.BroadcastToRoom("metrics", messageJSON, nil)
 }
 
-// GetRoomManager повертає менеджер кімнат
-func (s *WSServer) GetRoomManager() *RoomManager {
-	return s.roomManager
+// BroadcastMetrics відправляє media всім клієнтам у кімнаті media
+func (s *WSServer) BroadcastMedia(metricsData []byte) {
+	// Сначала проверяем, есть ли клиенты в комнате "media"
+	mediaRoom := s.roomManager.GetRoom("media")
+	if mediaRoom == nil || mediaRoom.ClientCount() == 0 {
+		// Комната не существует или пуста
+		//log.Printf("No clients in media room, skipping broadcast")
+		return
+	}
+
+	// Продолжаем только если есть клиенты в комнате
+	message := MediaMessage{
+		Type: "media",
+		Data: json.RawMessage(metricsData),
+	}
+
+	messageJSON, err := json.Marshal(message)
+	if err != nil {
+		log.Printf("Error marshaling metrics message: %v", err)
+		return
+	}
+
+	// Отправляем сообщение клиентам в комнате
+	s.roomManager.BroadcastToRoom("media", messageJSON, nil)
+}
+
+// handleMediaCommand обрабатывает команды управления мультимедиа,и звуком
+func (s *WSServer) handleMediaCommand(client *Client, msg *ClientMessage) {
+	// First check if client is in media room
+	if !s.roomManager.IsClientInRoom("media", client) {
+		log.Printf("Client %s tried to send media command without joining media room", client.DeviceName)
+		return
+	}
+
+	var data map[string]interface{}
+	if err := json.Unmarshal(msg.Data, &data); err != nil {
+		log.Printf("Error unmarshaling media command: %v", err)
+		return
+	}
+
+	action, ok1 := data["action"].(float64)
+	value, ok2 := data["value"].(float64)
+
+	var mediaCommand = media.MediaCommand{
+		Action: int(action),
+		Value:  int(value),
+	}
+
+	// Проверяем, что action и value корректные
+	if !ok1 {
+		log.Printf("Invalid media command format from %s", client.DeviceName)
+		return
+	}
+
+	if !ok2 {
+		log.Printf("Invalid media command format from %s", client.DeviceName)
+		return
+	}
+
+	err := media.HandleMediaCommand(mediaCommand)
+	if err != nil {
+		log.Printf("Error executing media command: %v", err)
+		return
+	}
 }

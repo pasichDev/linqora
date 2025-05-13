@@ -287,7 +287,8 @@ func runServer(cmd *cobra.Command, args []string) {
 			ValidDeviceIDs: map[string]bool{
 				codeStr: true,
 			},
-			MetricsInterval: 2 * 1000000000, // 2 секунди в наносекундах
+			MetricsInterval: 2 * 1000000000,
+			MediasInterval:  2 * 1000000000, // 2 секунди в наносекундах
 			EnableTLS:       enableTLS,
 			CertFile:        certFile,
 			KeyFile:         keyFile,

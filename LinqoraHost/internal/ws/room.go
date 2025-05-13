@@ -126,3 +126,19 @@ func (rm *RoomManager) GetRoom(roomName string) *Room {
 	defer rm.mu.Unlock()
 	return rm.Rooms[roomName]
 }
+
+// IsClientInRoom проверяет, находится ли клиент в указанной комнате
+func (rm *RoomManager) IsClientInRoom(roomName string, client *Client) bool {
+	rm.mu.Lock()
+	room, exists := rm.Rooms[roomName]
+	rm.mu.Unlock()
+
+	if !exists {
+		return false
+	}
+
+	room.mu.Lock()
+	defer room.mu.Unlock()
+	_, isInRoom := room.Clients[client]
+	return isInRoom
+}

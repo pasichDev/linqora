@@ -1,6 +1,8 @@
 package ws
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 // ClientMessage представляє повідомлення від клієнта
 type ClientMessage struct {
@@ -23,6 +25,7 @@ type CursorCommand struct {
 	Action int `json:"action"` // 0 - move, 1 - click, 2 - right click, etc.
 }
 
+/*
 // SystemInfo містить інформацію про систему
 type SystemInfo struct {
 	OS          string `json:"os"`
@@ -33,6 +36,7 @@ type SystemInfo struct {
 	DiskTotal   uint64 `json:"diskSpaceTotal"`
 	DiskFree    uint64 `json:"diskSpaceFree"`
 }
+*/
 
 // AuthResponse відповідь на авторизацію
 type AuthResponse struct {
@@ -57,4 +61,9 @@ type AuthInformation struct {
 	CpuPhysicalCores   int     `json:"physicalCores"`
 	CpuLogicalCores    int     `json:"logicalCores"`
 	VirtualMemoryTotal float64 `json:"virtualMemoryTotal"`
+}
+
+type MediaMessage struct {
+	Type string          `json:"type"`
+	Data json.RawMessage `json:"data"`
 }
