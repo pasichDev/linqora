@@ -176,6 +176,14 @@ func (s *WSServer) removeClient(client *Client) {
 
 // handleClientMessage обробляє повідомлення від клієнта
 func (s *WSServer) handleClientMessage(client *Client, msg *ClientMessage) {
+
+	if msg.Type != "auth_request" && msg.Type != "auth_check" {
+		if !s.authManager.IsAuthorized(client.GetDeviceID()) {
+			client.SendError("Unauthorized access")
+			return
+		}
+	}
+
 	switch msg.Type {
 	case "host_info":
 		s.handleHostInfoMessage(client, msg)
