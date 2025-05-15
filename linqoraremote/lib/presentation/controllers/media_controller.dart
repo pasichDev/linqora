@@ -39,34 +39,47 @@ class MediaController extends GetxController {
   }
 
   Future<void> _init() async {
-    webSocketProvider.registerHandler(TypeMessageWs.media.value, _handleMediaData);
+    webSocketProvider.registerHandler(
+      TypeMessageWs.media.value,
+      _handleMediaData,
+    );
 
     await webSocketProvider.joinRoom(TypeMessageWs.media.value);
   }
 
-
   void _handleMediaData(dynamic data) {
-    print("loadsms");
-print(data);
     final mediaData = data['data'];
     if (mediaData != null && mediaData is Map<String, dynamic>) {
-      final nowPlayingData = mediaData['nowPlaying'] as Map<String, dynamic>?;
+      // Handle nowPlaying data separately
+      _handleNowPlayingData(mediaData);
 
-      if (nowPlayingData != null) {
-        nowPlaying.value = NowPlaying.fromJson(nowPlayingData).copyWith(
-          stringDuration: formatTimeTrack(nowPlayingData['duration'] as int),
-          stringPosition: formatTimeTrack(nowPlayingData['position'] as int),
-        );
-      }
+      // Handle capabilities data separately
+      _handleCapabilitiesData(mediaData);
 
-      final capabilitiesData =
-      mediaData['mediaCapabilities'] as Map<String, dynamic>?;
-      if (capabilitiesData != null) {
-        capabilities.value = MediaCapabilities.fromJson(capabilitiesData);
-      }
+      // Reset loading state if needed
       if (isLoadingMedia.value) {
         isLoadingMedia.value = false;
       }
+    }
+  }
+
+  void _handleNowPlayingData(Map<String, dynamic> mediaData) {
+    final nowPlayingData = mediaData['nowPlaying'] as Map<String, dynamic>?;
+    if (nowPlayingData != null) {
+      nowPlaying.value = NowPlaying.fromJson(nowPlayingData).copyWith(
+        stringDuration: formatTimeTrack(nowPlayingData['duration'] as int),
+        stringPosition: formatTimeTrack(nowPlayingData['position'] as int),
+      );
+    }
+  }
+
+  void _handleCapabilitiesData(Map<String, dynamic> mediaData) {
+    final capabilitiesData =
+        mediaData['mediaCapabilities'] as Map<String, dynamic>?;
+    if (capabilitiesData != null) {
+      capabilities.value = MediaCapabilities.fromJson(capabilitiesData);
+      volume.value = double.parse(capabilities.value!.currentVolume.toString());
+      isMuted.value = capabilities.value!.isMuted;
     }
   }
 
