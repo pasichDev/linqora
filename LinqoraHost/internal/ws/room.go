@@ -130,15 +130,26 @@ func (rm *RoomManager) GetRoom(roomName string) *Room {
 // IsClientInRoom проверяет, находится ли клиент в указанной комнате
 func (rm *RoomManager) IsClientInRoom(roomName string, client *Client) bool {
 	rm.mu.Lock()
-	room, exists := rm.Rooms[roomName]
-	rm.mu.Unlock()
+	defer rm.mu.Unlock()
 
+	room, exists := rm.Rooms[roomName]
 	if !exists {
 		return false
 	}
 
-	room.mu.Lock()
-	defer room.mu.Unlock()
-	_, isInRoom := room.Clients[client]
-	return isInRoom
+	_, inRoom := room.Clients[client]
+	return inRoom
+}
+
+// RemoveClientFromAllRooms удаляет клиента из всех комнат
+func (rm *RoomManager) RemoveClientFromAllRooms(client *Client) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
+	for name, room := range rm.Rooms {
+		if _, exists := room.Clients[client]; exists {
+			delete(room.Clients, client)
+			log.Printf("Client %s removed from room %s", client.DeviceName, name)
+		}
+	}
 }

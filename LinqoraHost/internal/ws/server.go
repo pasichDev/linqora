@@ -10,9 +10,10 @@ import (
 	"time"
 
 	"LinqoraHost/internal/config"
-	"LinqoraHost/internal/handler"
 	"LinqoraHost/internal/media"
 	"LinqoraHost/internal/metrics"
+
+	"LinqoraHost/internal/interfaces"
 
 	"github.com/gorilla/websocket"
 )
@@ -22,24 +23,33 @@ type WSServer struct {
 	config       *config.ServerConfig
 	httpServer   *http.Server
 	roomManager  *RoomManager
+	broadcaster  *Broadcaster
 	clients      map[*Client]bool
 	clientsMutex sync.Mutex
 	upgrader     websocket.Upgrader
+	authManager  interfaces.AuthManagerInterface
 }
 
 // NewWSServer створює новий WebSocket сервер
-func NewWSServer(config *config.ServerConfig) *WSServer {
-	return &WSServer{
+func NewWSServer(config *config.ServerConfig, authManager interfaces.AuthManagerInterface) *WSServer {
+	roomManager := NewRoomManager()
+
+	server := &WSServer{
 		config:      config,
-		roomManager: NewRoomManager(),
+		roomManager: roomManager,
 		clients:     make(map[*Client]bool),
+		authManager: authManager,
 		upgrader: websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool { return true }, // Дозволяє підключатися з будь-якого походження
+			CheckOrigin: func(r *http.Request) bool { return true },
 		},
 	}
+
+	// Инициализируем broadcaster после создания server
+	server.broadcaster = NewBroadcaster(roomManager)
+
+	return server
 }
 
-// Start запускає WebSocket сервер
 func (s *WSServer) Start(ctx context.Context) error {
 	mux := http.NewServeMux()
 
@@ -52,7 +62,9 @@ func (s *WSServer) Start(ctx context.Context) error {
 		Addr:    fmt.Sprintf(":%d", s.config.Port),
 		Handler: mux,
 	}
+
 	// Запускаємо HTTP сервер у goroutine
+	serverErr := make(chan error, 1)
 	go func() {
 		var err error
 		log.Printf("WebSocket server started at :%d", s.config.Port)
@@ -69,45 +81,70 @@ func (s *WSServer) Start(ctx context.Context) error {
 		}
 
 		if err != nil && err != http.ErrServerClosed {
-			log.Fatalf("WebSocket server failed: %v", err)
+			log.Printf("WebSocket server failed: %v", err)
+			serverErr <- err
 		}
 	}()
 
-	// Очікуємо на завершення контексту
-	<-ctx.Done()
-	//	mediaMonitor.Stop()
-	return s.Shutdown()
-}
-
-// Shutdown зупиняє WebSocket сервер
-func (s *WSServer) Shutdown() error {
-	// Створюємо контекст з таймаутом для зупинки сервера
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// Зупиняємо HTTP сервер
-	if err := s.httpServer.Shutdown(ctx); err != nil {
+	select {
+	case <-ctx.Done():
+		log.Println("Server context cancelled, shutting down...")
+		return s.Shutdown()
+	case err := <-serverErr:
 		return err
 	}
+}
 
-	// Закриваємо всі WebSocket з'єднання
+// Улучшенный метод Shutdown
+func (s *WSServer) Shutdown() error {
+	log.Println("Shutting down WebSocket server...")
+
+	// Создаем контекст с таймаутом для корректного закрытия
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	// Отправляем сигнал всем клиентам о закрытии
 	s.clientsMutex.Lock()
+	log.Printf("Closing %d client connections...", len(s.clients))
 	for client := range s.clients {
+		if err := client.Conn.WriteControl(websocket.CloseMessage,
+			websocket.FormatCloseMessage(websocket.CloseGoingAway, "server shutdown"),
+			time.Now().Add(time.Second)); err != nil {
+			log.Printf("Error sending close message to client: %v", err)
+		}
 		client.Conn.Close()
+		delete(s.clients, client)
 	}
 	s.clientsMutex.Unlock()
 
+	// Останавливаем HTTP сервер
+	if err := s.httpServer.Shutdown(ctx); err != nil {
+		log.Printf("HTTP server shutdown error: %v", err)
+		return err
+	}
+
+	log.Println("WebSocket server stopped successfully")
 	return nil
 }
 
-// handleWSConnection обробляє нове WebSocket з'єднання
+// Обновите метод handleWSConnection
 func (s *WSServer) handleWSConnection(w http.ResponseWriter, r *http.Request) {
 	log.Println("WebSocket connection attempt from", r.RemoteAddr)
+
+	// Устанавливаем таймауты соединения
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println("Upgrade error:", err)
 		return
 	}
+
+	// Настройка параметров WebSocket соединения
+	conn.SetReadLimit(2048)
+	conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		return nil
+	})
 
 	client := NewClient(conn, r.RemoteAddr, s.roomManager)
 
@@ -115,9 +152,18 @@ func (s *WSServer) handleWSConnection(w http.ResponseWriter, r *http.Request) {
 	s.clients[client] = true
 	s.clientsMutex.Unlock()
 
-	// Запускаємо горутини для обробки повідомлень
+	// Запускаем горутины с контролируемым завершением
 	go client.StartWritePump()
-	go client.StartReadPump(s.config.ValidDeviceIDs, s.handleClientMessage)
+	validDevices := make([]string, 0, len(s.config.ValidDeviceIDs))
+	for deviceID := range s.config.ValidDeviceIDs {
+		validDevices = append(validDevices, deviceID)
+	}
+	go client.StartReadPump(validDevices, func(msg *ClientMessage) {
+		s.handleClientMessage(client, msg)
+	}, func() {
+		s.removeClient(client)
+		s.roomManager.RemoveClientFromAllRooms(client)
+	})
 }
 
 // removeClient видаляє клієнта з сервера
@@ -131,33 +177,37 @@ func (s *WSServer) removeClient(client *Client) {
 // handleClientMessage обробляє повідомлення від клієнта
 func (s *WSServer) handleClientMessage(client *Client, msg *ClientMessage) {
 	switch msg.Type {
-	case "auth":
-		s.handleAuthMessage(client, msg)
+	case "host_info":
+		s.handleHostInfoMessage(client, msg)
 	case "join_room":
 		s.handleJoinRoomMessage(client, msg)
 	case "leave_room":
 		s.handleLeaveRoomMessage(client, msg)
-	case "cursor_command":
-		s.handleCursorCommandMessage(client, msg)
 	case "media":
 		s.handleMediaCommand(client, msg)
-
+	case "auth_request":
+		if s.authManager != nil {
+			s.authManager.HandleAuthRequest(client, msg)
+		} else {
+			log.Printf("ERROR: authManager is nil, cannot process auth_request")
+			client.SendError("Internal server error: auth manager not initialized")
+		}
+	case "auth_check":
+		if s.authManager != nil {
+			s.authManager.HandleAuthCheck(client)
+		} else {
+			log.Printf("ERROR: authManager is nil, cannot process auth_check")
+			client.SendError("Internal server error: auth manager not initialized")
+		}
 	default:
 		log.Printf("Unknown message type: %s", msg.Type)
+
 	}
 }
 
-// handleAuthMessage обробляє повідомлення аутентифікації
-func (s *WSServer) handleAuthMessage(client *Client, msg *ClientMessage) {
-	var authData AuthData
-	if err := json.Unmarshal(msg.Data, &authData); err != nil {
-		log.Printf("Error unmarshaling auth data: %v", err)
-		return
-	}
-
-	client.SetDeviceName(authData.DeviceName)
-	client.IP = authData.IP
-
+// handleHostInfoMessage обробляє відомлення з інформацією про хост
+// Відправляє інформацію про систему назад клієнту
+func (s *WSServer) handleHostInfoMessage(client *Client, msg *ClientMessage) {
 	// Отримуємо характеристики системи
 	ramTotal, _ := metrics.GetRamTotal()
 
@@ -171,7 +221,7 @@ func (s *WSServer) handleAuthMessage(client *Client, msg *ClientMessage) {
 	cores, threads, _ := metrics.GetCPUCoresAndThreads()
 
 	// Формуємо відповідь з характеристиками системи
-	authInformation := AuthInformation{
+	host_info := HostInfo{
 		OS:                 deviceInfo.OS,
 		Hostname:           deviceInfo.Hostname,
 		CpuModel:           cpuModel,
@@ -181,19 +231,15 @@ func (s *WSServer) handleAuthMessage(client *Client, msg *ClientMessage) {
 		CpuFrequency:       freq,
 	}
 
-	response := AuthResponse{
-		Type:            "auth_response",
-		Success:         true,
-		AuthInformation: authInformation,
+	response := HostInfoResponse{
+		Type:     "host_info",
+		Success:  true,
+		HostInfo: host_info,
 	}
 
 	responseJSON, _ := json.Marshal(response)
 	client.SendMessage(responseJSON)
 
-	// Додаємо клієнта до кімнати аутентифікації
-	s.roomManager.AddClientToRoom("auth", client)
-
-	log.Printf("Client %s authenticated successfully", client.DeviceName)
 }
 
 // handleJoinRoomMessage обробляє повідомлення приєднання до кімнати
@@ -210,94 +256,13 @@ func (s *WSServer) handleLeaveRoomMessage(client *Client, msg *ClientMessage) {
 // GetRoomManager повертає менеджер кімнат
 func (s *WSServer) GetRoomManager() *RoomManager {
 	return s.roomManager
-}
-
-// handleCursorCommandMessage обробляє команди керування курсором
-func (s *WSServer) handleCursorCommandMessage(client *Client, msg *ClientMessage) {
-	var data map[string]interface{}
-	if err := json.Unmarshal(msg.Data, &data); err != nil {
-		log.Printf("Error unmarshaling cursor command: %v", err)
-		return
-	}
-
-	x, ok1 := data["x"].(float64)
-	y, ok2 := data["y"].(float64)
-	action, ok3 := data["action"].(float64)
-
-	if !ok1 || !ok2 || !ok3 {
-		log.Printf("Invalid cursor command format from %s", client.DeviceName)
-		return
-	}
-
-	// Увеличиваем чувствительность и округляем
-	intX := int(x * 3) // Увеличили множитель
-	intY := int(y * 3)
-	intAction := int(action)
-
-	// Игнорируем слишком маленькие движения при перемещении
-	if intAction == 0 && abs(intX) < 2 && abs(intY) < 2 {
-		return
-	}
-
-	handler.HandleMouseCommand(intX, intY, intAction)
-}
-
-func abs(x int) int {
-	if x < 0 {
-		return -x
-	}
-	return x
-}
-
+} // Используем broadcaster вместо прямых реализаций методов
 func (s *WSServer) BroadcastMetrics(metricsData []byte) {
-	// Сначала проверяем, есть ли клиенты в комнате "metrics"
-	metricsRoom := s.roomManager.GetRoom("metrics")
-	if metricsRoom == nil || metricsRoom.ClientCount() == 0 {
-		// Комната не существует или пуста
-		//log.Printf("No clients in metrics room, skipping broadcast")
-		return
-	}
-
-	// Продолжаем только если есть клиенты в комнате
-	message := MetricsMessage{
-		Type: "metrics",
-		Data: json.RawMessage(metricsData),
-	}
-
-	messageJSON, err := json.Marshal(message)
-	if err != nil {
-		log.Printf("Error marshaling metrics message: %v", err)
-		return
-	}
-
-	// Отправляем сообщение клиентам в комнате
-	s.roomManager.BroadcastToRoom("metrics", messageJSON, nil)
+	s.broadcaster.BroadcastMetrics(metricsData)
 }
 
-// BroadcastMetrics відправляє media всім клієнтам у кімнаті media
-func (s *WSServer) BroadcastMedia(metricsData []byte) {
-	// Сначала проверяем, есть ли клиенты в комнате "media"
-	mediaRoom := s.roomManager.GetRoom("media")
-	if mediaRoom == nil || mediaRoom.ClientCount() == 0 {
-		// Комната не существует или пуста
-		//log.Printf("No clients in media room, skipping broadcast")
-		return
-	}
-
-	// Продолжаем только если есть клиенты в комнате
-	message := MediaMessage{
-		Type: "media",
-		Data: json.RawMessage(metricsData),
-	}
-
-	messageJSON, err := json.Marshal(message)
-	if err != nil {
-		log.Printf("Error marshaling metrics message: %v", err)
-		return
-	}
-
-	// Отправляем сообщение клиентам в комнате
-	s.roomManager.BroadcastToRoom("media", messageJSON, nil)
+func (s *WSServer) BroadcastMedia(mediaData []byte) {
+	s.broadcaster.BroadcastMedia(mediaData)
 }
 
 // handleMediaCommand обрабатывает команды управления мультимедиа,и звуком

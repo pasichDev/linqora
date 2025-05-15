@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	"LinqoraHost/internal/auth"
 	"LinqoraHost/internal/config"
 	"LinqoraHost/internal/mdns"
 	"LinqoraHost/internal/media"
@@ -17,24 +18,29 @@ type Server struct {
 	cancel           context.CancelFunc
 	config           *config.ServerConfig
 	wsServer         *ws.WSServer
-	mdnsService      *mdns.MDNSService
+	mdnsService      *mdns.MDNSServer
 	metricsCollector *metrics.MetricsCollector
 	mediaCollector   *media.MediaCollector
 }
 
 // NewServer створює новий сервер
-func NewServer(cfg *config.ServerConfig) *Server {
+func NewServer(cfg *config.ServerConfig, authManager *auth.AuthManager) *Server {
 	if cfg == nil {
 		cfg = config.DefaultConfig()
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Створюємо WebSocket сервер
-	wsServer := ws.NewWSServer(cfg)
+	// Створюємо WebSocket сервер с правильной передачей authManager
+	wsServer := ws.NewWSServer(cfg, authManager)
 
 	// Створюємо mDNS сервіс
-	mdnsService := mdns.NewMDNSService(cfg)
+	mdnsService, err := mdns.NewMDNSServer(cfg)
+	if err != nil {
+		log.Printf("Failed to create mDNS server: %v", err)
+		cancel()
+		return nil
+	}
 
 	// Створюємо колектор метрик
 	metricsCollector := metrics.NewMetricsCollector(cfg, wsServer.BroadcastMetrics)
@@ -51,41 +57,45 @@ func NewServer(cfg *config.ServerConfig) *Server {
 	}
 }
 
-// Start запускає сервер
-func (s *Server) Start() error {
-	log.Println("Starting Linqora server...")
+func (s *Server) Start(ctx context.Context) error {
+	var err error
 
-	// Запускаємо mDNS сервіс в goroutine
+	// Запускаем WebSocket сервер
+	wsErrCh := make(chan error, 1)
 	go func() {
-		if err := s.mdnsService.Start(s.ctx); err != nil {
-			log.Printf("mDNS service error: %v", err)
+		log.Println("Starting WebSocket server...")
+		if err := s.wsServer.Start(ctx); err != nil && err != context.Canceled {
+			log.Printf("WebSocket server error: %v", err)
+			wsErrCh <- err
 		}
 	}()
 
-	go s.metricsCollector.Start(s.ctx)
-	go s.mediaCollector.Start(s.ctx)
+	// Запускаем сборщик метрик в отдельной горутине
+	if s.config.MetricsInterval > 0 {
+		go s.metricsCollector.Start(s.ctx)
+	}
 
-	return s.wsServer.Start(s.ctx)
-}
+	// Запускаем сборщик медиа в отдельной горутине
+	if s.config.MediasInterval > 0 {
+		go s.mediaCollector.Start(s.ctx)
+	}
 
-// Restart перезапускає сервер з новими параметрами
-func (s *Server) Restart(cfg *config.ServerConfig) error {
-	s.Shutdown()
-	newServer := NewServer(cfg)
-	return newServer.Start()
+	// Ожидаем сигнала завершения или ошибки
+	select {
+	case <-ctx.Done():
+		return s.Shutdown()
+	case err = <-wsErrCh:
+		return err
+	}
 }
 
 // Shutdown зупиняє сервер
-func (s *Server) Shutdown() {
+func (s *Server) Shutdown() error {
 	log.Println("Shutting down Linqora server...")
 
 	// Скасовуємо контекст, щоб всі компоненти отримали сигнал про зупинку
 	s.cancel()
-}
-
-// UpdateMDNSConfig оновлює конфігурацію mDNS
-func (s *Server) UpdateMDNSConfig(name, serviceType, domain string) {
-	s.mdnsService.UpdateConfig(name, serviceType, domain)
+	return nil
 }
 
 // GetConfig повертає конфігурацію сервера

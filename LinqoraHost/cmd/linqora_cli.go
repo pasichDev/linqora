@@ -1,15 +1,17 @@
 package main
 
 import (
+	"LinqoraHost/internal/auth"
 	"LinqoraHost/internal/config"
+	"LinqoraHost/internal/interfaces"
+	"LinqoraHost/internal/mdns"
 	"LinqoraHost/internal/metrics"
 	"bufio"
+	"context"
 	"fmt"
-	"math/rand"
+	"log"
 	"os"
 	"os/signal"
-	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -17,23 +19,20 @@ import (
 
 	"LinqoraHost"
 
-	"github.com/mdp/qrterminal/v3"
 	"github.com/spf13/cobra"
 )
 
-/**
-sudo apt-get install libx11-dev xorg-dev libxtst-dev xsel xclip
-реалізувати перевірку чи встановлені необхідін пакети
-реалізувати перевірку сертифікатів при запску гуі і просто
-*/
-
 var (
-	port     int
-	authCode string
-	server   *LinqoraHost.Server
-	stopCh   chan struct{}
-	restart  chan struct{}
-	serverMu sync.Mutex
+	port         int
+	server       *LinqoraHost.Server
+	mdnsServer   *mdns.MDNSServer
+	authManager  *auth.AuthManager
+	consoleMutex sync.Mutex
+	authChan     = make(chan interfaces.PendingAuthRequest, 10) // Буфер для запросов авторизации
+	stopCh       = make(chan struct{})
+	restart      = make(chan struct{})
+	serverMu     sync.Mutex
+	cfg          *config.ServerConfig
 
 	// Головна команда
 	rootCmd = &cobra.Command{
@@ -44,314 +43,238 @@ var (
 	}
 )
 
-// Execute виконує кореневу команду
-func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-}
-
-// init ініціалізує команди та флаги
 func init() {
-	// Ініціалізуємо генератор випадкових чисел
-	rand.Seed(time.Now().UnixNano())
-
 	// Додаємо флаги
 	rootCmd.Flags().IntVarP(&port, "port", "p", 8070, "Порт для WebSocket сервера")
-	rootCmd.Flags().StringVarP(&authCode, "code", "c", "", "Код автентифікації (6 цифр)")
-
-	rootCmd.Flags().BoolP("notls", "s", false, "Enable TLS/SSL for WebSocket")
+	rootCmd.Flags().BoolP("notls", "s", false, "Disable TLS/SSL for WebSocket")
 	rootCmd.Flags().String("cert", "./certs/dev-certs/cert.pem", "Path to the TLS certificate file")
 	rootCmd.Flags().String("key", "./certs/dev-certs/key.pem", "Path to the TLS key file")
-
-	// Ініціалізуємо канали
-	stopCh = make(chan struct{})
-	restart = make(chan struct{})
 }
 
-// Перевіряє, чи рядок складається тільки з 6 цифр
-func isValidAuthCode(code string) bool {
-	match, _ := regexp.MatchString(`^\d{6}$`, code)
-	return match
-}
-
-// Генерує новий код автентифікації
-func generateAuthCode() string {
-	// Генеруємо число в діапазоні [100000, 999999]
-	code := rand.Intn(900000) + 100000
-	return strconv.Itoa(code)
-}
-
-// startCommandProcessor запускає обробник команд з консолі
+// startCommandProcessor запускает обработчик команд консоли
 func startCommandProcessor() {
 	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Println("Введіть команду (help - для списку команд):")
+	authRequests := make(map[string]interfaces.PendingAuthRequest)
 
-	for {
-		if scanner.Scan() {
-			command := scanner.Text()
-			processCommand(command)
-		} else {
-			break
+	fmt.Println("\nВведите 'help' для просмотра доступных команд")
+	fmt.Print("> ")
+
+	// Запускаем горутину для обработки запросов авторизации
+	go func() {
+		for {
+			select {
+			case req := <-authChan:
+				consoleMutex.Lock()
+				fmt.Printf("\n\n===> ЗАПРОС АВТОРИЗАЦИИ <===\n")
+				fmt.Printf("Устройство:  %s\n", req.DeviceName)
+				fmt.Printf("ID:          %s\n", req.DeviceID)
+				fmt.Printf("IP:          %s\n", req.IP)
+				fmt.Printf("Время:       %s\n\n", req.RequestTime.Format("15:04:05"))
+				fmt.Printf("Разрешить подключение? (y/n): ")
+
+				// Сохраняем запрос для последующей обработки
+				authRequests[req.DeviceID] = req
+				consoleMutex.Unlock()
+
+			case <-stopCh:
+				return
+			}
 		}
-	}
-}
+	}()
 
-// processCommand обробляє введену команду
-func processCommand(command string) {
-	command = strings.TrimSpace(strings.ToLower(command))
-	args := strings.Fields(command)
+	for scanner.Scan() {
+		command := scanner.Text()
 
-	if len(args) == 0 {
-		return
-	}
+		// Проверка на ответы на запросы авторизации
+		if len(authRequests) > 0 && (strings.ToLower(command) == "y" || strings.ToLower(command) == "n") {
+			// Находим последний запрос авторизации
+			var latestReq interfaces.PendingAuthRequest
+			var latestDeviceID string
+			latestTime := time.Time{}
 
-	switch args[0] {
-	case "help", "?":
-		showHelp()
-	case "restart":
-		restartServer()
-	case "stop", "exit", "quit":
-		stopServer()
-	case "send":
-		if len(args) > 1 {
-			sendFile(args[1:])
-		} else {
-			fmt.Println("Використання: send <шлях_до_файлу>")
+			for id, req := range authRequests {
+				if latestTime.IsZero() || req.RequestTime.After(latestTime) {
+					latestReq = req
+					latestDeviceID = id
+					latestTime = req.RequestTime
+				}
+			}
+
+			approved := strings.ToLower(command) == "y"
+
+			// Отвечаем на запрос
+			authManager.RespondToAuthRequest(latestDeviceID, approved)
+
+			if approved {
+				fmt.Printf("Авторизация для устройства %s одобрена\n", latestReq.DeviceName)
+			} else {
+				fmt.Printf("Авторизация для устройства %s отклонена\n", latestReq.DeviceName)
+			}
+
+			// Удаляем обработанный запрос
+			delete(authRequests, latestDeviceID)
+			fmt.Print("> ")
+			continue
 		}
-	case "code", "changecode":
-		if len(args) > 1 {
-			changeCode(args[1])
-		} else {
-			fmt.Println("Використання: code <новий_код>")
+
+		// Обработка обычных команд
+		switch strings.ToLower(strings.TrimSpace(command)) {
+		// ... [остальной код обработки команд] ...
 		}
-	case "status":
-		showStatus()
-	default:
-		fmt.Println("Невідома команда. Введіть 'help' для списку команд.")
+
+		fmt.Print("> ")
 	}
 }
 
-// showHelp виводить список доступних команд
-func showHelp() {
-	fmt.Println("Доступні команди:")
-	fmt.Println("  help, ?      - Показати цей список команд")
-	fmt.Println("  restart      - Перезапустити сервер")
-	fmt.Println("  stop, exit   - Зупинити сервер і вийти")
-	fmt.Println("  send <файл>  - Передати файл")
-	fmt.Println("  code <код>   - Змінити код автентифікації")
-	fmt.Println("  status       - Показати статус сервера")
-}
-
-// restartServer перезапускає сервер
-func restartServer() {
-	fmt.Println("Перезапуск сервера...")
-
-	// Сигнал для перезапуску сервера
-	restart <- struct{}{}
-}
-
-// stopServer зупиняє сервер
-func stopServer() {
-	fmt.Println("Зупинення сервера...")
-
-	// Сигнал для зупинки сервера
-	close(stopCh)
-}
-
-// sendFile обробляє команду передачі файлу
-func sendFile(args []string) {
-	if len(args) < 1 {
-		fmt.Println("Не вказано шлях до файлу")
-		return
-	}
-
-	filePath := args[0]
-	fmt.Printf("Підготовка до передачі файлу: %s\n", filePath)
-	fmt.Println("Функція передачі файлів ще не реалізована.")
-}
-
-// changeCode змінює код автентифікації
-func changeCode(newCode string) {
-	if !isValidAuthCode(newCode) {
-		fmt.Println("Помилка: Код автентифікації повинен складатися з 6 цифр")
-		return
-	}
-
-	fmt.Printf("Зміна коду автентифікації на: %s\n", newCode)
-	fmt.Println("Необхідно перезапустити сервер для застосування змін.")
-	fmt.Print("Перезапустити зараз? (y/n): ")
-
-	scanner := bufio.NewScanner(os.Stdin)
-	if scanner.Scan() && strings.ToLower(scanner.Text()) == "y" {
-		authCode = newCode
-		restartServer()
-	}
-}
-
-// showStatus показує поточний статус сервера
-func showStatus() {
-	fmt.Println("====================================================")
-	fmt.Println("                 СТАТУС СЕРВЕРА                     ")
-	fmt.Println("====================================================")
-	fmt.Printf("Порт:             %d\n", port)
-	fmt.Printf("Код автентифікації: %s\n", authCode)
-	fmt.Println("Сервер активний: Так")
-}
-
+// Главная функция запуска сервера
 func runServer(cmd *cobra.Command, args []string) {
-	// Виводимо заголовок
 	fmt.Println("====================================================")
 	fmt.Println("                 LINQORA HOST SERVER                ")
 	fmt.Println("====================================================")
 
-	// Отримуємо системну інформацію
+	// Получаем системную информацию
 	deviceInfo := metrics.GetDeviceInfo()
 
-	codeStr := authCode
-	if codeStr == "" {
-		codeStr = generateAuthCode()
-		authCode = codeStr // Зберігаємо для глобального доступу
-	} else if !isValidAuthCode(codeStr) {
-		fmt.Println("Помилка: Код автентифікації повинен складатися з 6 цифр")
-		os.Exit(1)
-	}
-
-	// Вивід додаткової системної інформації
-	fmt.Printf("Хост IP:     %s\n", deviceInfo.IP)
-	fmt.Printf("Порт:        %d\n", port)
-	fmt.Printf("ОС:          %s\n", deviceInfo.OS)
-	fmt.Println("═════════════════════════════════════════════════")
-	fmt.Printf("КОД АВТЕНТИФІКАЦІЇ:          %s\n", codeStr)
-	fmt.Println("═════════════════════════════════════════════════")
-	fmt.Println()
-
-	// Налаштування та генерація QR-коду
-	qrConfig := qrterminal.Config{
-		Level:     qrterminal.M,
-		Writer:    os.Stdout,
-		BlackChar: qrterminal.BLACK,
-		WhiteChar: qrterminal.WHITE,
-		QuietZone: 1,
-	}
-	qrterminal.GenerateWithConfig(codeStr, qrConfig)
-
-	// Лінія-розділювач після QR-коду
-	fmt.Println(strings.Repeat("─", 50))
-	fmt.Println()
-
-	// Запускаємо обробник команд у окремій горутині
-	go startCommandProcessor()
-
-	// Отримуємо значення TLS-прапорців
+	// Получаем значения TLS-флагов
 	disableTLS, _ := cmd.Flags().GetBool("notls")
 	enableTLS := !disableTLS
 	certFile, _ := cmd.Flags().GetString("cert")
 	keyFile, _ := cmd.Flags().GetString("key")
 
-	// Перевіряємо наявність сертифікатів, якщо TLS увімкнено
+	// Проверяем наличие сертификатов, если TLS включен
 	if enableTLS {
 		certExists := true
 		keyExists := true
 
 		if _, err := os.Stat(certFile); os.IsNotExist(err) {
 			certExists = false
-			fmt.Printf("Увага: Файл сертифіката %s не знайдено\n", certFile)
+			fmt.Printf("Предупреждение: Файл сертификата %s не найден\n", certFile)
 		}
 
 		if _, err := os.Stat(keyFile); os.IsNotExist(err) {
 			keyExists = false
-			fmt.Printf("Увага: Файл ключа %s не знайдено\n", keyFile)
+			fmt.Printf("Предупреждение: Файл ключа %s не найден\n", keyFile)
 		}
 
 		// Если файлов нет, автоматически выключаем TLS
 		if !certExists || !keyExists {
-			fmt.Println("TLS автоматично вимкнено через відсутність сертифікатів")
+			fmt.Println("TLS автоматически отключен из-за отсутствия сертификатов")
 			enableTLS = false
 		} else {
-			fmt.Println("TLS увімкнено. Використовується захищений WebSocket (WSS).")
+			fmt.Println("TLS включен. Используется защищенный WebSocket (WSS).")
 		}
 	} else {
-		fmt.Println("TLS вимкнено. Використовується незахищений WebSocket (WS).")
+		fmt.Println("TLS отключен. Используется незащищенный WebSocket (WS).")
 	}
 
-	// Запускаємо сервер у циклі для можливості перезапуску
-	for {
-		// Створюємо конфігурацію сервера
-		cfg := &config.ServerConfig{
-			Port:       port,
-			MDNSName:   "linqora_host",
-			MDNSType:   "_" + codeStr + "._tcp",
-			MDNSDomain: "local.",
-			ValidDeviceIDs: map[string]bool{
-				codeStr: true,
-			},
-			MetricsInterval: 2 * 1000000000,
-			MediasInterval:  2 * 1000000000, // 2 секунди в наносекундах
-			EnableTLS:       enableTLS,
-			CertFile:        certFile,
-			KeyFile:         keyFile,
+	// Загружаем конфигурацию
+	var err error
+	cfg, err = config.LoadConfig()
+	if err != nil {
+		fmt.Printf("Ошибка загрузки конфигурации: %v\n", err)
+		fmt.Println("Будет использована конфигурация по умолчанию.")
+		cfg = config.DefaultConfig()
+	}
+
+	// Обновляем порт, если указан в аргументах
+	if port != 0 {
+		cfg.Port = port
+	}
+
+	// Обновляем настройки TLS
+	cfg.EnableTLS = enableTLS
+	cfg.CertFile = certFile
+	cfg.KeyFile = keyFile
+
+	// Сохраняем обновленную конфигурацию
+	if err := cfg.SaveConfig(); err != nil {
+		fmt.Printf("Ошибка сохранения конфигурации: %v\n", err)
+	}
+
+	// Выводим основную информацию о сервере
+	fmt.Printf("Хост IP:     %s\n", deviceInfo.IP)
+	fmt.Printf("Порт:        %d\n", cfg.Port)
+	fmt.Printf("ОС:          %s\n", deviceInfo.OS)
+
+	// Инициализируем канал для запросов авторизации
+	authChan = make(chan interfaces.PendingAuthRequest, 10)
+
+	// Инициализируем менеджер авторизации
+	authManager = auth.NewAuthManager(cfg, authChan)
+
+	// Запускаем сервер mDNS
+	mdnsServer, err = mdns.NewMDNSServer(cfg)
+	if err != nil {
+		fmt.Printf("Ошибка создания mDNS сервера: %v\n", err)
+	}
+
+	// Вывод информации о mDNS
+	fmt.Println("═════════════════════════════════════════════════")
+	fmt.Printf("mDNS имя:    %s\n", mdnsServer.GetServiceName())
+	fmt.Printf("mDNS тип:    %s\n", mdnsServer.GetServiceType())
+	fmt.Printf("mDNS домен:  %s\n", cfg.MDNSDomain)
+	fmt.Println("═════════════════════════════════════════════════")
+
+	// Запускаем mDNS сервер
+	if err := mdnsServer.Start(); err != nil {
+		fmt.Printf("Ошибка запуска mDNS сервера: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Инициализируем основной сервер
+	server = LinqoraHost.NewServer(cfg, authManager)
+
+	// Запускаем обработчик команд в отдельной горутине
+	go startCommandProcessor()
+
+	// Создаем контекст для управляемого завершения
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Запускаем сервер в отдельной горутине
+	go func() {
+		log.Println("Запуск WebSocket сервера...")
+		if err := server.Start(ctx); err != nil {
+			log.Printf("Ошибка WebSocket сервера: %v", err)
+			close(stopCh) // Сигнал для завершения программы при ошибке
 		}
+	}()
 
-		// Повідомлення про підготовку до запуску
-		fmt.Println("Підготовка до запуску сервера...")
-		fmt.Println()
+	// Настройка обработчика сигналов для graceful shutdown
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 
-		// Створюємо новий сервер
-		serverMu.Lock()
-		server = LinqoraHost.NewServer(cfg)
-		serverMu.Unlock()
+	// Ожидаем сигнала завершения
+	select {
+	case <-stopCh:
+		fmt.Println("Получен сигнал остановки сервера...")
+	case sig := <-sigCh:
+		fmt.Printf("Получен сигнал %v...\n", sig)
+	}
 
-		// Обробка сигналів для коректного завершення
-		sigCh := make(chan os.Signal, 1)
-		signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	// Корректное завершение сервера
+	fmt.Println("Останавливаем сервер...")
+	cancel() // Отменяем контекст для graceful shutdown
 
-		// Запускаємо сервер у goroutine
-		serverErrCh := make(chan error, 1)
-		go func() {
-			err := server.Start()
-			if err != nil {
-				serverErrCh <- err
-			}
-		}()
+	// Останавливаем mDNS сервер
+	if mdnsServer != nil {
+		mdnsServer.Stop()
+	}
 
-		fmt.Println("Сервер запущено. Очікування команд або підключень...")
-		fmt.Println(strings.Repeat("─", 50))
-		fmt.Println()
+	// Даем время на завершение всех подключений
+	shutdownTimeout := time.NewTimer(5 * time.Second)
+	shutdownDone := make(chan struct{})
 
-		// Очікуємо на сигнали
-		select {
-		case <-stopCh:
-			fmt.Println("\nВимикання сервера...")
-			serverMu.Lock()
-			server.Shutdown()
-			serverMu.Unlock()
-			fmt.Println("Сервер зупинено")
-			return // Виходимо з програми
+	go func() {
+		// Здесь можно добавить дополнительную логику завершения
+		close(shutdownDone)
+	}()
 
-		case <-restart:
-			fmt.Println("\nПерезапуск сервера...")
-			serverMu.Lock()
-			server.Shutdown()
-			serverMu.Unlock()
-			fmt.Println("Сервер зупинено, підготовка до перезапуску...")
-			continue // Продовжуємо цикл для перезапуску
-
-		case <-sigCh:
-			fmt.Println("\nОтримано сигнал переривання...")
-			serverMu.Lock()
-			server.Shutdown()
-			serverMu.Unlock()
-			fmt.Println("Сервер зупинено")
-			return // Виходимо з програми
-
-		case err := <-serverErrCh:
-			fmt.Printf("\nПомилка сервера: %v\n", err)
-			fmt.Println("Спроба перезапустити сервер через 5 секунд...")
-			time.Sleep(5 * time.Second)
-			continue // Продовжуємо цикл для перезапуску
-		}
+	// Ожидаем завершения всех операций или таймаута
+	select {
+	case <-shutdownDone:
+		fmt.Println("Сервер успешно остановлен")
+	case <-shutdownTimeout.C:
+		fmt.Println("Таймаут при остановке сервера")
 	}
 }
 

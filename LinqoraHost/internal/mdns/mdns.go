@@ -1,101 +1,125 @@
 package mdns
 
 import (
-	"context"
 	"fmt"
 	"log"
-
-	"github.com/grandcat/zeroconf"
+	"net"
+	"os"
+	"os/user"
+	"strings"
 
 	"LinqoraHost/internal/config"
-	"LinqoraHost/pkg/utils"
+
+	"github.com/grandcat/zeroconf"
 )
 
-// MDNSService представляє mDNS сервіс
-type MDNSService struct {
-	config *config.ServerConfig
-	server *zeroconf.Server
+// MDNSServer представляет mDNS сервер для обнаружения в сети
+type MDNSServer struct {
+	server     *zeroconf.Server
+	config     *config.ServerConfig
+	hostname   string
+	username   string
+	mdnsName   string
+	mdnsType   string
+	mdnsDomain string
 }
 
-// NewMDNSService створює новий mDNS сервіс
-func NewMDNSService(config *config.ServerConfig) *MDNSService {
-	return &MDNSService{
-		config: config,
-	}
-}
-
-// Start запускає mDNS сервіс
-func (s *MDNSService) Start(ctx context.Context) error {
-	// Отримуємо локальну IP-адресу
-	ip, err := utils.GetLocalIP()
+func NewMDNSServer(cfg *config.ServerConfig) (*MDNSServer, error) {
+	// Получаем информацию о системе для идентификации хоста
+	hostname, err := os.Hostname()
 	if err != nil {
-		log.Printf("Error getting local IP: %v", err)
+		return nil, fmt.Errorf("failed to get hostname: %w", err)
 	}
 
-	// Додаємо інформацію про IP-адресу в сервіс
-	var txt []string
-	if ip != "" {
-		txt = append(txt, fmt.Sprintf("ip=%s", ip))
+	currentUser, err := user.Current()
+	username := "unknown"
+	if err == nil {
+		username = currentUser.Username
 	}
 
-	if s.config.EnableTLS {
-		txt = append(txt, "tls=true")
-	} else {
-		txt = append(txt, "tls=false")
+	// Используем фиксированный тип сервиса для облегчения обнаружения
+	mdnsType := "_linqora._tcp"
+
+	// Создаем имя сервиса на основе пользователя и хоста
+	cleanUsername := strings.ToLower(strings.ReplaceAll(username, " ", "_"))
+	cleanHostname := strings.ToLower(strings.ReplaceAll(hostname, " ", "_"))
+	mdnsName := fmt.Sprintf("%s-%s", cleanUsername, cleanHostname)
+
+	return &MDNSServer{
+		config:     cfg,
+		hostname:   hostname,
+		username:   username,
+		mdnsName:   mdnsName,
+		mdnsType:   mdnsType,
+		mdnsDomain: cfg.MDNSDomain,
+	}, nil
+}
+
+// Start запускает mDNS сервер
+func (s *MDNSServer) Start() error {
+	port := s.config.Port
+
+	// Получить текущий IP адрес
+	ip, err := getOutboundIP()
+	if err != nil {
+		log.Printf("Warning: could not determine outbound IP: %v", err)
 	}
 
-	// Реєструємо сервіс
+	// Преобразуем метаданные в правильный формат для TXT записей
+	txtRecords := []string{
+		fmt.Sprintf("hostname=%s", s.hostname),
+		fmt.Sprintf("os=%s", fmt.Sprintf("%s %s", os.Getenv("DESKTOP_SESSION"), os.Getenv("XDG_CURRENT_DESKTOP"))),
+		fmt.Sprintf("ip=%s", ip.String()),
+		fmt.Sprintf("tls=%v", s.config.EnableTLS),
+		fmt.Sprintf("username=%s", s.username),
+	}
+
+	// Создаем mDNS сервер со стандартным типом
 	server, err := zeroconf.Register(
-		s.config.MDNSName,
-		s.config.MDNSType,
-		s.config.MDNSDomain,
-		s.config.Port,
-		txt,
-		nil,
+		s.mdnsName,   // Имя сервиса (например "pasich-ubuntu")
+		s.mdnsType,   // Тип сервиса (фиксированный "_linqora._tcp")
+		s.mdnsDomain, // Домен (обычно "local.")
+		port,         // Порт
+		txtRecords,   // Метаданные в формате ["key=value", ...]
+		nil,          // Интерфейсы (nil = все)
 	)
-
 	if err != nil {
-		return fmt.Errorf("mDNS registration failed: %w", err)
+		return fmt.Errorf("failed to register mDNS server: %w", err)
 	}
 
 	s.server = server
-
-	log.Printf("mDNS service registered: %s.%s.%s on port %d (TLS: %v)",
-		s.config.MDNSName, s.config.MDNSType, s.config.MDNSDomain,
-		s.config.Port, s.config.EnableTLS)
-
-	// Очікуємо на завершення контексту
-	<-ctx.Done()
-
-	// Зупиняємо сервер
-	s.Shutdown()
-
+	log.Printf("mDNS server started as '%s.%s.%s' on port %d",
+		s.mdnsName, s.mdnsType, s.mdnsDomain, port)
+	log.Printf("mDNS TXT records: %v", txtRecords)
 	return nil
 }
 
-// Shutdown зупиняє mDNS сервіс
-func (s *MDNSService) Shutdown() {
+// Stop останавливает mDNS сервер
+func (s *MDNSServer) Stop() {
 	if s.server != nil {
+		log.Printf("Shutting down mDNS server")
 		s.server.Shutdown()
-		log.Printf("mDNS service shutdown: %s.%s.%s",
-			s.config.MDNSName, s.config.MDNSType, s.config.MDNSDomain)
 	}
 }
 
-// UpdateConfig оновлює конфігурацію mDNS сервісу
-func (s *MDNSService) UpdateConfig(name, serviceType, domain string) {
-	// Зупиняємо поточний сервер
-	s.Shutdown()
+// GetServiceName возвращает имя mDNS сервиса
+func (s *MDNSServer) GetServiceName() string {
+	return s.mdnsName
+}
 
-	// Оновлюємо конфігурацію
-	s.config.MDNSName = name
-	s.config.MDNSType = serviceType
-	s.config.MDNSDomain = domain
+// GetServiceType возвращает тип mDNS сервиса
+func (s *MDNSServer) GetServiceType() string {
+	return s.mdnsType
+}
 
-	// Запускаємо новий сервер у goroutine
-	go func() {
-		if err := s.Start(context.Background()); err != nil {
-			log.Printf("Failed to restart mDNS service: %v", err)
-		}
-	}()
+// getOutboundIP определяет IP адрес для исходящих подключений
+func getOutboundIP() (net.IP, error) {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	return localAddr.IP, nil
 }

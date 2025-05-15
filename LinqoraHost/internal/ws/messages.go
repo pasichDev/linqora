@@ -12,48 +12,16 @@ type ClientMessage struct {
 	Data       json.RawMessage `json:"data,omitempty"`
 }
 
-// AuthData містить дані для авторизації
-type AuthData struct {
-	DeviceName string `json:"deviceName"`
-	IP         string `json:"ip"`
-}
-
-// CursorCommand команда для керування курсором
-type CursorCommand struct {
-	X      int `json:"x"`
-	Y      int `json:"y"`
-	Action int `json:"action"` // 0 - move, 1 - click, 2 - right click, etc.
-}
-
-/*
-// SystemInfo містить інформацію про систему
-type SystemInfo struct {
-	OS          string `json:"os"`
-	Hostname    string `json:"hostname"`
-	CPUCores    int    `json:"cpuCores"`
-	MemoryTotal uint64 `json:"memoryTotal"`
-	MemoryFree  uint64 `json:"memoryFree"`
-	DiskTotal   uint64 `json:"diskSpaceTotal"`
-	DiskFree    uint64 `json:"diskSpaceFree"`
-}
-*/
-
 // AuthResponse відповідь на авторизацію
-type AuthResponse struct {
-	Type            string          `json:"type"`
-	Success         bool            `json:"success"`
-	Message         string          `json:"message,omitempty"`
-	AuthInformation AuthInformation `json:"authInfomation,omitempty"`
+type HostInfoResponse struct {
+	Type     string   `json:"type"`
+	Success  bool     `json:"success"`
+	Message  string   `json:"message,omitempty"`
+	HostInfo HostInfo `json:"host_info,omitempty"`
 }
 
-// MetricsMessage повідомлення з метриками
-type MetricsMessage struct {
-	Type string          `json:"type"`
-	Data json.RawMessage `json:"data"`
-}
-
-// AuthInfomation містить інформацію про систему яка не буде змінюватись
-type AuthInformation struct {
+// HostInfo містить інформацію про систему яка не буде змінюватись
+type HostInfo struct {
 	OS                 string  `json:"os"`
 	Hostname           string  `json:"hostname"`
 	CpuModel           string  `json:"cpuModel"`
@@ -64,6 +32,12 @@ type AuthInformation struct {
 }
 
 type MediaMessage struct {
+	Type string          `json:"type"`
+	Data json.RawMessage `json:"data"`
+}
+
+// MetricsMessage повідомлення з метриками
+type MetricsMessage struct {
 	Type string          `json:"type"`
 	Data json.RawMessage `json:"data"`
 }
