@@ -6,6 +6,7 @@ enum TypeMessageWs {
   auth_pending,
   auth_request,
   media,
+  metrics,
   host_info,
 }
 

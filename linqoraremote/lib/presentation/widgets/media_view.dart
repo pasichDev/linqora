@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:linqoraremote/data/providers/websocket_provider.dart';
 import 'package:linqoraremote/presentation/widgets/loading_view.dart';
 import 'package:linqoraremote/presentation/widgets/shimmer_effect.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
@@ -20,14 +21,21 @@ class _MediaScreenViewState extends State<MediaScreenView> {
   @override
   void initState() {
     super.initState();
-    controller = Get.find<MediaController>();
-    controller.joinRoom();
+    controller = Get.put(
+      MediaController(webSocketProvider: Get.find<WebSocketProvider>()),
+    );
   }
 
   @override
   void dispose() {
-    controller.leaveRoom();
+    if (_isControllerRegistered<MediaController>()) {
+      Get.delete<MediaController>();
+    }
     super.dispose();
+  }
+
+  bool _isControllerRegistered<T>() {
+    return Get.isRegistered<T>();
   }
 
   @override

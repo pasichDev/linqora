@@ -23,12 +23,22 @@ class MediaController extends GetxController {
   final RxBool isLoadingMedia = false.obs;
 
   @override
-  void onClose() {
-    leaveRoom();
-    super.onClose();
+  void onInit() {
+    _init();
+    super.onInit();
   }
 
-  Future<void> joinRoom() async {
+  @override
+  void dispose() {
+    webSocketProvider.leaveRoom(TypeMessageWs.media.value);
+    webSocketProvider.removeHandler(TypeMessageWs.media.value);
+
+    capabilities.value = null;
+    nowPlaying.value = null;
+    super.dispose();
+  }
+
+  Future<void> _init() async {
     webSocketProvider.registerHandler(TypeMessageWs.media.value, (data) {
       final mediaData = data['data'];
       if (mediaData != null && mediaData is Map<String, dynamic>) {
@@ -53,14 +63,6 @@ class MediaController extends GetxController {
     });
 
     await webSocketProvider.joinRoom(TypeMessageWs.media.value);
-  }
-
-  void leaveRoom() {
-    webSocketProvider.leaveRoom(TypeMessageWs.media.value);
-    webSocketProvider.removeHandler(TypeMessageWs.media.value);
-
-    capabilities.value = null;
-    nowPlaying.value = null;
   }
 
   Future<void> sendMediaCommand(int action, {int value = 0}) async {

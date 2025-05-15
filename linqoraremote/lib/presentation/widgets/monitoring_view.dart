@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:linqoraremote/presentation/controllers/metrics_controller.dart';
+import 'package:linqoraremote/data/providers/websocket_provider.dart';
+import 'package:linqoraremote/presentation/controllers/monitoring_controller.dart';
 import 'package:linqoraremote/presentation/widgets/loading_view.dart';
 
 import 'metrics/metric_card.dart';
@@ -20,15 +21,16 @@ class MonitoringView extends StatefulWidget {
 
 class _MonitoringViewState extends State<MonitoringView>
     with SingleTickerProviderStateMixin {
-  late final MetricsController metricsController;
+  late final MonitoringController metricsController;
   late final AnimationController _animationController;
   late final Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
-    metricsController = Get.find<MetricsController>();
-    metricsController.joinMetricsRoom();
+    metricsController = Get.put(
+      MonitoringController(webSocketProvider: Get.find<WebSocketProvider>()),
+    );
 
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 500),
@@ -44,9 +46,15 @@ class _MonitoringViewState extends State<MonitoringView>
 
   @override
   void dispose() {
-    metricsController.leaveMetricsRoom();
+    if (_isControllerRegistered<MonitoringController>()) {
+      Get.delete<MonitoringController>();
+    }
     _animationController.dispose();
     super.dispose();
+  }
+
+  bool _isControllerRegistered<T>() {
+    return Get.isRegistered<T>();
   }
 
   @override

@@ -1,12 +1,13 @@
 import 'package:get/get.dart';
 
+import '../../data/enums/type_messages_ws.dart';
 import '../../data/models/metrics.dart';
 import '../../data/providers/websocket_provider.dart';
 
-class MetricsController extends GetxController {
+class MonitoringController extends GetxController {
   final WebSocketProvider webSocketProvider;
 
-  MetricsController({required this.webSocketProvider});
+  MonitoringController({required this.webSocketProvider});
 
   static const int maxMetricsCount = 20;
 
@@ -24,15 +25,22 @@ class MetricsController extends GetxController {
   CPUMetrics? getCurrentCPUMetrics() => currentCPUMetrics.value;
   RAMMetrics? getCurrentRAMMetrics() => currentRAMMetrics.value;
 
-  void joinMetricsRoom() {
-    webSocketProvider.registerHandler('metrics', _handleMetricsUpdate);
-    webSocketProvider.joinRoom('metrics');
+  @override
+  void onInit() {
+    webSocketProvider.registerHandler(
+      TypeMessageWs.metrics.value,
+      _handleMetricsUpdate,
+    );
+    webSocketProvider.joinRoom(TypeMessageWs.metrics.value);
+    super.onInit();
   }
 
-  void leaveMetricsRoom() {
-    webSocketProvider.leaveRoom('metrics');
-    webSocketProvider.removeHandler('metrics');
+  @override
+  void dispose() {
+    webSocketProvider.leaveRoom(TypeMessageWs.metrics.value);
+    webSocketProvider.removeHandler(TypeMessageWs.metrics.value);
     _resetMetrics();
+    super.dispose();
   }
 
   void _handleMetricsUpdate(Map<String, dynamic> data) {
@@ -63,7 +71,9 @@ class MetricsController extends GetxController {
     if (cpuLoads.length >= maxMetricsCount) cpuLoads.removeAt(0);
     cpuLoads.add(cpuLoad);
 
-    if (ramUsagesPercent.length >= maxMetricsCount) ramUsagesPercent.removeAt(0);
+    if (ramUsagesPercent.length >= maxMetricsCount) {
+      ramUsagesPercent.removeAt(0);
+    }
     ramUsagesPercent.add(ramUsage);
   }
 }
