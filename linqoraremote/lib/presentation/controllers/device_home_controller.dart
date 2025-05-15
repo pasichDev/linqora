@@ -6,7 +6,6 @@ import 'package:get/get.dart';
 import 'package:linqoraremote/data/enums/type_messages_ws.dart';
 import 'package:linqoraremote/data/models/discovered_service.dart';
 import 'package:linqoraremote/data/models/host_system_info.dart';
-import 'package:linqoraremote/data/models/ws_message.dart';
 
 import '../../data/providers/websocket_provider.dart';
 import '../../routes/app_routes.dart';

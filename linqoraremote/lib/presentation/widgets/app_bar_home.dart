@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:linqoraremote/presentation/dashboard_items.dart';
+import 'package:linqoraremote/routes/app_routes.dart';
 
 import '../controllers/device_home_controller.dart';
 import 'dialogs/dialog_cancel_connect_device.dart';
@@ -82,6 +83,12 @@ class AppBarHomePage extends StatelessWidget implements PreferredSizeWidget {
           }
         },
       ),
+      actions: [
+        IconButton(
+          onPressed: () => Get.toNamed(AppRoutes.SETTINGS),
+          icon: Icon(Icons.settings),
+        ),
+      ],
     );
   }
 
