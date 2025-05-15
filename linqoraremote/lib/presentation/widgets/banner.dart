@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 
-class LoadingBanner extends StatelessWidget {
+class MessageBanner extends StatelessWidget {
   final String message;
-
-  const LoadingBanner({required this.message, super.key});
+  final bool isLoading;
+  const MessageBanner({
+    required this.message,
+    this.isLoading = true,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -22,6 +26,7 @@ class LoadingBanner extends StatelessWidget {
         ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
             width: 8,
@@ -34,28 +39,35 @@ class LoadingBanner extends StatelessWidget {
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: SizedBox(
-              width: 24,
-              height: 24,
-              child: LoadingAnimationWidget.inkDrop(
-                color: Theme.of(context).colorScheme.onSurface,
-                size: 24,
-              ),
-            ),
-          ),
           Expanded(
-            child: Text(
-              message,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  if (isLoading)
+                    SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: LoadingAnimationWidget.inkDrop(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        size: 24,
+                      ),
+                    ),
+                  SizedBox(width: isLoading ? 15 : 0),
+                  Expanded(
+                    child: Text(
+                      message,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-          const SizedBox(width: 16),
         ],
       ),
     );

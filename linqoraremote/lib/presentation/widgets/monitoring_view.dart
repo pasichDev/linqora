@@ -83,7 +83,7 @@ class _MonitoringViewState extends State<MonitoringView>
                       mainAxisAlignment: MainAxisAlignment.start,
                       children: [
                         !_monitoringController.hasEnoughMetricsData
-                            ? LoadingBanner(
+                            ? MessageBanner(
                               message:
                                   'Зачекайте, відбувається калібрація даних',
                             )

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:linqoraremote/data/providers/websocket_provider.dart';
+import 'package:linqoraremote/presentation/widgets/banner.dart';
 import 'package:linqoraremote/presentation/widgets/loading_view.dart';
 import 'package:linqoraremote/presentation/widgets/shimmer_effect.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
@@ -16,12 +17,12 @@ class MediaScreenView extends StatefulWidget {
 }
 
 class _MediaScreenViewState extends State<MediaScreenView> {
-  late final MediaController controller;
+  late final MediaController _mediaController;
 
   @override
   void initState() {
     super.initState();
-    controller = Get.put(
+    _mediaController = Get.put(
       MediaController(webSocketProvider: Get.find<WebSocketProvider>()),
     );
   }
@@ -46,15 +47,31 @@ class _MediaScreenViewState extends State<MediaScreenView> {
         children: [
           Expanded(
             child: Obx(() {
-              if (controller.nowPlaying.value == null ||
-                  controller.capabilities.value == null) {
+              if (_mediaController.capabilities.value == null) {
                 return LoadingView();
               } else {
                 return Column(
                   children: [
+                    if (!_mediaController
+                            .capabilities
+                            .value!
+                            .isControlledByRemote ||
+                        _mediaController.nowPlaying.value == null)
+                      MessageBanner(
+                        message:
+                            _mediaController.nowPlaying.value == null
+                                ? "На віддаленому пристрої зараз нічого не відтворюється"
+                                : "Керування медіа на віддаленому пристрої недоступно",
+                        isLoading: false,
+                      ),
                     _volumeCard(),
                     const SizedBox(height: 20),
-                    _mediaCard(),
+                    if (_mediaController
+                            .capabilities
+                            .value!
+                            .isControlledByRemote &&
+                        _mediaController.nowPlaying.value != null)
+                      _mediaCard(),
                   ],
                 );
               }
@@ -84,12 +101,12 @@ class _MediaScreenViewState extends State<MediaScreenView> {
                 Obx(
                   () => IconButton(
                     icon: Icon(
-                      controller.isMuted.value
+                      _mediaController.isMuted.value
                           ? Icons.volume_off
                           : Icons.volume_up,
                       size: 24,
                     ),
-                    onPressed: controller.setMuted,
+                    onPressed: _mediaController.setMuted,
                   ),
                 ),
                 const SizedBox(width: 5),
@@ -97,23 +114,23 @@ class _MediaScreenViewState extends State<MediaScreenView> {
                 // Кнопка уменьшения громкости
                 IconButton(
                   icon: const Icon(Icons.remove, size: 24),
-                  onPressed: controller.minusVolume,
+                  onPressed: _mediaController.minusVolume,
                 ),
 
                 // Слайдер громкости
                 Expanded(
                   child: Obx(
                     () => Slider(
-                      value: controller.volume.value,
+                      value: _mediaController.volume.value,
                       min: 0,
                       max: 100,
                       divisions: 20,
-                      label: '${controller.volume.value.toInt()}%',
+                      label: '${_mediaController.volume.value.toInt()}%',
                       onChanged: (newValue) {
-                        controller.volume.value = newValue;
+                        _mediaController.volume.value = newValue;
                       },
                       onChangeEnd: (newValue) {
-                        controller.slideVolume(newValue);
+                        _mediaController.slideVolume(newValue);
                       },
                     ),
                   ),
@@ -122,7 +139,7 @@ class _MediaScreenViewState extends State<MediaScreenView> {
                 // Кнопка увеличения громкости
                 IconButton(
                   icon: const Icon(Icons.add, size: 24),
-                  onPressed: controller.plusVolume,
+                  onPressed: _mediaController.plusVolume,
                 ),
               ],
             ),
@@ -151,7 +168,7 @@ class _MediaScreenViewState extends State<MediaScreenView> {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Obx(() {
-          if (!controller.capabilities.value!.canControlMedia) {
+          if (!_mediaController.capabilities.value!.canControlMedia) {
             return const Center(
               child: Text(
                 'Управление мультимедиа недоступно на устройстве',
@@ -174,13 +191,17 @@ class _MediaScreenViewState extends State<MediaScreenView> {
                   // Индикатор обновления в реальном времени
                   Obx(
                     () =>
-                        !controller.isLoadingMedia.value
+                        !_mediaController.isLoadingMedia.value
                             ? Icon(
-                              controller.nowPlaying.value?.isPlaying ?? false
+                              _mediaController.nowPlaying.value?.isPlaying ??
+                                      false
                                   ? Icons.music_note
                                   : Icons.music_off,
                               color:
-                                  controller.nowPlaying.value?.isPlaying ??
+                                  _mediaController
+                                              .nowPlaying
+                                              .value
+                                              ?.isPlaying ??
                                           false
                                       ? Colors.green
                                       : Colors.grey,
@@ -193,11 +214,12 @@ class _MediaScreenViewState extends State<MediaScreenView> {
                 ],
               ),
               const SizedBox(height: 20),
-              if (controller.capabilities.value!.canGetMediaInfo) ...[
+              if (_mediaController.capabilities.value!.canGetMediaInfo) ...[
                 _buildMediaInfoSection(),
                 Obx(
-                  () =>
-                      _buildPlaybackControls(!controller.isLoadingMedia.value),
+                  () => _buildPlaybackControls(
+                    !_mediaController.isLoadingMedia.value,
+                  ),
                 ),
               ],
             ],
@@ -209,7 +231,7 @@ class _MediaScreenViewState extends State<MediaScreenView> {
 
   Widget _buildVolumePresetButton(String label, int volumeValue) {
     return TextButton(
-      onPressed: () => controller.setVolume(volumeValue),
+      onPressed: () => _mediaController.setVolume(volumeValue),
       style: ElevatedButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         minimumSize: const Size(0, 0),
@@ -225,10 +247,10 @@ class _MediaScreenViewState extends State<MediaScreenView> {
       children: [
         Obx(
           () =>
-              controller.isLoadingMedia.value
+              _mediaController.isLoadingMedia.value
                   ? ShimmerEffect(height: 16, width: 160)
                   : Text(
-                    "${controller.nowPlaying.value!.title} - ${controller.nowPlaying.value!.artist}",
+                    "${_mediaController.nowPlaying.value!.title} - ${_mediaController.nowPlaying.value!.artist}",
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -239,14 +261,14 @@ class _MediaScreenViewState extends State<MediaScreenView> {
         ),
         Obx(
           () =>
-              controller.isLoadingMedia.value
+              _mediaController.isLoadingMedia.value
                   ? SizedBox(height: 5)
                   : SizedBox(),
         ),
 
         Obx(() {
-          final app = controller.nowPlaying.value!.application;
-          if (!controller.isLoadingMedia.value) {
+          final app = _mediaController.nowPlaying.value!.application;
+          if (!_mediaController.isLoadingMedia.value) {
             return Text(
               app.isEmpty ? 'Неизвестное приложение' : app,
               style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
@@ -259,12 +281,12 @@ class _MediaScreenViewState extends State<MediaScreenView> {
         // Прогресс воспроизведения
         const SizedBox(height: 20),
         Obx(() {
-          if (controller.nowPlaying.value!.duration > 0 &&
-              !controller.isLoadingMedia.value) {
+          if (_mediaController.nowPlaying.value!.duration > 0 &&
+              !_mediaController.isLoadingMedia.value) {
             return Column(
               children: [
                 LinearProgressIndicator(
-                  value: controller.nowPlaying.value!.progress.toDouble(),
+                  value: _mediaController.nowPlaying.value!.progress.toDouble(),
                   backgroundColor: Colors.grey.shade300.withAlpha(60),
                   valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
                   minHeight: 6,
@@ -275,7 +297,8 @@ class _MediaScreenViewState extends State<MediaScreenView> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      controller.nowPlaying.value!.stringPosition.toString(),
+                      _mediaController.nowPlaying.value!.stringPosition
+                          .toString(),
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.grey.shade700,
@@ -283,7 +306,8 @@ class _MediaScreenViewState extends State<MediaScreenView> {
                     ),
 
                     Text(
-                      controller.nowPlaying.value!.stringDuration.toString(),
+                      _mediaController.nowPlaying.value!.stringDuration
+                          .toString(),
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.grey.shade700,
@@ -318,7 +342,7 @@ class _MediaScreenViewState extends State<MediaScreenView> {
           icon: Icon(Icons.skip_previous, size: 36, color: color),
           onPressed: () {
             if (isEnabled) {
-              controller.sendMediaCommand(MediaActions.mediaPrevious);
+              _mediaController.sendMediaCommand(MediaActions.mediaPrevious);
             }
           },
         ),
@@ -329,7 +353,7 @@ class _MediaScreenViewState extends State<MediaScreenView> {
         Obx(
           () => IconButton(
             icon: Icon(
-              controller.nowPlaying.value!.isPlaying
+              _mediaController.nowPlaying.value!.isPlaying
                   ? Icons.pause_circle_filled
                   : Icons.play_circle_filled,
               size: 48,
@@ -337,7 +361,7 @@ class _MediaScreenViewState extends State<MediaScreenView> {
             ),
             onPressed: () {
               if (isEnabled) {
-                controller.sendMediaCommand(MediaActions.mediaPlayPause);
+                _mediaController.sendMediaCommand(MediaActions.mediaPlayPause);
               }
             },
           ),
@@ -350,7 +374,7 @@ class _MediaScreenViewState extends State<MediaScreenView> {
           icon: Icon(Icons.skip_next, size: 36, color: color),
           onPressed: () {
             if (isEnabled) {
-              controller.sendMediaCommand(MediaActions.mediaNext);
+              _mediaController.sendMediaCommand(MediaActions.mediaNext);
             }
           },
         ),

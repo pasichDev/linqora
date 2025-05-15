@@ -39,30 +39,35 @@ class MediaController extends GetxController {
   }
 
   Future<void> _init() async {
-    webSocketProvider.registerHandler(TypeMessageWs.media.value, (data) {
-      final mediaData = data['data'];
-      if (mediaData != null && mediaData is Map<String, dynamic>) {
-        final nowPlayingData = mediaData['nowPlaying'] as Map<String, dynamic>?;
-
-        if (nowPlayingData != null) {
-          nowPlaying.value = NowPlaying.fromJson(nowPlayingData).copyWith(
-            stringDuration: formatTimeTrack(nowPlayingData['duration'] as int),
-            stringPosition: formatTimeTrack(nowPlayingData['position'] as int),
-          );
-        }
-
-        final capabilitiesData =
-            mediaData['mediaCapabilities'] as Map<String, dynamic>?;
-        if (capabilitiesData != null) {
-          capabilities.value = MediaCapabilities.fromJson(capabilitiesData);
-        }
-        if (isLoadingMedia.value) {
-          isLoadingMedia.value = false;
-        }
-      }
-    });
+    webSocketProvider.registerHandler(TypeMessageWs.media.value, _handleMediaData);
 
     await webSocketProvider.joinRoom(TypeMessageWs.media.value);
+  }
+
+
+  void _handleMediaData(dynamic data) {
+    print("loadsms");
+print(data);
+    final mediaData = data['data'];
+    if (mediaData != null && mediaData is Map<String, dynamic>) {
+      final nowPlayingData = mediaData['nowPlaying'] as Map<String, dynamic>?;
+
+      if (nowPlayingData != null) {
+        nowPlaying.value = NowPlaying.fromJson(nowPlayingData).copyWith(
+          stringDuration: formatTimeTrack(nowPlayingData['duration'] as int),
+          stringPosition: formatTimeTrack(nowPlayingData['position'] as int),
+        );
+      }
+
+      final capabilitiesData =
+      mediaData['mediaCapabilities'] as Map<String, dynamic>?;
+      if (capabilitiesData != null) {
+        capabilities.value = MediaCapabilities.fromJson(capabilitiesData);
+      }
+      if (isLoadingMedia.value) {
+        isLoadingMedia.value = false;
+      }
+    }
   }
 
   Future<void> sendMediaCommand(int action, {int value = 0}) async {

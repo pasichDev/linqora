@@ -13,6 +13,8 @@ class MediaCapabilities {
     this.isMuted = false,
   });
 
+  get isControlledByRemote => canControlVolume || canControlMedia;
+
   factory MediaCapabilities.fromJson(Map<String, dynamic> json) {
     return MediaCapabilities(
       canControlVolume: json['canControlVolume'] ?? false,
