@@ -4,6 +4,7 @@ import 'package:linqoraremote/data/providers/websocket_provider.dart';
 import 'package:linqoraremote/presentation/controllers/monitoring_controller.dart';
 import 'package:linqoraremote/presentation/widgets/loading_view.dart';
 
+import 'banner.dart';
 import 'metrics/metric_card.dart';
 import 'metrics/metric_chart.dart';
 import 'metrics/metrics_row.dart';
@@ -21,14 +22,14 @@ class MonitoringView extends StatefulWidget {
 
 class _MonitoringViewState extends State<MonitoringView>
     with SingleTickerProviderStateMixin {
-  late final MonitoringController metricsController;
+  late final MonitoringController _monitoringController;
   late final AnimationController _animationController;
   late final Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
-    metricsController = Get.put(
+    _monitoringController = Get.put(
       MonitoringController(webSocketProvider: Get.find<WebSocketProvider>()),
     );
 
@@ -65,8 +66,8 @@ class _MonitoringViewState extends State<MonitoringView>
         children: [
           Expanded(
             child: Obx(() {
-              final cpuMetrics = metricsController.getCurrentCPUMetrics();
-              final ramMetrics = metricsController.getCurrentRAMMetrics();
+              final cpuMetrics = _monitoringController.getCurrentCPUMetrics();
+              final ramMetrics = _monitoringController.getCurrentRAMMetrics();
 
               if (cpuMetrics == null || ramMetrics == null) {
                 return LoadingView();
@@ -81,11 +82,18 @@ class _MonitoringViewState extends State<MonitoringView>
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.start,
                       children: [
+                        !_monitoringController.hasEnoughMetricsData
+                            ? LoadingBanner(
+                              message:
+                                  'Зачекайте, відбувається калібрація даних',
+                            )
+                            : SizedBox.shrink(),
                         MetricsCard(
                           title: 'Температура CPU',
                           value: '${cpuMetrics.temperature}°C',
                           widget: MetricChart(
-                            metricsData: metricsController.getTemperatures(),
+                            metricsData:
+                                _monitoringController.getTemperatures(),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -95,7 +103,8 @@ class _MonitoringViewState extends State<MonitoringView>
                           widget: Column(
                             children: [
                               MetricChart(
-                                metricsData: metricsController.getCPULoads(),
+                                metricsData:
+                                    _monitoringController.getCPULoads(),
                               ),
 
                               Padding(
@@ -107,7 +116,7 @@ class _MonitoringViewState extends State<MonitoringView>
                                     MetricDetailRow(
                                       label: "Процеси",
                                       value:
-                                          metricsController
+                                          _monitoringController
                                               .currentCPUMetrics
                                               .value
                                               ?.processes
@@ -117,7 +126,7 @@ class _MonitoringViewState extends State<MonitoringView>
                                     MetricDetailRow(
                                       label: "Нитки",
                                       value:
-                                          metricsController
+                                          _monitoringController
                                               .currentCPUMetrics
                                               .value
                                               ?.threads
@@ -138,7 +147,7 @@ class _MonitoringViewState extends State<MonitoringView>
                               '${ramMetrics.loadPercent}% (${ramMetrics.usage} ГБ)',
                           widget: MetricChart(
                             metricsData:
-                                metricsController.getRAMUsagesPercent(),
+                                _monitoringController.getRAMUsagesPercent(),
                           ),
                         ),
                       ],

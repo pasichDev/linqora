@@ -25,6 +25,11 @@ class MonitoringController extends GetxController {
   CPUMetrics? getCurrentCPUMetrics() => currentCPUMetrics.value;
   RAMMetrics? getCurrentRAMMetrics() => currentRAMMetrics.value;
 
+  bool get hasEnoughMetricsData =>
+      temperatures.length > 5 &&
+      cpuLoads.length > 5 &&
+      ramUsagesPercent.length > 5;
+
   @override
   void onInit() {
     webSocketProvider.registerHandler(
