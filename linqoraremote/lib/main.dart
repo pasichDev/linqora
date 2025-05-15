@@ -30,7 +30,7 @@ void main() async {
 class MyApp extends StatelessWidget {
   MyApp({super.key});
 
-  final settingsController = Get.find<SettingsController>();
+  final settingsController = Get.put(SettingsController());
 
   @override
   Widget build(BuildContext context) {
