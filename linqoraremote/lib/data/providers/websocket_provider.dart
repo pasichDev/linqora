@@ -15,7 +15,9 @@ import '../models/ws_message.dart';
 class WebSocketProvider {
   WebSocketChannel? _channel;
   final RxList<String> messages = <String>[].obs;
-
+  final Duration _defaultPingInterval = const Duration(seconds: 30);
+  Duration _pingInterval = const Duration(seconds: 30);
+  Timer? _pingTimer;
   Function()? onConnected;
   Function()? onDisconnected;
   Function(Object error)? onError;
@@ -66,12 +68,11 @@ class WebSocketProvider {
     DiscoveredService device, {
     bool allowSelfSigned = true,
     Duration timeout = const Duration(seconds: 10),
+    Duration pingInterval = const Duration(seconds: 30),
   }) async {
-    // 1. Сбрасываем статус соединения
     _isConnected = false;
-
-    // 2. Корректно закрываем предыдущее соединение
     await _cleanupExistingConnection();
+    _pingInterval = pingInterval;
 
     final protocol = device.supportsTLS ? 'wss' : 'ws';
     final wsUrl = '$protocol://${device.address}:${device.port}/ws';
@@ -81,7 +82,6 @@ class WebSocketProvider {
     }
 
     try {
-      // 3. Используем таймаут для подключения
       await _establishConnection(
         wsUrl,
         device.supportsTLS,
@@ -95,24 +95,23 @@ class WebSocketProvider {
         },
       );
 
-      // 4. Настраиваем обработчики сообщений
       _subscription = _channel!.stream.listen(
         (message) {
           messages.add(message);
           _handleMessage(message);
         },
         onError: (error) {
-          _isConnected = false; // Сброс при ошибке
+          _isConnected = false;
           _handleError(error);
         },
         onDone: () {
-          _isConnected = false; // Сброс при закрытии
+          _isConnected = false;
           _handleDone();
         },
         cancelOnError: false,
       );
 
-      // 5. Устанавливаем флаг только при успешном соединении
+       _startPingTimer();
       _isConnected = true;
       onConnected?.call();
 
@@ -121,7 +120,6 @@ class WebSocketProvider {
       }
       return true;
     } catch (e) {
-      // 6. Обрабатываем любую ошибку, очищаем ресурсы
       await _cleanupExistingConnection();
 
       if (kDebugMode) {
@@ -132,10 +130,40 @@ class WebSocketProvider {
     }
   }
 
-  // Вспомогательные методы для упрощения основного кода:
+  // Новый метод для запуска периодических ping сообщений
+  void _startPingTimer() {
+    _pingTimer?.cancel();
+    _pingTimer = Timer.periodic(_pingInterval, (timer) {
+      if (!_isConnected || _channel == null) {
+        timer.cancel();
+        return;
+      }
 
-  // Очистка предыдущего соединения
+      try {
+        // Отправляем ping в формате JSON
+        sendJson({
+          'type': 'ping',
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+        });
+
+        if (kDebugMode) {
+          print('Ping отправлен');
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('Ошибка отправки ping: $e');
+        }
+      }
+    });
+  }
+  
+
+
+  // Обновляем метод cleanup для отмены ping таймера
   Future<void> _cleanupExistingConnection() async {
+    _pingTimer?.cancel();
+    _pingTimer = null;
+
     if (_subscription != null) {
       await _subscription!.cancel();
       _subscription = null;
@@ -146,6 +174,7 @@ class WebSocketProvider {
       _channel = null;
     }
   }
+
 
   Future<void> _establishConnection(
     String wsUrl,
@@ -345,6 +374,9 @@ class WebSocketProvider {
 
   // Відключення від WebSocket сервера
   Future<void> disconnect() async {
+    _pingTimer?.cancel();
+    _pingTimer = null;
+
     _isConnected = false;
     _isAuthenticated = false;
     _joinedRooms.clear();
@@ -362,6 +394,7 @@ class WebSocketProvider {
     if (kDebugMode) {
       print('WebSocket відключено');
     }
+
   }
 
   // Обробка вхідних повідомлень

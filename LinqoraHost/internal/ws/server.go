@@ -183,8 +183,17 @@ func (s *WSServer) handleClientMessage(client *Client, msg *ClientMessage) {
 			return
 		}
 	}
-
+	if msg.Type == "ping" {
+		pongMessage := map[string]interface{}{
+			"type":      "pong",
+			"timestamp": msg.Data,
+		}
+		responseJSON, _ := json.Marshal(pongMessage)
+		client.SendMessage(responseJSON)
+		return
+	}
 	switch msg.Type {
+
 	case "host_info":
 		s.handleHostInfoMessage(client, msg)
 	case "join_room":

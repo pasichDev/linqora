@@ -1,32 +1,41 @@
+// Добавьте эти импорты
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:linqoraremote/data/enums/type_messages_ws.dart';
 import 'package:linqoraremote/data/models/discovered_service.dart';
 import 'package:linqoraremote/data/models/host_system_info.dart';
+import 'package:linqoraremote/presentation/controllers/settings_controller.dart';
+import 'package:linqoraremote/services/background_service.dart';
 
 import '../../data/providers/websocket_provider.dart';
 import '../../routes/app_routes.dart';
 
-class DeviceHomeController extends GetxController {
+class DeviceHomeController extends GetxController with WidgetsBindingObserver {
   final WebSocketProvider webSocketProvider;
 
   DeviceHomeController({required this.webSocketProvider});
 
   final RxBool isConnected = false.obs;
   final RxInt selectedMenuIndex = (-1).obs;
+  final RxBool isBackgroundServiceRunning = false.obs;
+  final RxBool isReconnecting = false.obs;
 
   final RxMap deviceInfo = {}.obs;
   final Rxn<HostSystemInfo> hostInfo = Rxn<HostSystemInfo>();
   Timer? _connectionCheckTimer;
+  Timer? _serviceStatusTimer;
 
   final Rxn<DiscoveredService> authDevice = Rxn<DiscoveredService>();
 
   @override
   void onInit() {
     super.onInit();
+
+    // Регистрируем наблюдателя за жизненным циклом приложения
+    WidgetsBinding.instance.addObserver(this);
 
     // Получаем данные устройства из аргументов
     _setupFromArguments();
@@ -36,6 +45,65 @@ class DeviceHomeController extends GetxController {
 
     // Запускаем таймер для проверки соединения
     _startConnectionCheck();
+
+    // Запускаем таймер для проверки статуса сервиса
+    _startServiceStatusCheck();
+
+    // Запускаем фоновый сервис, если включено в настройках
+    _startBackgroundServiceIfEnabled();
+  }
+
+  @override
+  void onClose() {
+    WidgetsBinding.instance.removeObserver(this);
+    stopBackgroundService();
+    _connectionCheckTimer?.cancel();
+    _serviceStatusTimer?.cancel();
+
+    webSocketProvider.removeHandler('media');
+    webSocketProvider.removeHandler('host_info');
+
+    super.onClose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (kDebugMode) {
+      print('App lifecycle state changed: $state');
+    }
+
+    switch (state) {
+      case AppLifecycleState.resumed:
+        // Приложение возобновлено - проверяем соединение
+        checkConnectionAfterResume();
+        break;
+      case AppLifecycleState.inactive:
+        // Приложение неактивно - возможно, скоро будет свернуто
+        break;
+      case AppLifecycleState.paused:
+        // Приложение свернуто - проверяем, нужно ли запустить фоновый сервис
+        _handleAppPaused();
+        break;
+      case AppLifecycleState.detached:
+        // Приложение отсоединено от UI - остановить фоновый сервис
+        stopBackgroundService();
+        break;
+      default:
+        break;
+    }
+  }
+
+  void _handleAppPaused() {
+    if (_shouldRunBackgroundService()) {
+      startBackgroundService();
+    }
+  }
+
+  bool _shouldRunBackgroundService() {
+    final settingsController = Get.find<SettingsController>();
+    return settingsController.enableBackgroundService.value &&
+        webSocketProvider.isConnected &&
+        webSocketProvider.isAuthenticated;
   }
 
   void _setupFromArguments() {
@@ -58,8 +126,6 @@ class DeviceHomeController extends GetxController {
         if (kDebugMode) {
           print("WebSocket connection is not established");
         }
-
-        // Более надежная обработка перехода назад
         WidgetsBinding.instance.addPostFrameCallback((_) {
           Get.back();
           Get.snackbar(
@@ -87,6 +153,143 @@ class DeviceHomeController extends GetxController {
       _handleSystemInfo,
     );
     _requestSystemInfo();
+  }
+
+  // Запускаем таймер проверки статуса фонового сервиса
+  void _startServiceStatusCheck() {
+    _serviceStatusTimer = Timer.periodic(Duration(seconds: 5), (timer) async {
+      isBackgroundServiceRunning.value =
+          await BackgroundConnectionService.isRunning();
+    });
+  }
+
+  // Запуск фонового сервиса, если включено в настройках
+  Future<void> _startBackgroundServiceIfEnabled() async {
+    final settingsController = Get.find<SettingsController>();
+    if (settingsController.enableBackgroundService.value &&
+        authDevice.value != null &&
+        webSocketProvider.isConnected) {
+      await startBackgroundService();
+    }
+  }
+
+  // Запуск фонового сервиса
+  Future<void> startBackgroundService() async {
+    if (authDevice.value == null) {
+      if (kDebugMode) {
+        print('Cannot start background service: device is null');
+      }
+      return;
+    }
+
+    try {
+      final deviceName = authDevice.value!.name;
+      final deviceAddress =
+          "${authDevice.value!.address}:${authDevice.value!.port}";
+
+      // Получаем настройки уведомлений
+      final settingsController = Get.find<SettingsController>();
+      //final notificationsEnabled = settingsController.enableNotifications.value;
+
+      // Первым делом проверим, не запущен ли уже сервис
+      if (await BackgroundConnectionService.isRunning()) {
+        isBackgroundServiceRunning.value = true;
+
+        if (kDebugMode) {
+          print('Background service is already running');
+        }
+        return;
+      }
+
+      // Запускаем сервис
+      final result = await BackgroundConnectionService.startService(
+        deviceName,
+        deviceAddress,
+      );
+
+      isBackgroundServiceRunning.value = result;
+
+      // Показываем уведомление только если они разрешены
+      if (result &&
+          settingsController.notificationPermissionGranted.value &&
+          settingsController.enableNotifications.value) {
+        Get.snackbar(
+          'Фоновая служба',
+          'Служба поддержания соединения запущена',
+          duration: Duration(seconds: 7),
+          mainButton: TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.white),
+            onPressed: () {
+              stopBackgroundService();
+              Get.closeCurrentSnackbar();
+            },
+            child: Text('Отключить'),
+          ),
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.blueGrey.shade700,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error starting background service: $e');
+      }
+      isBackgroundServiceRunning.value = false;
+
+      // Показываем ошибку только если уведомления разрешены
+      final settingsController = Get.find<SettingsController>();
+      if (settingsController.notificationPermissionGranted.value &&
+          settingsController.enableNotifications.value) {
+        Get.snackbar(
+          'Ошибка',
+          'Не удалось запустить фоновую службу: $e',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red.shade700,
+          colorText: Colors.white,
+        );
+      }
+    }
+  }
+
+  // Остановка фонового сервиса
+  Future<void> stopBackgroundService() async {
+    try {
+      await BackgroundConnectionService.stopService();
+      isBackgroundServiceRunning.value = false;
+      if (kDebugMode) {
+        print('Background service stopped');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error stopping background service: $e');
+      }
+    }
+  }
+
+  void checkConnectionAfterResume() {
+    if (!webSocketProvider.isConnected && authDevice.value != null) {
+      isReconnecting.value = true;
+      webSocketProvider
+          .connect(authDevice.value!)
+          .then((success) {
+            if (success) {
+              // Восстановление успешно
+              isConnected.value = true;
+              isReconnecting.value = false;
+
+              // Восстанавливаем предыдущее состояние (комнаты, авторизация)
+              webSocketProvider.setAuthenticated(true);
+              _requestSystemInfo();
+            } else {
+              isReconnecting.value = false;
+              _handleConnectionLost('Не удалось восстановить подключение');
+            }
+          })
+          .catchError((error) {
+            isReconnecting.value = false;
+            _handleConnectionLost('Ошибка при восстановлении: $error');
+          });
+    }
   }
 
   // Запрос информации о системе
@@ -127,21 +330,53 @@ class DeviceHomeController extends GetxController {
   // Запуск таймера для проверки состояния соединения
   void _startConnectionCheck() {
     _connectionCheckTimer = Timer.periodic(Duration(seconds: 10), (timer) {
-      if (kDebugMode) {
-        print(webSocketProvider.isConnected);
-      }
       if (!webSocketProvider.isConnected) {
-        isConnected.value = false;
-        timer.cancel();
+        _handleConnectionLost('WebSocket соединение закрыто');
+        return;
+      }
 
-        Get.offAllNamed(AppRoutes.DEVICE_AUTH);
-        Get.snackbar(
-          'Соединение потеряно',
-          'Соединение с устройством было прервано',
-          snackPosition: SnackPosition.BOTTOM,
-        );
+      // Активно проверяем состояние авторизации, а не просто флаг
+      try {
+        webSocketProvider.sendJson({'type': 'auth_check', 'data': {}});
+
+        // Добавляем короткий таймаут для ожидания ответа
+        Future.delayed(Duration(seconds: 2), () {
+          if (!isConnected.value && webSocketProvider.isConnected) {
+            // Если за 2 секунды нет ответа, но соединение считается активным
+            _handleConnectionLost(
+              'Сервер не отвечает на запросы проверки авторизации',
+            );
+          }
+        });
+      } catch (e) {
+        if (kDebugMode) {
+          print('Ошибка отправки auth_check: $e');
+        }
       }
     });
+  }
+
+  // Обработка потери соединения
+  void _handleConnectionLost(String reason) {
+    if (!isConnected.value) return; // Избегаем повторной обработки
+
+    isConnected.value = false;
+    _connectionCheckTimer?.cancel();
+
+    if (kDebugMode) {
+      print('Соединение потеряно: $reason');
+    }
+
+    // Останавливаем фоновый сервис при потере соединения
+    stopBackgroundService();
+
+    // Возвращаемся на экран авторизации
+    Get.offAllNamed(AppRoutes.DEVICE_AUTH);
+    Get.snackbar(
+      'Соединение потеряно',
+      'Соединение с устройством было прервано: $reason',
+      snackPosition: SnackPosition.BOTTOM,
+    );
   }
 
   // Метод для выбора пункта меню
@@ -151,16 +386,9 @@ class DeviceHomeController extends GetxController {
 
   // Отключиться от устройства
   void disconnectFromDevice() {
+    stopBackgroundService();
     webSocketProvider.disconnect();
     isConnected.value = false;
     Get.back(result: {'disconnectReason': true});
-  }
-
-  @override
-  void onClose() {
-    _connectionCheckTimer?.cancel();
-    webSocketProvider.removeHandler('media');
-    webSocketProvider.removeHandler('system_info');
-    super.onClose();
   }
 }

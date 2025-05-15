@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:linqoraremote/presentation/controllers/device_home_controller.dart';
+import 'package:linqoraremote/services/permissions_service.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class SettingsController extends GetxController {
   static const _kThemeMode = 'theme_mode';
@@ -8,37 +12,125 @@ class SettingsController extends GetxController {
   static const _kEnableNotifications = 'enable_notifications';
   static const _kEnableAutoConnect = 'enable_auto_connect';
   static const _kKeepAliveInterval = 'keep_alive_interval';
+  static const _kEnableBackgroundService = 'enable_background_service';
 
   final _storage = GetStorage('settings');
 
   final Rx<ThemeMode> themeMode = ThemeMode.system.obs;
   final RxBool showMetrics = true.obs;
-  final RxBool enableNotifications = true.obs;
+  final RxBool enableNotifications = false.obs; // По умолчанию выключено
   final RxBool enableAutoConnect = false.obs;
   final RxInt keepAliveInterval = 10.obs;
+  final RxBool enableBackgroundService = false.obs;
+
+  // Добавляем переменную для отслеживания статуса разрешения
+  final RxBool notificationPermissionGranted = false.obs;
+
+  final FlutterLocalNotificationsPlugin notificationsPlugin =
+      FlutterLocalNotificationsPlugin();
 
   @override
   void onInit() {
     super.onInit();
     loadSettings();
+    checkNotificationPermission();
   }
 
   void loadSettings() {
     try {
-      // Получаем сохраненные настройки или используем значения по умолчанию
       final themeModeValue = _storage.read<String>(_kThemeMode) ?? 'system';
       themeMode.value = _getThemeMode(themeModeValue);
 
       showMetrics.value = _storage.read<bool>(_kShowMetrics) ?? true;
-      enableNotifications.value = _storage.read<bool>(_kEnableNotifications) ?? true;
-      enableAutoConnect.value = _storage.read<bool>(_kEnableAutoConnect) ?? false;
+      enableNotifications.value =
+          _storage.read<bool>(_kEnableNotifications) ?? false;
+      enableAutoConnect.value =
+          _storage.read<bool>(_kEnableAutoConnect) ?? false;
       keepAliveInterval.value = _storage.read<int>(_kKeepAliveInterval) ?? 10;
+      enableBackgroundService.value =
+          _storage.read<bool>(_kEnableBackgroundService) ?? false;
 
-      // Применяем тему сразу при загрузке
       Get.changeThemeMode(themeMode.value);
     } catch (e) {
       printError(info: 'Ошибка загрузки настроек: $e');
-      // В случае ошибки используем значения по умолчанию
+    }
+  }
+
+  // Проверка разрешения уведомлений при запуске
+  Future<void> checkNotificationPermission() async {
+    try {
+      final status = await PermissionsService.checkNotificationPermission();
+      notificationPermissionGranted.value = status;
+
+      // Если разрешение не выдано, но настройка включена - отключаем настройку
+      if (!status && enableNotifications.value) {
+        enableNotifications.value = false;
+        await _storage.write(_kEnableNotifications, false);
+      }
+    } catch (e) {
+      // Обрабатываем ошибку - не блокируем функционал
+      notificationPermissionGranted.value = true;
+      printError(info: 'Ошибка проверки разрешений: $e');
+    }
+  }
+
+  // Запрос разрешения на уведомления
+  Future<bool> requestNotificationPermission() async {
+    final status = await Permission.notification.request();
+    notificationPermissionGranted.value = status.isGranted;
+    return status.isGranted;
+  }
+
+  // Обновленный метод переключения уведомлений с запросом разрешений
+  Future<void> toggleNotifications(bool value) async {
+    try {
+      if (value && !notificationPermissionGranted.value) {
+        // Если пользователь хочет включить уведомления, но разрешения нет
+        final granted =
+            await PermissionsService.requestNotificationPermission();
+        if (!granted) {
+          // Если пользователь отказал в разрешении
+          Get.snackbar(
+            'Отсутствует разрешение',
+            'Чтобы получать уведомления, предоставьте разрешение в настройках устройства',
+            snackPosition: SnackPosition.BOTTOM,
+            duration: Duration(seconds: 5),
+            mainButton: TextButton(
+              child: Text('Настройки', style: TextStyle(color: Colors.white)),
+              onPressed: () => PermissionsService.openAppSettings(),
+            ),
+            backgroundColor: Colors.orange.shade800,
+            colorText: Colors.white,
+          );
+          return; // Не сохраняем значение, оставляем переключатель выключенным
+        }
+        notificationPermissionGranted.value = granted;
+      }
+
+      // Установка значения только если разрешения получены или отключаем уведомления
+      if (!value || notificationPermissionGranted.value) {
+        enableNotifications.value = value;
+        await _storage.write(_kEnableNotifications, value);
+      }
+    } catch (e) {
+      printError(info: 'Ошибка при переключении уведомлений: $e');
+      // В случае ошибки позволяем пользователю включить настройку
+      // но логируем проблему
+      enableNotifications.value = value;
+      await _storage.write(_kEnableNotifications, value);
+    }
+  }
+
+  // Новый метод для управления настройкой фонового сервиса
+  Future<void> toggleBackgroundService(bool value) async {
+    enableBackgroundService.value = value;
+    await _storage.write(_kEnableBackgroundService, value);
+
+    if (!value && Get.isRegistered<DeviceHomeController>()) {
+      final controller = Get.find<DeviceHomeController>();
+      if (controller.isBackgroundServiceRunning.value) {
+        controller.stopBackgroundService();
+      }
     }
   }
 
@@ -55,11 +147,6 @@ class SettingsController extends GetxController {
   Future<void> toggleShowMetrics(bool value) async {
     showMetrics.value = value;
     await _storage.write(_kShowMetrics, value);
-  }
-
-  Future<void> toggleNotifications(bool value) async {
-    enableNotifications.value = value;
-    await _storage.write(_kEnableNotifications, value);
   }
 
   Future<void> toggleAutoConnect(bool value) async {

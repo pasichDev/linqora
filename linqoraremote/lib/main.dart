@@ -13,6 +13,7 @@ import 'package:linqoraremote/presentation/pages/device_home_page.dart';
 import 'package:linqoraremote/presentation/pages/settings_page.dart';
 import 'package:linqoraremote/routes/app_routes.dart';
 
+import 'services/background_service.dart';
 import 'data/models/ws_host_model.dart';
 
 void main() async {
@@ -21,6 +22,11 @@ void main() async {
   Hive.registerAdapter(WsHostModelAdapter());
 
   WsHostBinding().dependencies();
+  try {
+    await BackgroundConnectionService.initializeService();
+  } catch (e) {
+    debugPrint("Error initializing background service: $e");
+  }
 
   await GetStorage.init('settings');
 
