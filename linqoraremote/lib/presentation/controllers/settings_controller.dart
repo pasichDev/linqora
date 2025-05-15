@@ -18,12 +18,11 @@ class SettingsController extends GetxController {
 
   final Rx<ThemeMode> themeMode = ThemeMode.system.obs;
   final RxBool showMetrics = true.obs;
-  final RxBool enableNotifications = false.obs; // По умолчанию выключено
+  final RxBool enableNotifications = false.obs;
   final RxBool enableAutoConnect = false.obs;
   final RxInt keepAliveInterval = 10.obs;
   final RxBool enableBackgroundService = false.obs;
 
-  // Добавляем переменную для отслеживания статуса разрешения
   final RxBool notificationPermissionGranted = false.obs;
 
   final FlutterLocalNotificationsPlugin notificationsPlugin =
@@ -85,11 +84,9 @@ class SettingsController extends GetxController {
   Future<void> toggleNotifications(bool value) async {
     try {
       if (value && !notificationPermissionGranted.value) {
-        // Если пользователь хочет включить уведомления, но разрешения нет
         final granted =
             await PermissionsService.requestNotificationPermission();
         if (!granted) {
-          // Если пользователь отказал в разрешении
           Get.snackbar(
             'Отсутствует разрешение',
             'Чтобы получать уведомления, предоставьте разрешение в настройках устройства',
@@ -102,7 +99,7 @@ class SettingsController extends GetxController {
             backgroundColor: Colors.orange.shade800,
             colorText: Colors.white,
           );
-          return; // Не сохраняем значение, оставляем переключатель выключенным
+          return;
         }
         notificationPermissionGranted.value = granted;
       }
@@ -114,14 +111,11 @@ class SettingsController extends GetxController {
       }
     } catch (e) {
       printError(info: 'Ошибка при переключении уведомлений: $e');
-      // В случае ошибки позволяем пользователю включить настройку
-      // но логируем проблему
       enableNotifications.value = value;
       await _storage.write(_kEnableNotifications, value);
     }
   }
 
-  // Новый метод для управления настройкой фонового сервиса
   Future<void> toggleBackgroundService(bool value) async {
     enableBackgroundService.value = value;
     await _storage.write(_kEnableBackgroundService, value);

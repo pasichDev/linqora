@@ -132,6 +132,8 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
             'Ошибка соединения',
             'Соединение с устройством потеряно',
             snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.orange.shade800,
+            colorText: Colors.white,
           );
         });
       }
@@ -146,6 +148,8 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
         'Соединение разорвано',
         'Соединение с устройством Linqora было прервано',
         snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.orange.shade800,
+        colorText: Colors.white,
       );
     };
     webSocketProvider.registerHandler(
@@ -334,15 +338,11 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
         _handleConnectionLost('WebSocket соединение закрыто');
         return;
       }
-
-      // Активно проверяем состояние авторизации, а не просто флаг
       try {
         webSocketProvider.sendJson({'type': 'auth_check', 'data': {}});
 
-        // Добавляем короткий таймаут для ожидания ответа
         Future.delayed(Duration(seconds: 2), () {
           if (!isConnected.value && webSocketProvider.isConnected) {
-            // Если за 2 секунды нет ответа, но соединение считается активным
             _handleConnectionLost(
               'Сервер не отвечает на запросы проверки авторизации',
             );
@@ -358,7 +358,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
 
   // Обработка потери соединения
   void _handleConnectionLost(String reason) {
-    if (!isConnected.value) return; // Избегаем повторной обработки
+    if (!isConnected.value) return;
 
     isConnected.value = false;
     _connectionCheckTimer?.cancel();
@@ -367,15 +367,15 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
       print('Соединение потеряно: $reason');
     }
 
-    // Останавливаем фоновый сервис при потере соединения
     stopBackgroundService();
 
-    // Возвращаемся на экран авторизации
     Get.offAllNamed(AppRoutes.DEVICE_AUTH);
     Get.snackbar(
       'Соединение потеряно',
       'Соединение с устройством было прервано: $reason',
       snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.orange.shade800,
+      colorText: Colors.white,
     );
   }
 

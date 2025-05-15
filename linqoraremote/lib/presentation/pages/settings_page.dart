@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:linqoraremote/presentation/controllers/settings_controller.dart';
-import 'package:linqoraremote/presentation/widgets/app_bar.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SettingsPage extends GetView<SettingsController> {
-  const SettingsPage({Key? key}) : super(key: key);
+  const SettingsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -25,15 +24,13 @@ class SettingsPage extends GetView<SettingsController> {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
         children: [
-          _buildThemeSection(context),
+          _buildSponsorshipSection(context),
           const SizedBox(height: 16),
-          _buildDisplaySection(context),
+          _buildThemeSection(context),
           const SizedBox(height: 16),
           _buildConnectionSection(context),
           const SizedBox(height: 16),
           _buildAboutSection(context),
-          const SizedBox(height: 16),
-          _buildSponsorshipSection(context),
         ],
       ),
     );
@@ -170,59 +167,6 @@ class SettingsPage extends GetView<SettingsController> {
     );
   }
 
-  Widget _buildDisplaySection(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionHeader('Отображение', Icons.visibility_outlined),
-        _buildCard(
-          context,
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Obx(
-                () => SwitchListTile(
-                  title: const Text('Показывать метрики'),
-                  subtitle: const Text(
-                    'Отображать данные системного мониторинга',
-                  ),
-                  value: controller.showMetrics.value,
-                  onChanged: (value) => controller.toggleShowMetrics(value),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              const Divider(),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Шаблон мониторинга'),
-                subtitle: const Text('Выбор стиля отображения метрик'),
-                trailing: DropdownButton<String>(
-                  value: 'Стандартный',
-                  underline: const SizedBox(),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'Стандартный',
-                      child: Text('Стандартный'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'Компактный',
-                      child: Text('Компактный'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'Детальный',
-                      child: Text('Детальный'),
-                    ),
-                  ],
-                  onChanged: (value) {},
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildConnectionSection(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -233,9 +177,44 @@ class SettingsPage extends GetView<SettingsController> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Добавьте этот переключатель перед остальными
               Obx(
                 () => SwitchListTile(
-                  title: const Text('Уведомления'),
+                  title: const Text('Фоновый режим'),
+                  subtitle: const Text(
+                    'Поддерживать соединение при свёрнутом приложении',
+                  ),
+                  value: controller.enableBackgroundService.value,
+                  onChanged:
+                      (value) => controller.toggleBackgroundService(value),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              Obx(
+                () => SwitchListTile(
+                  title: Row(
+                    children: [
+                      const Text('Уведомления'),
+                      const SizedBox(width: 8),
+                      // Показываем индикатор статуса разрешения
+                      if (!controller.notificationPermissionGranted.value &&
+                          controller.enableNotifications.value)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.orange,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'Требуется разрешение',
+                            style: TextStyle(fontSize: 10, color: Colors.white),
+                          ),
+                        ),
+                    ],
+                  ),
                   subtitle: const Text(
                     'Показывать уведомления о состоянии подключения',
                   ),
@@ -244,7 +223,6 @@ class SettingsPage extends GetView<SettingsController> {
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
-              const Divider(),
               Obx(
                 () => SwitchListTile(
                   title: const Text('Автоподключение'),
@@ -254,43 +232,6 @@ class SettingsPage extends GetView<SettingsController> {
                   value: controller.enableAutoConnect.value,
                   onChanged: (value) => controller.toggleAutoConnect(value),
                   contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              const Divider(),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Интервал проверки соединения',
-                      style: TextStyle(fontSize: 16),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Частота отправки проверочных запросов (в секундах)',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey,
-                        height: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Obx(
-                      () => Slider(
-                        value: controller.keepAliveInterval.value.toDouble(),
-                        min: 5,
-                        max: 60,
-                        divisions: 11,
-                        label:
-                            controller.keepAliveInterval.value.toString() +
-                            ' с',
-                        onChanged:
-                            (value) =>
-                                controller.setKeepAliveInterval(value.toInt()),
-                      ),
-                    ),
-                  ],
                 ),
               ),
             ],
@@ -331,22 +272,22 @@ class SettingsPage extends GetView<SettingsController> {
                 ),
                 subtitle: const Text('Версия 1.0.0'),
               ),
-             // const Divider(),
+              // const Divider(),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Документация'),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                 onTap: () => _launchURL('https://linqora.com/docs'),
               ),
-            //  const Divider(),
+              //  const Divider(),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Лицензии'),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                 onTap: () => Get.toNamed('/licenses'),
               ),
-         //     const Divider(),
-             ListTile(
+              //     const Divider(),
+              ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Политика конфиденциальности'),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16),
@@ -373,39 +314,43 @@ class SettingsPage extends GetView<SettingsController> {
                 style: TextStyle(fontSize: 14, height: 1.4),
               ),
               const SizedBox(height: 20),
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              ElevatedButton.icon(
-                icon: const Icon(Icons.favorite),
-                label: const Text('Поддержать проект'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Get.theme.colorScheme.primary,
-                  foregroundColor: Get.theme.colorScheme.onPrimary,
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 12,
-                    horizontal: 16,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.favorite),
+                    label: const Text('Поддержать проект'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Get.theme.colorScheme.primary,
+                      foregroundColor: Get.theme.colorScheme.onPrimary,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 16,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed:
+                        () => _launchURL('https://github.com/sponsors/linqora'),
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.star_outline),
+                    label: const Text('Оставить отзыв'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 16,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () {},
                   ),
-                ),
-                onPressed:
-                    () => _launchURL('https://github.com/sponsors/linqora'),
+                ],
               ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                icon: const Icon(Icons.star_outline),
-                label: const Text('Оставить отзыв'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 12,
-                    horizontal: 16,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onPressed: () {},
-              ),],)
             ],
           ),
         ),

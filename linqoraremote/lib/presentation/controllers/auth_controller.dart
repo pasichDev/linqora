@@ -107,18 +107,17 @@ class AuthController extends GetxController {
   Future<void> connectToDevice(DiscoveredService device) async {
     if (authStatus.value == AuthStatus.connecting) return;
     authDevice.value = device;
-    authStatus.value =
-        AuthStatus.connecting; // Вместо isConnecting.value = true;
+    authStatus.value = AuthStatus.connecting;
     statusMessage.value = 'Подключение к ${device.name}...';
 
     // Устанавливаем обработчики до попытки подключения
     webSocketProvider.onConnected = () {
       if (authStatus.value != AuthStatus.connecting) {
-        return; // Проверка на случай, если соединение было отменено
+        return;
       }
       statusMessage.value =
           'Соединение установлено, выполняется авторизация...';
-      startAuthProcess(); // Автоматически запускаем авторизацию
+      startAuthProcess();
       if (kDebugMode) print("onConnected");
     };
 
@@ -150,7 +149,8 @@ class AuthController extends GetxController {
         'Ошибка авторизации',
         "Ошибка подключения: ${e.toString().split('\n').first}",
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Theme.of(Get.context!).colorScheme.primaryContainer,
+        backgroundColor: Colors.orange.shade800,
+        colorText: Colors.white,
       );
     }
   }
@@ -158,7 +158,7 @@ class AuthController extends GetxController {
   void _notConnectDevice({
     String errorMessage = 'Не удалось подключиться к устройству',
   }) {
-    authStatus.value = AuthStatus.listDevices; // Вместо всех флагов
+    authStatus.value = AuthStatus.listDevices;
     statusMessage.value = errorMessage;
     statusMessage.value = 'Соединение прервано';
     _authTimer?.cancel();
@@ -167,7 +167,8 @@ class AuthController extends GetxController {
       'Ошибка авторизации',
       errorMessage,
       snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Theme.of(Get.context!).colorScheme.primaryContainer,
+      backgroundColor: Colors.orange.shade800,
+      colorText: Colors.white,
     );
   }
 
@@ -261,12 +262,16 @@ class AuthController extends GetxController {
 
       // Неверный формат данных авторизации
       case AuthStatusCode.invalidFormat:
-        cancelAuth(AuthResponseHandler.getAuthMessage(AuthStatusCode.invalidFormat));
+        cancelAuth(
+          AuthResponseHandler.getAuthMessage(AuthStatusCode.invalidFormat),
+        );
         break;
 
       // Отсутствует ID устройства
       case AuthStatusCode.missingDeviceID:
-        cancelAuth(AuthResponseHandler.getAuthMessage(AuthStatusCode.missingDeviceID));
+        cancelAuth(
+          AuthResponseHandler.getAuthMessage(AuthStatusCode.missingDeviceID),
+        );
         break;
 
       // Время ожидания ответа истекло
@@ -276,7 +281,9 @@ class AuthController extends GetxController {
 
       // Ошибка запроса авторизации на стороне сервера
       case AuthStatusCode.requestFailed:
-        cancelAuth(AuthResponseHandler.getAuthMessage(AuthStatusCode.requestFailed));
+        cancelAuth(
+          AuthResponseHandler.getAuthMessage(AuthStatusCode.requestFailed),
+        );
         break;
 
       // Устройство не авторизовано
@@ -376,7 +383,8 @@ class AuthController extends GetxController {
         'Ошибка авторизации',
         reason,
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Theme.of(Get.context!).colorScheme.secondaryContainer,
+        backgroundColor: Colors.orange.shade800,
+        colorText: Colors.white,
       );
     }
   }
