@@ -1,31 +1,47 @@
 class DiscoveredService {
+  final String id;
   final String name;
-  final String? address;
-  final String? port;
-  final String? authCode;
+  final String address;
+  final String port;
   final bool supportsTLS;
+  final String? hostname;
+  final String? osInfo;
+  String? authToken;
 
   DiscoveredService({
+    required this.id,
     required this.name,
-    this.address,
-    this.port,
-    this.authCode,
-    this.supportsTLS = false,
+    required this.address,
+    required this.port,
+    required this.supportsTLS,
+    this.hostname,
+    this.osInfo,
+    this.authToken,
   });
 
-  DiscoveredService copyWith({
-    String? name,
-    String? address,
-    String? port,
-    String? authCode,
-    bool? supportsTLS,
-  }) {
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'address': address,
+      'port': port,
+      'supportsTLS': supportsTLS,
+      'hostname': hostname,
+      'osInfo': osInfo,
+      'authToken': authToken,
+    };
+  }
+
+  factory DiscoveredService.fromJson(Map<String, dynamic> json) {
     return DiscoveredService(
-      name: name ?? this.name,
-      address: address ?? this.address,
-      port: port ?? this.port,
-      authCode: authCode ?? this.authCode,
-      supportsTLS: supportsTLS ?? this.supportsTLS,
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      address: json['address'] ?? '',
+      port: json['port'] ?? '',
+      supportsTLS: json['supportsTLS'] ?? false,
+      hostname: json['hostname'],
+      osInfo: json['osInfo'],
+      authToken: json['authToken'],
     );
   }
 }

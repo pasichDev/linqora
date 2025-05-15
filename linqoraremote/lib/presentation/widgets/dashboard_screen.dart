@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:linqoraremote/data/models/auth_response.dart';
+import 'package:linqoraremote/data/models/host_system_info.dart';
 import 'package:linqoraremote/presentation/widgets/shimmer_effect.dart';
 
 import '../controllers/device_home_controller.dart';
@@ -47,13 +47,12 @@ class DashboardScreen extends StatelessWidget {
                       width: double.infinity,
                       child: Obx(
                         () =>
-                            controller.authInformation.value != null
-                                ? HostInfoCard(
-                                  host: controller.authInformation.value!,
-                                )
+                            controller.hostInfo.value != null
+                                ? HostInfoCard(host: controller.hostInfo.value!)
                                 : const HostInfoCardSkeleton(),
                       ),
                     ),
+
                     Expanded(
                       child: GridView.builder(
                         padding: const EdgeInsets.all(16),
@@ -84,7 +83,7 @@ class DashboardScreen extends StatelessWidget {
 }
 
 class HostInfoCard extends StatelessWidget {
-  final AuthInformation host;
+  final HostSystemInfo host;
 
   const HostInfoCard({required this.host, super.key});
 

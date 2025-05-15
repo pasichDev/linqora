@@ -2,8 +2,11 @@ enum TypeMessageWs {
   auth,
   join_room,
   leave_room,
-  cursor_command,
+  auth_response,
+  auth_pending,
+  auth_request,
   media,
+  host_info,
 }
 
 extension TypeMessageWsExtension on TypeMessageWs {

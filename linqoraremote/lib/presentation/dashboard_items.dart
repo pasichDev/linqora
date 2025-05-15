@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:linqoraremote/presentation/widgets/monitoring_view.dart';
-import 'package:linqoraremote/presentation/widgets/mouse_control_view.dart';
 
 import 'widgets/media_view.dart';
 
@@ -21,11 +20,6 @@ final menuOptions = [
     title: 'Моніторинг',
     icon: Icons.monitor_heart_outlined,
     view: MonitoringView(),
-  ),
-  MenuOption(
-    title: 'Керування мишкою',
-    icon: Icons.mouse,
-    view: MouseControlView(),
   ),
   MenuOption(title: 'Медіа', icon: Icons.volume_up, view: MediaScreenView()),
 ];

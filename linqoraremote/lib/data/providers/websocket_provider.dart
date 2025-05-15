@@ -27,12 +27,6 @@ class WebSocketProvider {
   bool _isAuthenticated = false;
   StreamSubscription? _subscription;
 
-  // bool _useTSL= false;
-
-  String? _deviceCode;
-
-  get getDeviceCode => _deviceCode;
-
   // Перевірка стану підключення
   bool get isConnected => _isConnected;
 
@@ -46,111 +40,205 @@ class WebSocketProvider {
   // Отримання списку кімнат, до яких приєднаний клієнт
   Set<String> get joinedRooms => Set.from(_joinedRooms);
 
+  // Добавляем метод для отправки JSON объекта
+  void sendJson(Map<String, dynamic> message) {
+    if (kDebugMode) {
+      print('Sending message: ${jsonEncode(message)}');
+    }
+    send(jsonEncode(message));
+  }
+
+  // Обновляем метод send с дополнительным логированием
   void send(String message) {
-    _channel?.sink.add(message);
-  }
-
-  // get isTSLConnect => _useTSL;
-
-  /*
-  Future<bool> _isTSLConnect(
-    DiscoveredService device,
-    bool allowSelfSigned,
-  ) async {
-    try {
-      final socket = await Socket.connect(
-        device.address,
-        int.parse(device.port ?? ""),
-        timeout: Duration(seconds: 2),
-      );
-      await socket.close();
-
-      // check TSL
-      final secureContext = SecurityContext();
-      try {
-        final secureSocket = await SecureSocket.connect(
-          device.address,
-          int.parse(device.port ?? ""),
-          context: secureContext,
-          timeout: Duration(seconds: 2),
-          onBadCertificate: (_) => allowSelfSigned,
-        );
-        await secureSocket.close();
-        return true; // TSL работает
-      } catch (e) {
-        return false; // TSL не работает
+    if (_channel != null) {
+      if (kDebugMode) {
+        print('WebSocket message sent');
       }
-    } catch (_) {}
-    return false;
+      _channel!.sink.add(message);
+    } else {
+      if (kDebugMode) {
+        print('WebSocket not connected, cannot send message');
+      }
+    }
   }
 
-
-   */
   Future<bool> connect(
     DiscoveredService device, {
     bool allowSelfSigned = true,
+    Duration timeout = const Duration(seconds: 10),
   }) async {
-    if (device.address == null || device.port == null) {
-      if (kDebugMode) {
-        print('Invalid device address or port');
-      }
-      return false;
-    }
-    print('Подключение к ${device.supportsTLS} ');
+    // 1. Сбрасываем статус соединения
+    _isConnected = false;
+
+    // 2. Корректно закрываем предыдущее соединение
+    await _cleanupExistingConnection();
+
     final protocol = device.supportsTLS ? 'wss' : 'ws';
     final wsUrl = '$protocol://${device.address}:${device.port}/ws';
 
     if (kDebugMode) {
-      print('Подключение к $wsUrl');
+      print('Підключення до $wsUrl');
     }
-    _deviceCode = device.authCode;
 
     try {
-      if (device.supportsTLS) {
-        try {
-          final client =
-              HttpClient()..badCertificateCallback = (_, __, ___) => true;
-          final webSocket = await WebSocket.connect(
-            wsUrl,
-            customClient: client,
+      // 3. Используем таймаут для подключения
+      await _establishConnection(
+        wsUrl,
+        device.supportsTLS,
+        allowSelfSigned,
+      ).timeout(
+        timeout,
+        onTimeout: () {
+          throw TimeoutException(
+            'Підключення перевищило час очікування $timeout',
           );
-          _channel = IOWebSocketChannel(webSocket);
+        },
+      );
 
-          if (kDebugMode) {
-            print('Подключено через самоподписанный TSL сертификат');
-          }
-        } catch (e) {
-          if (kDebugMode) {
-            print('Ошибка подключения через самоподписанный сертификат: $e');
-            print('Пробуем обычное подключение...');
-          }
-          _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
-        }
-      } else {
-        _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
-      }
-
+      // 4. Настраиваем обработчики сообщений
       _subscription = _channel!.stream.listen(
         (message) {
           messages.add(message);
           _handleMessage(message);
         },
-        onError: _handleError,
-        onDone: _handleDone,
+        onError: (error) {
+          _isConnected = false; // Сброс при ошибке
+          _handleError(error);
+        },
+        onDone: () {
+          _isConnected = false; // Сброс при закрытии
+          _handleDone();
+        },
         cancelOnError: false,
       );
 
+      // 5. Устанавливаем флаг только при успешном соединении
       _isConnected = true;
       onConnected?.call();
+
       if (kDebugMode) {
-        print('WebSocket підключено ');
+        print('WebSocket підключено');
       }
       return true;
     } catch (e) {
+      // 6. Обрабатываем любую ошибку, очищаем ресурсы
+      await _cleanupExistingConnection();
+
       if (kDebugMode) {
         print('Помилка підключення до WebSocket: $e');
       }
+      onError?.call(e);
       return false;
+    }
+  }
+
+  // Вспомогательные методы для упрощения основного кода:
+
+  // Очистка предыдущего соединения
+  Future<void> _cleanupExistingConnection() async {
+    if (_subscription != null) {
+      await _subscription!.cancel();
+      _subscription = null;
+    }
+
+    if (_channel != null) {
+      await _channel!.sink.close(status.normalClosure);
+      _channel = null;
+    }
+  }
+
+  Future<void> _establishConnection(
+    String wsUrl,
+    bool supportsTLS,
+    bool allowSelfSigned,
+  ) async {
+    // Проверяем доступность хоста перед WebSocket подключением
+    final uri = Uri.parse(wsUrl);
+    try {
+      // Быстрая проверка доступности хоста - таймаут 2 секунды
+      final socket = await Socket.connect(
+        uri.host,
+        uri.port,
+        timeout: const Duration(seconds: 2),
+      );
+      await socket.close();
+    } catch (e) {
+      // Если хост недоступен, сразу выбрасываем исключение
+      if (kDebugMode) {
+        print('Хост недоступен: ${uri.host}:${uri.port}');
+      }
+      throw SocketException('Хост недоступен');
+    }
+
+    // Продолжаем только если хост доступен
+    if (supportsTLS) {
+      try {
+        final client =
+            HttpClient()
+              ..badCertificateCallback = (_, __, ___) => allowSelfSigned;
+
+        // Используем таймаут для TLS подключения
+        final webSocket = await WebSocket.connect(
+          wsUrl,
+          customClient: client,
+        ).timeout(
+          const Duration(seconds: 5),
+          onTimeout: () => throw TimeoutException('Таймаут TLS подключения'),
+        );
+
+        _channel = IOWebSocketChannel(webSocket);
+
+        if (kDebugMode) {
+          print('Підключено через самопідписаний TLS сертифікат');
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('Помилка підключення через самопідписаний сертифікат: $e');
+          print('Пробуємо звичайне підключення...');
+        }
+
+        // Используем таймаут для обычного подключения
+        final completer = Completer<WebSocketChannel>();
+
+        // Запускаем таймер для ограничения времени ожидания
+        final timer = Timer(const Duration(seconds: 5), () {
+          if (!completer.isCompleted) {
+            completer.completeError(
+              TimeoutException('Таймаут обычного подключения'),
+            );
+          }
+        });
+
+        // Запускаем подключение в отдельной зоне
+        try {
+          final channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+          // Ждем событие открытия соединения или ошибки
+          await channel.ready.timeout(
+            const Duration(seconds: 5),
+            onTimeout: () => throw TimeoutException('Channel ready timeout'),
+          );
+
+          timer.cancel();
+          if (!completer.isCompleted) {
+            completer.complete(channel);
+          }
+        } catch (e) {
+          timer.cancel();
+          if (!completer.isCompleted) {
+            completer.completeError(e);
+          }
+        }
+
+        _channel = await completer.future;
+      }
+    } else {
+      // Обычное подключение с таймаутом
+      final channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+      await channel.ready.timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => throw TimeoutException('Таймаут обычного подключения'),
+      );
+      _channel = channel;
     }
   }
 
@@ -158,7 +246,6 @@ class WebSocketProvider {
     _channel!.sink.add(jsonEncode(message));
   }
 
-  // Приєднатися до кімнати
   Future<bool> joinRoom(String roomName) async {
     if (!_isConnected || !_isAuthenticated || _channel == null) {
       if (kDebugMode) {
@@ -172,7 +259,6 @@ class WebSocketProvider {
     try {
       final WsMessage joinRoomMessage = WsMessage(
         type: TypeMessageWs.join_room.value,
-        deviceCode: _deviceCode!,
       )..setField('room', roomName);
 
       _channel!.sink.add(jsonEncode(joinRoomMessage));
@@ -199,17 +285,10 @@ class WebSocketProvider {
       }
       return false;
     }
-    if (_deviceCode == null) {
-      if (kDebugMode) {
-        print('Device code не авторизовано');
-      }
-      return false;
-    }
 
     try {
       final WsMessage leaveRoomMessage = WsMessage(
         type: TypeMessageWs.leave_room.value,
-        deviceCode: _deviceCode!,
       )..setField('room', roomName);
 
       _channel!.sink.add(jsonEncode(leaveRoomMessage));
@@ -247,12 +326,9 @@ class WebSocketProvider {
     }
 
     try {
-      // final mediaData = {'action': action};
       final mediaData = {'action': action, 'value': value};
-
       final message = {
         'type': TypeMessageWs.media.value,
-        'deviceCode': _deviceCode,
         'room': TypeMessageWs.media.value,
         'data': mediaData,
       };
@@ -262,44 +338,6 @@ class WebSocketProvider {
     } catch (e) {
       if (kDebugMode) {
         print('Помилка відправки медіа команди: $e');
-      }
-      return false;
-    }
-  }
-
-  // Надіслати команду керування курсором
-  Future<bool> sendCursorCommand(int x, int y, int action) async {
-    if (!_isConnected || !_isAuthenticated || _channel == null) {
-      if (kDebugMode) {
-        print(
-          'Неможливо надіслати команду курсора: клієнт не підключений або не авторизований',
-        );
-      }
-      return false;
-    }
-
-    if (!_joinedRooms.contains('control')) {
-      if (kDebugMode) {
-        print('Необхідно спочатку приєднатися до кімнати control');
-      }
-      return false;
-    }
-
-    try {
-      final cursorData = {'x': x, 'y': y, 'action': action};
-
-      final message = {
-        'type': TypeMessageWs.cursor_command.value,
-        'deviceCode': _deviceCode,
-        'room': 'control',
-        'data': cursorData,
-      };
-
-      _channel!.sink.add(jsonEncode(message));
-      return true;
-    } catch (e) {
-      if (kDebugMode) {
-        print('Помилка надсилання команди курсора: $e');
       }
       return false;
     }
@@ -390,13 +428,11 @@ class WebSocketProvider {
     for (var room in _joinedRooms.toList()) {
       leaveRoom(room);
     }
-    // Закрываем WebSocket соединение
     if (_channel != null) {
       _channel = null;
     }
 
     _isConnected = false;
-    _deviceCode = null;
     _messageHandlers.clear();
     _joinedRooms.clear();
   }

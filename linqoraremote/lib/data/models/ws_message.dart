@@ -2,14 +2,10 @@ import 'dart:convert';
 
 class WsMessage {
   final String type;
-  final String deviceCode;
   final Map<String, dynamic> _additionalFields;
 
-  WsMessage({
-    required this.type,
-    required this.deviceCode,
-    Map<String, dynamic>? additionalFields,
-  }) : _additionalFields = additionalFields ?? {};
+  WsMessage({required this.type, Map<String, dynamic>? additionalFields})
+    : _additionalFields = additionalFields ?? {};
 
   /// Встановлює додаткове поле в повідомленні
   void setField(String fieldName, dynamic value) {
@@ -29,9 +25,6 @@ class WsMessage {
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> result = {'type': type};
 
-    result['deviceCode'] = deviceCode;
-
-    // Додаємо всі додаткові поля до результату
     result.addAll(_additionalFields);
 
     return result;
@@ -40,7 +33,6 @@ class WsMessage {
   /// Створення екземпляру з Map
   factory WsMessage.fromJson(Map<String, dynamic> json) {
     final type = json['type'] as String;
-    final deviceCode = json['deviceCode'] as String;
 
     // Копіюємо всі поля крім type і deviceCode в additionalFields
     final additionalFields =
@@ -48,11 +40,7 @@ class WsMessage {
           ..remove('type')
           ..remove('deviceCode');
 
-    return WsMessage(
-      type: type,
-      deviceCode: deviceCode,
-      additionalFields: additionalFields,
-    );
+    return WsMessage(type: type, additionalFields: additionalFields);
   }
 
   /// Перетворення моделі в JSON-рядок

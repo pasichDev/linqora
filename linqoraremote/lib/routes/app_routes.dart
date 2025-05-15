@@ -1,8 +1,8 @@
 import 'package:get/get.dart';
 import 'package:linqoraremote/presentation/pages/device_home_page.dart';
 
+import '../presentation/bindings/device_auth_binding.dart';
 import '../presentation/bindings/device_home_binding.dart';
-import '../presentation/bindings/ws_host_binding.dart';
 import '../presentation/pages/device_auth_page.dart';
 
 class AppRoutes {
@@ -15,7 +15,7 @@ class AppRoutes {
     GetPage(
       name: DEVICE_AUTH,
       page: () => const DeviceAuthPage(),
-      binding: WsHostBinding(),
+      binding: DeviceAuthBinding(),
     ),
     GetPage(
       name: DEVICE_HOME,

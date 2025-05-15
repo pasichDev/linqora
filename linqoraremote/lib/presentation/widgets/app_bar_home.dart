@@ -3,68 +3,56 @@ import 'package:get/get.dart';
 import 'package:linqoraremote/presentation/dashboard_items.dart';
 
 import '../controllers/device_home_controller.dart';
+import 'dialogs/dialog_cancel_connect_device.dart';
 
-class AppBarHomePage extends GetView<DeviceHomeController>
-    implements PreferredSizeWidget {
-  const AppBarHomePage({super.key});
+class AppBarHomePage extends StatelessWidget implements PreferredSizeWidget {
+  final DeviceHomeController controller = Get.find<DeviceHomeController>();
+
+  AppBarHomePage({super.key});
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 
   @override
   Widget build(BuildContext context) {
     return AppBar(
       title: Obx(
-        () =>
-            controller.devices.isEmpty ||
-                    controller.authInformation.value == null
-                ? SizedBox()
-                : Column(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      controller.selectedMenuIndex.value == -1
-                          ? controller.authInformation.value?.hostname ?? ""
-                          : menuOptions[controller.selectedMenuIndex.value]
-                              .title,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        if (controller.devices.value.first.supportsTLS == true) ...[
-                          Icon(
-                            Icons.lock_outlined,
-                            size: 12,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          SizedBox(width: 2),
-                          Text(
-                            "(TSL)",
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                          SizedBox(width: 2),
-                        ],
+        () => Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              controller.selectedMenuIndex.value == -1
+                  ? controller.hostInfo.value?.hostname ?? ""
+                  : menuOptions[controller.selectedMenuIndex.value].title,
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _buildTlsIndicator(context),
 
-                        Text(
-                          "${controller.devices.first.address ?? ""}:${controller.devices.first.port ?? ""}",
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withOpacity(0.8),
-                          ),
-                        ),
-                      ],
+                Obx(() {
+                  final device = controller.authDevice.value;
+                  return Text(
+                    device != null
+                        ? "${device.address}:${device.port}"
+                        : "Подключение...",
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withAlpha(204),
                     ),
-                  ],
-                ),
+                  );
+                }),
+              ],
+            ),
+          ],
+        ),
       ),
+      elevation: 7,
       leading: IconButton(
         icon: Obx(
           () => Icon(
@@ -81,35 +69,47 @@ class AppBarHomePage extends GetView<DeviceHomeController>
           }
           if (controller.isConnected.value &&
               controller.selectedMenuIndex.value == -1) {
-            final result = await Get.dialog<bool>(
-              AlertDialog(
-                title: const Text('Підтвердження'),
-                content: const Text(
-                  'Ви впевнені, що хочете розірвати з\'єднання?',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => {Get.back(result: false)},
-                    child: const Text('Скасувати'),
-                  ),
-                  TextButton(
-                    onPressed: () => Get.back(result: true),
-                    child: const Text('Так'),
-                  ),
-                ],
-              ),
+            final result = await DisconnectConfirmationDialog.show(
+              onConfirm: () {
+                controller.disconnectFromDevice();
+              },
             );
             if (result == true) {
-              controller.cancelConnection();
+              controller.disconnectFromDevice();
             }
           } else {
-            controller.cancelConnection();
+            controller.disconnectFromDevice();
           }
         },
       ),
     );
   }
 
-  @override
-  Size get preferredSize => Size.fromHeight(kToolbarHeight);
+  Widget _buildTlsIndicator(BuildContext context) {
+    var isTLS = controller.authDevice.value!.supportsTLS;
+    return Row(
+      children: [
+        Icon(
+          isTLS ? Icons.lock_outlined : Icons.block_sharp,
+          size: 12,
+          color:
+              isTLS
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.errorContainer,
+        ),
+        SizedBox(width: 2),
+        Text(
+          isTLS ? "(TSL)" : "(Non-TSL)",
+          style: TextStyle(
+            fontSize: 12,
+            color:
+                isTLS
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).colorScheme.errorContainer,
+          ),
+        ),
+        SizedBox(width: 2),
+      ],
+    );
+  }
 }

@@ -28,7 +28,7 @@ class MDnsProvider {
   /// Enables multicast capability on Android devices
   ///
   /// Returns true if successful, false otherwise
-  Future<bool> enableMulticast() async {
+  Future<bool> _enableMulticast() async {
     // Only applicable to Android
     if (!Platform.isAndroid) return true;
 
@@ -66,7 +66,7 @@ class MDnsProvider {
       onStatusChanged?.call(DiscoveryStatus.started);
 
       // Enable multicast for Android devices
-      final multicastEnabled = await enableMulticast();
+      final multicastEnabled = await _enableMulticast();
       if (!multicastEnabled) {
         completer.complete([]);
         return [];
@@ -130,6 +130,7 @@ class MDnsProvider {
                 address: ip.address.address,
                 port: srv.port.toString(),
                 supportsTLS: supportsTLS,
+                id: "o",
               );
 
               devices.add(device);
@@ -220,5 +221,243 @@ class MDnsProvider {
   /// Dispose resources
   void dispose() {
     cancelDiscovery();
+  }
+
+  Future<List<DiscoveredService>> discoverAllLinqoraDevices() async {
+    List<DiscoveredService> devices = [];
+    Completer<List<DiscoveredService>> completer = Completer();
+
+    try {
+      onStatusChanged?.call(DiscoveryStatus.started);
+
+      // Включаем мультикаст для Android
+      final multicastEnabled = await _enableMulticast();
+      if (!multicastEnabled) {
+        completer.complete([]);
+        return [];
+      }
+
+      _client = MDnsClient();
+      await _client!.start();
+
+      if (kDebugMode) {
+        print('Начинаем mDNS-обнаружение для Linqora-устройств');
+      }
+
+      _discoveryTimer = Timer(Duration(seconds: discoveryTimeout), () {
+        if (!completer.isCompleted) {
+          _stopDiscovery();
+          completer.complete(devices);
+        }
+      });
+
+      // ПОСИК СТАНДАРТНОГО LINQORA СЕРВИСА
+      try {
+        if (kDebugMode) {
+          print('Ищем Linqora сервисы с типом "_linqora._tcp.local"');
+        }
+
+        await for (final PtrResourceRecord ptr in _client!
+            .lookup<PtrResourceRecord>(
+              ResourceRecordQuery.serverPointer('_linqora._tcp.local'),
+            )) {
+          if (kDebugMode) {
+            print('Найден Linqora сервис: ${ptr.domainName}');
+          }
+
+          // Обрабатываем найденный сервис
+          await _processLinqoraInstance(ptr.domainName, devices);
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('Ошибка при поиске стандартных Linqora сервисов: $e');
+        }
+      }
+
+      // ПОИСК ЧЕРЕЗ DNS-SD
+      if (devices.isEmpty) {
+        try {
+          if (kDebugMode) {
+            print('Пробуем поиск через DNS-SD...');
+          }
+
+          // Находим все типы сервисов через DNS-SD
+          await for (final PtrResourceRecord serviceType in _client!
+              .lookup<PtrResourceRecord>(
+                ResourceRecordQuery.serverPointer(
+                  '_services._dns-sd._udp.local',
+                ),
+              )) {
+            if (kDebugMode) {
+              print(
+                'Найден тип сервиса через DNS-SD: ${serviceType.domainName}',
+              );
+            }
+
+            // Ищем экземпляры Linqora сервисов
+            if (_isLinqoraServiceType(serviceType.domainName)) {
+              await for (final PtrResourceRecord instance in _client!
+                  .lookup<PtrResourceRecord>(
+                    ResourceRecordQuery.serverPointer(serviceType.domainName),
+                  )) {
+                if (kDebugMode) {
+                  print(
+                    'Найден экземпляр ${serviceType.domainName}: ${instance.domainName}',
+                  );
+                }
+
+                await _processLinqoraInstance(instance.domainName, devices);
+              }
+            }
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('Ошибка при поиске через DNS-SD: $e');
+          }
+        }
+      }
+
+      // Завершение поиска
+      if (_discoveryTimer?.isActive ?? false) {
+        _discoveryTimer!.cancel();
+      }
+
+      _stopDiscovery();
+
+      if (devices.isEmpty) {
+        onStatusChanged?.call(
+          DiscoveryStatus.empty,
+          message: 'Устройства не найдены',
+        );
+      } else {
+        onStatusChanged?.call(
+          DiscoveryStatus.completed,
+          message: 'Найдено ${devices.length} устройств',
+        );
+      }
+
+      if (!completer.isCompleted) {
+        completer.complete(devices);
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Ошибка при поиске устройств: $e');
+      }
+      _stopDiscovery();
+      completer.complete([]);
+    }
+
+    return completer.future;
+  }
+
+  // Метод для обработки найденного экземпляра Linqora сервиса
+  Future<void> _processLinqoraInstance(
+    String serviceName,
+    List<DiscoveredService> devices,
+  ) async {
+    try {
+      await for (final SrvResourceRecord srv in _client!
+          .lookup<SrvResourceRecord>(
+            ResourceRecordQuery.service(serviceName),
+          )) {
+        if (kDebugMode) {
+          print('SRV запись: ${srv.target}:${srv.port}');
+        }
+
+        bool supportsTLS = false;
+        String hostname = '';
+        String osInfo = '';
+
+        // Получаем TXT записи
+        try {
+          await for (final TxtResourceRecord txt in _client!
+              .lookup<TxtResourceRecord>(
+                ResourceRecordQuery.text(serviceName),
+              )) {
+            if (kDebugMode) {
+              print('TXT запись: ${txt.text}');
+            }
+
+            // Обработка TXT записи с поддержкой разных форматов
+            if (txt.text.contains('tls=true')) {
+              supportsTLS = true;
+            }
+
+            // Попытка извлечь hostname и os
+            final txtParts = txt.text.split(RegExp(r'[;\s]'));
+            for (final part in txtParts) {
+              final trimmedPart = part.trim();
+              if (trimmedPart.isEmpty) continue;
+
+              if (trimmedPart.startsWith('hostname=')) {
+                hostname = trimmedPart.substring(9);
+              } else if (trimmedPart.startsWith('os=')) {
+                osInfo = trimmedPart.substring(3);
+              }
+            }
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('Ошибка при обработке TXT записей: $e');
+          }
+        }
+
+        // Получаем IP адрес
+        await for (final IPAddressResourceRecord ip in _client!
+            .lookup<IPAddressResourceRecord>(
+              ResourceRecordQuery.addressIPv4(srv.target),
+            )) {
+          if (kDebugMode) {
+            print('Найден IP: ${ip.address.address}');
+          }
+
+          // Создаем понятное имя сервиса
+          String serviceParts = serviceName.split('._')[0];
+          if (serviceParts.startsWith('_')) {
+            serviceParts = serviceParts.substring(1);
+          }
+
+          final device = DiscoveredService(
+            id: serviceParts,
+            name: hostname.isNotEmpty ? hostname : serviceParts,
+            address: ip.address.address,
+            port: srv.port.toString(),
+            supportsTLS: supportsTLS,
+            hostname: hostname,
+            osInfo: osInfo,
+          );
+
+          if (!_deviceExists(devices, device)) {
+            devices.add(device);
+            onStatusChanged?.call(DiscoveryStatus.deviceFound);
+
+            if (kDebugMode) {
+              print(
+                'Добавлено устройство: ${device.name} (${device.address}:${device.port})',
+              );
+            }
+          }
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Ошибка при обработке сервиса $serviceName: $e');
+      }
+    }
+  }
+
+  // Проверяет, что тип сервиса может быть Linqora сервисом
+  bool _isLinqoraServiceType(String serviceType) {
+    return serviceType.contains('_linqora');
+  }
+
+  // Проверяет, существует ли устройство в списке
+  bool _deviceExists(
+    List<DiscoveredService> devices,
+    DiscoveredService device,
+  ) {
+    return devices.any(
+      (d) => d.address == device.address && d.port == device.port,
+    );
   }
 }
