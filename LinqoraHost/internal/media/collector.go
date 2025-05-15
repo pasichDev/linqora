@@ -11,8 +11,8 @@ import (
 )
 
 type MediaResponse struct {
-	NowPlaying        NowPlaying        `json:"nowPlaying"`
-	MediaCapabilities MediaCapabilities `json:"mediaCapabilities"`
+	NowPlaying        *NowPlaying        `json:"nowPlaying"`
+	MediaCapabilities *MediaCapabilities `json:"mediaCapabilities"`
 }
 
 type MediaCollector struct {
@@ -56,24 +56,25 @@ func (mc *MediaCollector) Start(ctx context.Context) {
 			return
 		}
 	}
+
 }
 
-// Новый метод для сбора и отправки информации
+// Метод для сбора и отправки информации
 func (mc *MediaCollector) collectAndSendInfo() {
+	// Собираем информацию о текущем медиа
 	nowPlaying, err := mc.collectMediaInfo()
 	if err != nil {
 		log.Printf("Ошибка сбора медиа-информации: %v", err)
-		return
 	}
 
+	// Собираем информацию о настройках аудио
 	mediaCapabilities, err := mc.collectAudioCapabilities()
 	if err != nil {
-		log.Printf("Ошибка сбора медиа-информации: %v", err)
-		return
+		log.Printf("Ошибка сбора аудио-настроек: %v", err)
 	}
 
-	// Проверяем, есть ли что отправлять
-	if nowPlaying == nil || mediaCapabilities == nil {
+	// Проверяем, есть ли что-то для отправки
+	if mediaCapabilities == nil && nowPlaying == nil {
 		return
 	}
 
@@ -82,11 +83,18 @@ func (mc *MediaCollector) collectAndSendInfo() {
 		return
 	}
 
-	metricsJSON, err := json.Marshal(MediaResponse{
+	// Создаем объект ответа с явным указанием null для отсутствующих данных
+	response := MediaResponse{}
 
-		NowPlaying:        *nowPlaying,
-		MediaCapabilities: *mediaCapabilities,
-	})
+	if nowPlaying != nil {
+		response.NowPlaying = nowPlaying
+	}
+
+	if mediaCapabilities != nil {
+		response.MediaCapabilities = mediaCapabilities
+	}
+
+	metricsJSON, err := json.Marshal(response)
 
 	// Проверяем на ошибки маршалинга
 	if err != nil {
