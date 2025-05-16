@@ -1,12 +1,16 @@
 package config
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 )
+
+//go:embed certificates
+var embeddedCerts embed.FS
 
 const (
 	// ConfigFileName ім'я файлу конфігурації
@@ -91,4 +95,65 @@ func LoadConfig() (*ServerConfig, error) {
 	}
 
 	return config, nil
+}
+
+// EnsureCertsExist проверяет наличие сертификатов и извлекает их из встроенных данных при необходимости
+func (c *ServerConfig) EnsureCertsExist() {
+	// Проверяем наличие сертификатов по указанным в конфигурации путям
+	certExists := fileExists(c.CertFile)
+	keyExists := fileExists(c.KeyFile)
+
+	// Если оба файла существуют, ничего делать не нужно
+	if certExists && keyExists {
+		return
+	}
+
+	log.Println("TLS certificates not found at specified paths, extracting embedded certificates...")
+
+	// Создаем директорию для сертификатов
+	certDir := filepath.Dir(c.CertFile)
+	if err := os.MkdirAll(certDir, 0755); err != nil {
+		log.Printf("Failed to create certificates directory: %v", err)
+		c.EnableTLS = false
+		return
+	}
+
+	// Извлекаем сертификат
+	if !certExists {
+		if err := extractEmbeddedFile("certificates/dev_cert.pem", c.CertFile); err != nil {
+			log.Printf("Failed to extract certificate: %v", err)
+			c.EnableTLS = false
+			return
+		}
+		log.Printf("Certificate extracted to %s", c.CertFile)
+	}
+
+	// Извлекаем ключ
+	if !keyExists {
+		if err := extractEmbeddedFile("certificates/dev_key.pem", c.KeyFile); err != nil {
+			log.Printf("Failed to extract key: %v", err)
+			c.EnableTLS = false
+			return
+		}
+		log.Printf("Key extracted to %s", c.KeyFile)
+	}
+
+	log.Println("TLS certificates successfully extracted, TLS enabled")
+	c.EnableTLS = true
+}
+
+// Извлечение файла из встроенных ресурсов
+func extractEmbeddedFile(embedPath, outputPath string) error {
+	data, err := embeddedCerts.ReadFile(embedPath)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(outputPath, data, 0644)
+}
+
+// Проверка существования файла
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }

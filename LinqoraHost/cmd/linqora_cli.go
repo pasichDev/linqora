@@ -12,6 +12,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -47,8 +48,8 @@ func init() {
 	// Додаємо флаги
 	rootCmd.Flags().IntVarP(&port, "port", "p", 8070, "Port for LinqoraHost server")
 	rootCmd.Flags().BoolP("notls", "s", false, "Disable TLS/SSL for LinqoraHost server")
-	rootCmd.Flags().String("cert", "./certs/dev-certs/cert.pem", "Path to the TLS certificate file")
-	rootCmd.Flags().String("key", "./certs/dev-certs/key.pem", "Path to the TLS key file")
+	rootCmd.Flags().String("cert", "./certificates/dev_cert.pem", "Path to the TLS certificate file")
+	rootCmd.Flags().String("key", "./certificates/dev_key.pem", "Path to the TLS key file")
 }
 
 func startCommandProcessor() {
@@ -119,9 +120,6 @@ func startCommandProcessor() {
 
 // Главная функция запуска сервера
 func runServer(cmd *cobra.Command, args []string) {
-	fmt.Println("====================================================")
-	fmt.Println("                 LINQORA HOST SERVER                ")
-	fmt.Println("====================================================")
 
 	// Получаем системную информацию
 	deviceInfo := metrics.GetDeviceInfo()
@@ -132,27 +130,6 @@ func runServer(cmd *cobra.Command, args []string) {
 	certFile, _ := cmd.Flags().GetString("cert")
 	keyFile, _ := cmd.Flags().GetString("key")
 
-	// Проверяем наличие сертификатов, если TLS включен
-	if enableTLS {
-		certExists := true
-		keyExists := true
-
-		if _, err := os.Stat(certFile); os.IsNotExist(err) {
-			certExists = false
-			fmt.Printf("Warning: Certificate file %s not found\n", certFile)
-		}
-
-		if _, err := os.Stat(keyFile); os.IsNotExist(err) {
-			keyExists = false
-			fmt.Printf("Warning: Key file %s not found\n", keyFile)
-		}
-
-		// Если файлов нет, автоматически выключаем TLS
-		if !certExists || !keyExists {
-			enableTLS = false
-		}
-	}
-
 	// Загружаем конфигурацию
 	var err error
 	cfg, err = config.LoadConfig()
@@ -160,6 +137,44 @@ func runServer(cmd *cobra.Command, args []string) {
 		fmt.Printf("Error loading configuration: %v\n", err)
 		fmt.Println("Default configuration will be used.")
 		cfg = config.DefaultConfig()
+	}
+	// Проверяем наличие сертификатов, если TLS включен
+	if enableTLS {
+		certExists := true
+		keyExists := true
+		isDevCert := false
+
+		if _, err := os.Stat(certFile); os.IsNotExist(err) {
+			certExists = false
+			fmt.Printf("Warning: Certificate file %s not found\n", certFile)
+		} else {
+			// Проверяем, является ли сертификат dev/тестовым
+			certFileName := filepath.Base(certFile)
+			if strings.HasPrefix(strings.ToLower(certFileName), "dev") {
+				isDevCert = true
+			}
+		}
+
+		if _, err := os.Stat(keyFile); os.IsNotExist(err) {
+			keyExists = false
+			fmt.Printf("Warning: Key file %s not found\n", keyFile)
+		} else {
+			// Проверяем, является ли ключ dev/тестовым
+			keyFileName := filepath.Base(keyFile)
+			if strings.HasPrefix(strings.ToLower(keyFileName), "dev") {
+				isDevCert = true
+			}
+
+			// Если файлы не существуют или это dev-сертификаты, выводим предупреждение
+			if !certExists || !keyExists || isDevCert {
+				fmt.Println("┌─────────────────────────────────────────────────────┐")
+				fmt.Println("│                   SECURITY WARNING                  │")
+				fmt.Println("├─────────────────────────────────────────────────────┤")
+				fmt.Println("│ TLS enabled with untrusted development certificates │")
+				fmt.Println("│ Mobile clients must allow self-signed certificates  │")
+				fmt.Println("└─────────────────────────────────────────────────────┘")
+			}
+		}
 	}
 
 	// Обновляем порт, если указан в аргументах
@@ -176,7 +191,12 @@ func runServer(cmd *cobra.Command, args []string) {
 	if err := cfg.SaveConfig(); err != nil {
 		fmt.Printf("Error saving configuration: %v\n", err)
 	}
+	fmt.Println("====================================================")
+	fmt.Println("                 LINQORA HOST SERVER                ")
+	fmt.Println("====================================================")
 
+	// Убеждаемся, что сертификаты существуют (извлекаем встроенные при необходимости)
+	cfg.EnsureCertsExist()
 	// Выводим основную информацию о сервере
 	fmt.Printf("TLS:         %t\n", enableTLS)
 	fmt.Printf("Хост IP:     %s\n", deviceInfo.IP)
