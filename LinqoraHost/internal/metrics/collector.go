@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"log"
 	"time"
+)
 
-	"LinqoraHost/internal/config"
+const (
+	MetricInterval = 2 * time.Second
 )
 
 // SystemMetrics представляє метрики системи
@@ -18,21 +20,19 @@ type SystemMetrics struct {
 
 // MetricsCollector збирає системні метрики
 type MetricsCollector struct {
-	config      *config.ServerConfig
 	broadcaster func([]byte)
 }
 
 // NewMetricsCollector створює новий колектор метрик
-func NewMetricsCollector(config *config.ServerConfig, broadcaster func([]byte)) *MetricsCollector {
+func NewMetricsCollector(broadcaster func([]byte)) *MetricsCollector {
 	return &MetricsCollector{
-		config:      config,
 		broadcaster: broadcaster,
 	}
 }
 
 // Start запускає збір метрик
 func (mc *MetricsCollector) Start(ctx context.Context) {
-	ticker := time.NewTicker(mc.config.MetricsInterval)
+	ticker := time.NewTicker(MetricInterval)
 	defer ticker.Stop()
 
 	for {

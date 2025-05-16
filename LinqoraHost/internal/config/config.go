@@ -11,42 +11,35 @@ import (
 
 // ServerConfig містить конфігурацію сервера
 type ServerConfig struct {
-	Port            int                   // Порт для WebSocket сервера
-	AuthorizedDevs  map[string]DeviceAuth // Авторизовані пристрої
-	ValidDeviceIDs  map[string]bool       // Список разрешенных DeviceID
-	MetricsInterval time.Duration         // Інтервал надсилання метрик
-	MediasInterval  time.Duration         // Інтервал надсилання медіа
-	ConfigPath      string                // Путь к файлу конфигурации
+	Port           int                   // Порт для WebSocket сервера
+	AuthorizedDevs map[string]DeviceAuth // Авторизовані пристрої
+	ConfigPath     string                // Путь к файлу конфигурации
 
 	EnableTLS bool   // Включити TLS
 	CertFile  string // Шлях до файлу сертифікату
 	KeyFile   string // Шлях до файлу ключа
 }
 
-// DeviceAuth содержит информацию об авторизованном устройстве
+// DeviceAuth зберігає інформацію про авторизовані пристрої
 type DeviceAuth struct {
-	DeviceName string    `json:"device_name"` // Имя устройства
-	DeviceID   string    `json:"device_id"`   // Уникальный ID устройства
-	LastAuth   time.Time `json:"last_auth"`   // Время последней авторизации
+	DeviceName string    `json:"device_name"` // Ім'я пристрою
+	DeviceID   string    `json:"device_id"`   // Унікальний ідентифікатор пристрою
+	LastAuth   time.Time `json:"last_auth"`   // Час останньої авторизації
 }
 
 // DefaultConfig повертає конфігурацію за замовчуванням
 func DefaultConfig() *ServerConfig {
-	// Путь к файлу конфигурации
 	configDir := getConfigDir()
 	configPath := filepath.Join(configDir, "linqora_config.json")
 
 	return &ServerConfig{
-		Port:            8070,
-		AuthorizedDevs:  make(map[string]DeviceAuth),
-		ValidDeviceIDs:  make(map[string]bool), // Новое поле
-		MetricsInterval: 2 * time.Second,
-		MediasInterval:  2 * time.Second,
-		ConfigPath:      configPath,
+		Port:           8070,
+		AuthorizedDevs: make(map[string]DeviceAuth),
+		ConfigPath:     configPath,
 	}
 }
 
-// Получение директории для конфигурации
+// Отримання директорії для конфігурації
 func getConfigDir() string {
 	configDir, err := os.UserConfigDir()
 	if err != nil {
@@ -62,7 +55,7 @@ func getConfigDir() string {
 	return linqoraDir
 }
 
-// SaveConfig сохраняет конфигурацию в файл
+// SaveConfig зберігає конфігурацію у файл
 func (c *ServerConfig) SaveConfig() error {
 	data, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
@@ -76,11 +69,10 @@ func (c *ServerConfig) SaveConfig() error {
 	return nil
 }
 
-// LoadConfig загружает конфигурацию из файла
+// LoadConfig завантажує конфігурацію з файлу
 func LoadConfig() (*ServerConfig, error) {
 	config := DefaultConfig()
 
-	// Если файл конфигурации существует, загружаем его
 	if _, err := os.Stat(config.ConfigPath); err == nil {
 		data, err := os.ReadFile(config.ConfigPath)
 		if err != nil {
@@ -91,7 +83,7 @@ func LoadConfig() (*ServerConfig, error) {
 			return config, fmt.Errorf("failed to parse config file: %w", err)
 		}
 	} else {
-		// Если файл не существует, создаем его
+
 		if err := config.SaveConfig(); err != nil {
 			log.Printf("Failed to create initial config: %v", err)
 		}

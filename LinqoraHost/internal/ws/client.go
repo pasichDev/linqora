@@ -78,7 +78,7 @@ func (m *ClientMessage) GetData() []byte {
 	return m.Data
 }
 
-func (c *Client) StartReadPump(validDeviceIDs []string, handleMessage func(*ClientMessage), onDisconnect func()) {
+func (c *Client) StartReadPump(handleMessage func(*ClientMessage), onDisconnect func()) {
 	// Устанавливаем лимит на размер сообщения
 	c.Conn.SetReadLimit(maxMessageSize)
 	c.Conn.SetReadDeadline(time.Now().Add(pongWait))

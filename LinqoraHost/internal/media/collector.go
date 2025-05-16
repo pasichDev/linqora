@@ -1,7 +1,6 @@
 package media
 
 import (
-	"LinqoraHost/internal/config"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -10,41 +9,41 @@ import (
 	"time"
 )
 
+const (
+	MediaInterval = 2 * time.Second
+)
+
 type MediaResponse struct {
 	NowPlaying        *NowPlaying        `json:"nowPlaying"`
 	MediaCapabilities *MediaCapabilities `json:"mediaCapabilities"`
 }
 
 type MediaCollector struct {
-	config        *config.ServerConfig
 	broadcaster   func([]byte)
 	lastMediaInfo NowPlaying
 	mu            sync.Mutex
 }
 
-func NewMediaCollector(config *config.ServerConfig, broadcaster func([]byte)) *MediaCollector {
+func NewMediaCollector(broadcaster func([]byte)) *MediaCollector {
 
 	return &MediaCollector{
-		config:      config,
 		broadcaster: broadcaster,
 	}
 }
 
 // Start запускає збір
 func (mc *MediaCollector) Start(ctx context.Context) {
-	// Проверка и установка значения по умолчанию для интервала
-	interval := mc.config.MediasInterval
-	if interval <= 0 {
-		interval = 2 * time.Second // Значение по умолчанию для предотвращения паники
-		log.Printf("Предупреждение: MediasInterval не установлен или равен нулю, используется 2 секунды")
-	}
 
-	log.Printf("MediaCollector запущен с интервалом %v", interval)
+	interval := MediaInterval
+	if interval <= 0 {
+		interval = 2 * time.Second
+		log.Printf("Попередженя: MediasInterval не встановлено, використовується 2 сек")
+	}
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	// Запускаем первый сбор сразу, не дожидаясь тикера
+	// Запускаємо перший збір інформації
 	mc.collectAndSendInfo()
 
 	for {
@@ -52,38 +51,36 @@ func (mc *MediaCollector) Start(ctx context.Context) {
 		case <-ticker.C:
 			mc.collectAndSendInfo()
 		case <-ctx.Done():
-			log.Println("MediaCollector остановлен")
+			log.Println("MediaCollector зупинено")
 			return
 		}
 	}
 
 }
 
-// Метод для сбора и отправки информации
+// Метод для збору та надсилання інформації про медіа
 func (mc *MediaCollector) collectAndSendInfo() {
-	// Собираем информацию о текущем медиа
+	// Збираємо інформацію про медіа
 	nowPlaying, err := mc.collectMediaInfo()
 	if err != nil {
 		log.Printf("Ошибка сбора медиа-информации: %v", err)
 	}
 
-	// Собираем информацию о настройках аудио
+	// Збираємо інформацію про аудіо-можливості
 	mediaCapabilities, err := mc.collectAudioCapabilities()
 	if err != nil {
 		log.Printf("Ошибка сбора аудио-настроек: %v", err)
 	}
 
-	// Проверяем, есть ли что-то для отправки
 	if mediaCapabilities == nil && nowPlaying == nil {
 		return
 	}
 
 	if mc.broadcaster == nil {
-		log.Printf("Предупреждение: broadcaster не установлен")
+		log.Printf("Попердження: broadcaster не встановлено")
 		return
 	}
 
-	// Создаем объект ответа с явным указанием null для отсутствующих данных
 	response := MediaResponse{}
 
 	if nowPlaying != nil {
@@ -96,20 +93,19 @@ func (mc *MediaCollector) collectAndSendInfo() {
 
 	metricsJSON, err := json.Marshal(response)
 
-	// Проверяем на ошибки маршалинга
 	if err != nil {
-		log.Printf("Ошибка маршалинга медиа: %v", err)
+		log.Printf("Помилки медіа: %v", err)
 		return
 	}
 
 	mc.broadcaster(metricsJSON)
 }
 
-// collectMediaInfo собирает информацию о текущем проигрываемом медиа
+// CollectMediaInfo збирає інформацію про медіа
 func (mc *MediaCollector) collectMediaInfo() (*NowPlaying, error) {
 	currentInfo, err := GetMediaInfo()
 	if err != nil {
-		return nil, fmt.Errorf("ошибка получения медиа-информации: %w", err)
+		return nil, fmt.Errorf("Помилка отримання інформації: %w", err)
 	}
 
 	mc.mu.Lock()
@@ -122,28 +118,27 @@ func (mc *MediaCollector) collectMediaInfo() (*NowPlaying, error) {
 	return nil, nil
 }
 
-// AudioCapabilities собирает информацию о настройках медиа
+// AudioCapabilities збирає інформацію про аудіо-можливості
 func (mc *MediaCollector) collectAudioCapabilities() (*MediaCapabilities, error) {
 	currentInfo, err := GetAudioCapabilities()
 	if err != nil {
-		return nil, fmt.Errorf("ошибка получения медиа-информации: %w", err)
+		return nil, fmt.Errorf("Помилка отримання інформації: %w", err)
 	}
 
 	return &currentInfo, nil
 }
 
-// isEqualMediaInfo сравнивает две структуры MediaInfo
+// isEqualMediaInfo порівнює дві структури MediaInfo
 func (m *MediaCollector) isEqualMediaInfo(old, new NowPlaying) bool {
 	return old.Title == new.Title &&
 		old.Artist == new.Artist &&
 		old.Album == new.Album &&
 		old.IsPlaying == new.IsPlaying &&
 		old.Application == new.Application &&
-		// Проверка позиции с небольшим отклонением для непрерывного потока
+
 		(old.Duration == 0 || abs(old.Position-new.Position) < 2)
 }
 
-// Вспомогательная функция для вычисления абсолютного значения
 func abs(x int) int {
 	if x < 0 {
 		return -x

@@ -109,7 +109,7 @@ func startCommandProcessor() {
 
 			// Удаляем обработанный запрос
 			delete(authRequests, latestDeviceID)
-			fmt.Print("> ")
+
 			continue
 		}
 
@@ -246,9 +246,6 @@ func runServer(cmd *cobra.Command, args []string) {
 	go func() {
 		// Закрываем канал остановки обработчика команд консоли
 		close(stopCh)
-
-		// Закрываем логи и выполняем финальное логирование
-		log.Println("All connections closed, resources released")
 
 		// Сигнализируем о завершении процедуры shutdown
 		close(shutdownDone)

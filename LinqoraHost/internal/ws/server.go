@@ -154,11 +154,8 @@ func (s *WSServer) handleWSConnection(w http.ResponseWriter, r *http.Request) {
 
 	// Запускаем горутины с контролируемым завершением
 	go client.StartWritePump()
-	validDevices := make([]string, 0, len(s.config.ValidDeviceIDs))
-	for deviceID := range s.config.ValidDeviceIDs {
-		validDevices = append(validDevices, deviceID)
-	}
-	go client.StartReadPump(validDevices, func(msg *ClientMessage) {
+
+	go client.StartReadPump(func(msg *ClientMessage) {
 		s.handleClientMessage(client, msg)
 	}, func() {
 		s.removeClient(client)

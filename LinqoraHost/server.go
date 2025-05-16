@@ -31,7 +31,6 @@ func NewServer(cfg *config.ServerConfig, authManager *auth.AuthManager) *Server 
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Створюємо WebSocket сервер с правильной передачей authManager
 	wsServer := ws.NewWSServer(cfg, authManager)
 
 	// Створюємо mDNS сервіс
@@ -43,8 +42,8 @@ func NewServer(cfg *config.ServerConfig, authManager *auth.AuthManager) *Server 
 	}
 
 	// Створюємо колектор метрик
-	metricsCollector := metrics.NewMetricsCollector(cfg, wsServer.BroadcastMetrics)
-	mediaCollector := media.NewMediaCollector(cfg, wsServer.BroadcastMedia)
+	metricsCollector := metrics.NewMetricsCollector(wsServer.BroadcastMetrics)
+	mediaCollector := media.NewMediaCollector(wsServer.BroadcastMedia)
 
 	return &Server{
 		ctx:              ctx,
@@ -70,17 +69,9 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 	}()
 
-	// Запускаем сборщик метрик в отдельной горутине
-	if s.config.MetricsInterval > 0 {
-		go s.metricsCollector.Start(s.ctx)
-	}
+	go s.metricsCollector.Start(s.ctx)
+	go s.mediaCollector.Start(s.ctx)
 
-	// Запускаем сборщик медиа в отдельной горутине
-	if s.config.MediasInterval > 0 {
-		go s.mediaCollector.Start(s.ctx)
-	}
-
-	// Ожидаем сигнала завершения или ошибки
 	select {
 	case <-ctx.Done():
 		return s.Shutdown()
@@ -93,7 +84,6 @@ func (s *Server) Start(ctx context.Context) error {
 func (s *Server) Shutdown() error {
 	log.Println("Shutting down Linqora server...")
 
-	// Скасовуємо контекст, щоб всі компоненти отримали сигнал про зупинку
 	s.cancel()
 	return nil
 }
