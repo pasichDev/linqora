@@ -102,20 +102,3 @@ class AuthResponse {
       type == TypeMessageWs.auth_pending.value ||
       AuthResponseHandler.isPendingCode(codeResponse);
 }
-
-/// Пример использования:
-/// 
-/// ```dart
-/// // Разбор ответа от сервера
-/// final jsonData = jsonDecode(responseString);
-/// final authResponse = AuthResponse.fromJson(jsonData);
-/// 
-/// // Проверка статуса авторизации
-/// if (authResponse.isAuthorized) {
-///   print('Успешная авторизация!');
-/// } else if (authResponse.isPending) {
-///   print('Ожидание подтверждения: ${authResponse.message}');
-/// } else {
-///   print('Ошибка авторизации: ${authResponse.message}');
-/// }
-/// ```

@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:linqoraremote/data/enums/type_messages_ws.dart';
 import 'package:linqoraremote/data/models/auth_response_handler.dart';
@@ -13,6 +12,7 @@ import 'package:linqoraremote/data/providers/websocket_provider.dart';
 
 import '../../core/constants/constants.dart';
 import '../../core/utils/device_info.dart';
+import '../../core/utils/error_handler.dart';
 import '../../data/models/discovered_service.dart';
 import '../../routes/app_routes.dart';
 
@@ -41,9 +41,6 @@ class AuthController extends GetxController {
 
   void _setupMDnsProvider() {
     mDnsProvider.onStatusChanged = (status, {String? message}) {
-      if (kDebugMode) {
-        print("MDNS status changed: $status, message: $message");
-      }
       switch (status) {
         case DiscoveryStatus.started:
           statusMessage.value = 'Поиск устройств в сети...';
@@ -95,13 +92,12 @@ class AuthController extends GetxController {
         statusMessage.value = 'Устройства не найдены';
         authStatus.value = AuthStatus.listDevices;
 
-        // Устанавливаем автоматический повторный поиск
         _scanTimer?.cancel();
         _scanTimer = Timer(const Duration(seconds: 60), startDiscovery);
       }
     } catch (e) {
       statusMessage.value = 'Ошибка при поиске устройств: $e';
-      authStatus.value = AuthStatus.listDevices; // Показываем пустой список
+      authStatus.value = AuthStatus.listDevices;
     }
   }
 
@@ -129,10 +125,7 @@ class AuthController extends GetxController {
 
     webSocketProvider.onError = (error) {
       if (kDebugMode) print("onError: $error");
-      _notConnectDevice(
-        errorMessage:
-            error.toString().split('\n').first,
-      );
+      _notConnectDevice(errorMessage: error.toString().split('\n').first);
     };
 
     try {
@@ -143,27 +136,8 @@ class AuthController extends GetxController {
       );
     } catch (e) {
       if (kDebugMode) print("connect Exception: $e");
-      _notConnectDevice(
-        errorMessage: e.toString().split('\n').first,
-      );
+      _notConnectDevice(errorMessage: e.toString().split('\n').first);
     }
-  }
-
-  void _notConnectDevice({
-    String errorMessage = 'Не удалось подключиться к устройству',
-  }) {
-    authStatus.value = AuthStatus.listDevices;
-    statusMessage.value = errorMessage;
-    statusMessage.value = 'Соединение прервано';
-    _authTimer?.cancel();
-    _scanTimer?.cancel();
-    Get.snackbar(
-      'Ошибка авторизации',
-      errorMessage,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.orange.shade800,
-      colorText: Colors.white,
-    );
   }
 
   void startAuthProcess() {
@@ -232,45 +206,19 @@ class AuthController extends GetxController {
     }
     switch (authResponse.codeResponse) {
       // Успешная авторизация - устройство уже авторизовано
-      case AuthStatusCode.authorized:
+      case AuthStatusCode.authorized || AuthStatusCode.approved:
         webSocketProvider.setAuthenticated(true);
         _navigateToDeviceHome(authResponse.extra);
         break;
 
-      // Авторизация только что подтверждена
-      case AuthStatusCode.approved:
-        webSocketProvider.setAuthenticated(true);
-        _navigateToDeviceHome(authResponse.extra);
-        break;
-
-      // Авторизация отклонена администратором
-      case AuthStatusCode.rejected:
-        cancelAuth(AuthResponseHandler.getAuthMessage(AuthStatusCode.rejected));
-        break;
-
-      // Неверный формат данных авторизации
-      case AuthStatusCode.invalidFormat:
+      // Авторизация отклонена хостом
+      case AuthStatusCode.rejected ||
+          AuthStatusCode.invalidFormat ||
+          AuthStatusCode.missingDeviceID ||
+          AuthStatusCode.timeout ||
+          AuthStatusCode.requestFailed:
         cancelAuth(
-          AuthResponseHandler.getAuthMessage(AuthStatusCode.invalidFormat),
-        );
-        break;
-
-      // Отсутствует ID устройства
-      case AuthStatusCode.missingDeviceID:
-        cancelAuth(
-          AuthResponseHandler.getAuthMessage(AuthStatusCode.missingDeviceID),
-        );
-        break;
-
-      // Время ожидания ответа истекло
-      case AuthStatusCode.timeout:
-        cancelAuth(AuthResponseHandler.getAuthMessage(AuthStatusCode.timeout));
-        break;
-
-      // Ошибка запроса авторизации на стороне сервера
-      case AuthStatusCode.requestFailed:
-        cancelAuth(
-          AuthResponseHandler.getAuthMessage(AuthStatusCode.requestFailed),
+          AuthResponseHandler.getAuthMessage(authResponse.codeResponse),
         );
         break;
 
@@ -310,7 +258,7 @@ class AuthController extends GetxController {
       return;
     }
     switch (authResponse.codeResponse) {
-      // Ожидание авторизации (стандартный случай)
+      // Очкування авторизації
       case AuthStatusCode.pending:
         statusMessage.value = 'Ожидание подтверждения на устройстве хоста...';
 
@@ -328,12 +276,7 @@ class AuthController extends GetxController {
     }
   }
 
-  /// Вспомогательный метод для навигации к главному экрану
   void _navigateToDeviceHome(Map<String, dynamic>? hostInfo) {
-    // Отменяем таймеры
-    _scanTimer?.cancel();
-    _authTimer?.cancel();
-
     if (authDevice.value == null) {
       if (kDebugMode) {
         print(
@@ -342,12 +285,10 @@ class AuthController extends GetxController {
       }
       return;
     }
-    authStatus.value = AuthStatus.listDevices;
+
+    _cleanupResources(resetStatus: true, clearHandlers: true);
     statusMessage.value = '';
 
-    // Очистка обработчиков сообщений WebSocket
-    webSocketProvider.removeHandler(TypeMessageWs.auth_response.value);
-    webSocketProvider.removeHandler(TypeMessageWs.auth_pending.value);
     Get.toNamed(
       AppRoutes.DEVICE_HOME,
       arguments: {
@@ -358,22 +299,49 @@ class AuthController extends GetxController {
   }
 
   void cancelAuth([String? reason]) {
-    _authTimer?.cancel();
-    webSocketProvider.removeHandler('auth_response');
-    webSocketProvider.removeHandler('auth_pending');
-    webSocketProvider.disconnect();
-
-    authStatus.value = AuthStatus.listDevices;
+    _cleanupResources(
+      resetStatus: true,
+      clearHandlers: true,
+      disconnectWebSocket: true,
+    );
 
     if (reason != null) {
-      statusMessage.value = reason;
-      Get.snackbar(
-        'Ошибка авторизации',
-        reason,
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange.shade800,
-        colorText: Colors.white,
-      );
+      showErrorSnackbar('Ошибка авторизации', reason);
+    }
+  }
+
+  void _notConnectDevice({
+    String errorMessage = 'Не удалось подключиться к устройству',
+    bool isError = true,
+  }) {
+    _cleanupResources(resetStatus: true);
+
+    if (isError) {
+      showErrorSnackbar('Ошибка подключения', errorMessage);
+    } else {
+      statusMessage.value = 'Соединение прервано';
+    }
+  }
+
+  void _cleanupResources({
+    bool resetStatus = true,
+    bool clearHandlers = true,
+    bool disconnectWebSocket = false,
+  }) {
+    _authTimer?.cancel();
+    _scanTimer?.cancel();
+
+    if (clearHandlers) {
+      webSocketProvider.removeHandler(TypeMessageWs.auth_response.value);
+      webSocketProvider.removeHandler(TypeMessageWs.auth_pending.value);
+    }
+
+    if (resetStatus) {
+      authStatus.value = AuthStatus.listDevices;
+    }
+
+    if (disconnectWebSocket) {
+      webSocketProvider.disconnect();
     }
   }
 }
