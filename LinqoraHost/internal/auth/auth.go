@@ -92,7 +92,7 @@ func (am *AuthManager) RespondToAuthRequest(deviceID string, approved bool) {
 		am.config.AuthorizedDevs[deviceID] = config.DeviceAuth{
 			DeviceName: request.DeviceName,
 			DeviceID:   deviceID,
-			LastAuth:   time.Now(),
+			LastAuth:   time.Now().Format("2006-01-02 15:04:05"),
 		}
 
 		if err := am.config.SaveConfig(); err != nil {

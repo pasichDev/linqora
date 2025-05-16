@@ -6,14 +6,17 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"time"
+)
+
+const (
+	// ConfigFileName ім'я файлу конфігурації
+	ConfigFileName = "linqora/linqora_config.json"
 )
 
 // ServerConfig містить конфігурацію сервера
 type ServerConfig struct {
 	Port           int                   // Порт для WebSocket сервера
 	AuthorizedDevs map[string]DeviceAuth // Авторизовані пристрої
-	ConfigPath     string                // Путь к файлу конфигурации
 
 	EnableTLS bool   // Включити TLS
 	CertFile  string // Шлях до файлу сертифікату
@@ -22,20 +25,17 @@ type ServerConfig struct {
 
 // DeviceAuth зберігає інформацію про авторизовані пристрої
 type DeviceAuth struct {
-	DeviceName string    `json:"device_name"` // Ім'я пристрою
-	DeviceID   string    `json:"device_id"`   // Унікальний ідентифікатор пристрою
-	LastAuth   time.Time `json:"last_auth"`   // Час останньої авторизації
+	DeviceName string `json:"device_name"` // Ім'я пристрою
+	DeviceID   string `json:"device_id"`   // Унікальний ідентифікатор пристрою
+	LastAuth   string `json:"last_auth"`   // Час останньої авторизації
 }
 
 // DefaultConfig повертає конфігурацію за замовчуванням
 func DefaultConfig() *ServerConfig {
-	configDir := getConfigDir()
-	configPath := filepath.Join(configDir, "linqora_config.json")
 
 	return &ServerConfig{
 		Port:           8070,
 		AuthorizedDevs: make(map[string]DeviceAuth),
-		ConfigPath:     configPath,
 	}
 }
 
@@ -52,17 +52,18 @@ func getConfigDir() string {
 		linqoraDir = "."
 	}
 
-	return linqoraDir
+	return filepath.Join(configDir, ConfigFileName)
 }
 
 // SaveConfig зберігає конфігурацію у файл
 func (c *ServerConfig) SaveConfig() error {
 	data, err := json.MarshalIndent(c, "", "  ")
+	configPath := getConfigDir()
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	if err := os.WriteFile(c.ConfigPath, data, 0644); err != nil {
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
@@ -72,9 +73,9 @@ func (c *ServerConfig) SaveConfig() error {
 // LoadConfig завантажує конфігурацію з файлу
 func LoadConfig() (*ServerConfig, error) {
 	config := DefaultConfig()
-
-	if _, err := os.Stat(config.ConfigPath); err == nil {
-		data, err := os.ReadFile(config.ConfigPath)
+	configPath := getConfigDir()
+	if _, err := os.Stat(configPath); err == nil {
+		data, err := os.ReadFile(configPath)
 		if err != nil {
 			return config, fmt.Errorf("failed to read config file: %w", err)
 		}
