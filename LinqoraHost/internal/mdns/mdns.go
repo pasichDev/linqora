@@ -90,7 +90,6 @@ func (s *MDNSServer) Start() error {
 	s.server = server
 	log.Printf("mDNS server started as '%s.%s.%s' on port %d",
 		s.mdnsName, s.mdnsType, s.mdnsDomain, port)
-	log.Printf("mDNS TXT records: %v", txtRecords)
 	return nil
 }
 

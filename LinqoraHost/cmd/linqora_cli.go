@@ -28,7 +28,7 @@ var (
 	mdnsServer   *mdns.MDNSServer
 	authManager  *auth.AuthManager
 	consoleMutex sync.Mutex
-	authChan     = make(chan interfaces.PendingAuthRequest, 10) // Буфер для запросов авторизации
+	authChan     = make(chan interfaces.PendingAuthRequest, 10)
 	stopCh       = make(chan struct{})
 	restart      = make(chan struct{})
 	serverMu     sync.Mutex
@@ -36,28 +36,24 @@ var (
 
 	// Головна команда
 	rootCmd = &cobra.Command{
-		Use:   "linqora",
-		Short: "Linqora Host Server - сервер для віддаленого керування пристроями",
-		Long:  `Linqora Host Server - сервер для моніторингу та віддаленого керування пристроями.`,
+		Use:   "linqorahost",
+		Short: "Linqora Host is a server that provides API endpoints for Linqora Remote.",
+		Long:  `Linqora is a comprehensive system for monitoring and future remote control of computers through a mobile application. The project consists of two main components: Linqora Host and Linqora Remote.`,
 		Run:   runServer,
 	}
 )
 
 func init() {
 	// Додаємо флаги
-	rootCmd.Flags().IntVarP(&port, "port", "p", 8070, "Порт для WebSocket сервера")
-	rootCmd.Flags().BoolP("notls", "s", false, "Disable TLS/SSL for WebSocket")
+	rootCmd.Flags().IntVarP(&port, "port", "p", 8070, "Port for LinqoraHost server")
+	rootCmd.Flags().BoolP("notls", "s", false, "Disable TLS/SSL for LinqoraHost server")
 	rootCmd.Flags().String("cert", "./certs/dev-certs/cert.pem", "Path to the TLS certificate file")
 	rootCmd.Flags().String("key", "./certs/dev-certs/key.pem", "Path to the TLS key file")
 }
 
-// startCommandProcessor запускает обработчик команд консоли
 func startCommandProcessor() {
 	scanner := bufio.NewScanner(os.Stdin)
 	authRequests := make(map[string]interfaces.PendingAuthRequest)
-
-	fmt.Println("\nВведите 'help' для просмотра доступных команд")
-	fmt.Print("> ")
 
 	// Запускаем горутину для обработки запросов авторизации
 	go func() {
@@ -65,12 +61,12 @@ func startCommandProcessor() {
 			select {
 			case req := <-authChan:
 				consoleMutex.Lock()
-				fmt.Printf("\n\n===> ЗАПРОС АВТОРИЗАЦИИ <===\n")
-				fmt.Printf("Устройство:  %s\n", req.DeviceName)
-				fmt.Printf("ID:          %s\n", req.DeviceID)
-				fmt.Printf("IP:          %s\n", req.IP)
-				fmt.Printf("Время:       %s\n\n", req.RequestTime.Format("15:04:05"))
-				fmt.Printf("Разрешить подключение? (y/n): ")
+				fmt.Printf("\n\n===> AUTHORIZATION REQUEST <===\n")
+				fmt.Printf("Device:  %s\n", req.DeviceName)
+				fmt.Printf("ID:      %s\n", req.DeviceID)
+				fmt.Printf("IP:      %s\n", req.IP)
+				fmt.Printf("Time:    %s\n\n", req.RequestTime.Format("15:04:05"))
+				fmt.Printf("Allow connection? (y/n): ")
 
 				// Сохраняем запрос для последующей обработки
 				authRequests[req.DeviceID] = req
@@ -106,20 +102,15 @@ func startCommandProcessor() {
 			authManager.RespondToAuthRequest(latestDeviceID, approved)
 
 			if approved {
-				fmt.Printf("Авторизация для устройства %s одобрена\n", latestReq.DeviceName)
+				fmt.Printf("Authorization for device %s approved\n", latestReq.DeviceName)
 			} else {
-				fmt.Printf("Авторизация для устройства %s отклонена\n", latestReq.DeviceName)
+				fmt.Printf("Authorization for device %s rejected\n", latestReq.DeviceName)
 			}
 
 			// Удаляем обработанный запрос
 			delete(authRequests, latestDeviceID)
 			fmt.Print("> ")
 			continue
-		}
-
-		// Обработка обычных команд
-		switch strings.ToLower(strings.TrimSpace(command)) {
-		// ... [остальной код обработки команд] ...
 		}
 
 		fmt.Print("> ")
@@ -148,31 +139,26 @@ func runServer(cmd *cobra.Command, args []string) {
 
 		if _, err := os.Stat(certFile); os.IsNotExist(err) {
 			certExists = false
-			fmt.Printf("Предупреждение: Файл сертификата %s не найден\n", certFile)
+			fmt.Printf("Warning: Certificate file %s not found\n", certFile)
 		}
 
 		if _, err := os.Stat(keyFile); os.IsNotExist(err) {
 			keyExists = false
-			fmt.Printf("Предупреждение: Файл ключа %s не найден\n", keyFile)
+			fmt.Printf("Warning: Key file %s not found\n", keyFile)
 		}
 
 		// Если файлов нет, автоматически выключаем TLS
 		if !certExists || !keyExists {
-			fmt.Println("TLS автоматически отключен из-за отсутствия сертификатов")
 			enableTLS = false
-		} else {
-			fmt.Println("TLS включен. Используется защищенный WebSocket (WSS).")
 		}
-	} else {
-		fmt.Println("TLS отключен. Используется незащищенный WebSocket (WS).")
 	}
 
 	// Загружаем конфигурацию
 	var err error
 	cfg, err = config.LoadConfig()
 	if err != nil {
-		fmt.Printf("Ошибка загрузки конфигурации: %v\n", err)
-		fmt.Println("Будет использована конфигурация по умолчанию.")
+		fmt.Printf("Error loading configuration: %v\n", err)
+		fmt.Println("Default configuration will be used.")
 		cfg = config.DefaultConfig()
 	}
 
@@ -188,13 +174,15 @@ func runServer(cmd *cobra.Command, args []string) {
 
 	// Сохраняем обновленную конфигурацию
 	if err := cfg.SaveConfig(); err != nil {
-		fmt.Printf("Ошибка сохранения конфигурации: %v\n", err)
+		fmt.Printf("Error saving configuration: %v\n", err)
 	}
 
 	// Выводим основную информацию о сервере
+	fmt.Printf("TLS:         %t\n", enableTLS)
 	fmt.Printf("Хост IP:     %s\n", deviceInfo.IP)
 	fmt.Printf("Порт:        %d\n", cfg.Port)
 	fmt.Printf("ОС:          %s\n", deviceInfo.OS)
+	fmt.Println("====================================================")
 
 	// Инициализируем канал для запросов авторизации
 	authChan = make(chan interfaces.PendingAuthRequest, 10)
@@ -205,19 +193,12 @@ func runServer(cmd *cobra.Command, args []string) {
 	// Запускаем сервер mDNS
 	mdnsServer, err = mdns.NewMDNSServer(cfg)
 	if err != nil {
-		fmt.Printf("Ошибка создания mDNS сервера: %v\n", err)
+		fmt.Printf("Error creating mDNS server: %v\n", err)
 	}
-
-	// Вывод информации о mDNS
-	fmt.Println("═════════════════════════════════════════════════")
-	fmt.Printf("mDNS имя:    %s\n", mdnsServer.GetServiceName())
-	fmt.Printf("mDNS тип:    %s\n", mdnsServer.GetServiceType())
-	fmt.Printf("mDNS домен:  %s\n", cfg.MDNSDomain)
-	fmt.Println("═════════════════════════════════════════════════")
 
 	// Запускаем mDNS сервер
 	if err := mdnsServer.Start(); err != nil {
-		fmt.Printf("Ошибка запуска mDNS сервера: %v\n", err)
+		fmt.Printf("Error starting mDNS server: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -232,10 +213,9 @@ func runServer(cmd *cobra.Command, args []string) {
 
 	// Запускаем сервер в отдельной горутине
 	go func() {
-		log.Println("Запуск WebSocket сервера...")
 		if err := server.Start(ctx); err != nil {
-			log.Printf("Ошибка WebSocket сервера: %v", err)
-			close(stopCh) // Сигнал для завершения программы при ошибке
+			log.Printf("WebSocket server error: %v", err)
+			close(stopCh)
 		}
 	}()
 
@@ -246,14 +226,13 @@ func runServer(cmd *cobra.Command, args []string) {
 	// Ожидаем сигнала завершения
 	select {
 	case <-stopCh:
-		fmt.Println("Получен сигнал остановки сервера...")
+		fmt.Println("Server stop signal received...")
 	case sig := <-sigCh:
-		fmt.Printf("Получен сигнал %v...\n", sig)
+		fmt.Printf("Signal %v received...\n", sig)
 	}
 
-	// Корректное завершение сервера
-	fmt.Println("Останавливаем сервер...")
-	cancel() // Отменяем контекст для graceful shutdown
+	fmt.Println("Stopping server...")
+	cancel()
 
 	// Останавливаем mDNS сервер
 	if mdnsServer != nil {
@@ -265,16 +244,22 @@ func runServer(cmd *cobra.Command, args []string) {
 	shutdownDone := make(chan struct{})
 
 	go func() {
-		// Здесь можно добавить дополнительную логику завершения
+		// Закрываем канал остановки обработчика команд консоли
+		close(stopCh)
+
+		// Закрываем логи и выполняем финальное логирование
+		log.Println("All connections closed, resources released")
+
+		// Сигнализируем о завершении процедуры shutdown
 		close(shutdownDone)
 	}()
 
 	// Ожидаем завершения всех операций или таймаута
 	select {
 	case <-shutdownDone:
-		fmt.Println("Сервер успешно остановлен")
+		fmt.Println("Server successfully stopped")
 	case <-shutdownTimeout.C:
-		fmt.Println("Таймаут при остановке сервера")
+		fmt.Println("Timeout while stopping the server")
 	}
 }
 
