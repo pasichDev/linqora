@@ -11,9 +11,9 @@ import 'package:linqoraremote/data/providers/mdns_provider.dart';
 import 'package:linqoraremote/data/providers/websocket_provider.dart';
 
 import '../../core/constants/constants.dart';
+import '../../core/utils/device_info.dart';
 import '../../data/models/discovered_service.dart';
 import '../../routes/app_routes.dart';
-import '../../utils/device_info.dart';
 
 enum AuthStatus { scanning, listDevices, pendingAuth, connecting }
 

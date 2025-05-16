@@ -13,8 +13,6 @@ dependencies:
   flutter:
     sdk: flutter
   get: ^4.7.2
-  hive: ^2.2.3
-  hive_flutter: ^1.1.0
   multicast_dns: ^0.3.2
   web_socket_channel: ^2.4.0
   network_info_plus: ^6.1.4
