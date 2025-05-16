@@ -3,9 +3,7 @@ package mdns
 import (
 	"fmt"
 	"log"
-	"net"
 	"os"
-	"os/user"
 	"strings"
 
 	"LinqoraHost/internal/config"
@@ -18,40 +16,29 @@ type MDNSServer struct {
 	server     *zeroconf.Server
 	config     *config.ServerConfig
 	hostname   string
-	username   string
 	mdnsName   string
 	mdnsType   string
 	mdnsDomain string
 }
 
 func NewMDNSServer(cfg *config.ServerConfig) (*MDNSServer, error) {
-	// Получаем информацию о системе для идентификации хоста
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get hostname: %w", err)
 	}
 
-	currentUser, err := user.Current()
-	username := "unknown"
-	if err == nil {
-		username = currentUser.Username
-	}
-
 	// Используем фиксированный тип сервиса для облегчения обнаружения
 	mdnsType := "_linqora._tcp"
 
-	// Создаем имя сервиса на основе пользователя и хоста
-	cleanUsername := strings.ToLower(strings.ReplaceAll(username, " ", "_"))
+	// Создаем имя сервиса на основе хоста
 	cleanHostname := strings.ToLower(strings.ReplaceAll(hostname, " ", "_"))
-	mdnsName := fmt.Sprintf("%s-%s", cleanUsername, cleanHostname)
 
 	return &MDNSServer{
 		config:     cfg,
 		hostname:   hostname,
-		username:   username,
-		mdnsName:   mdnsName,
+		mdnsName:   cleanHostname,
 		mdnsType:   mdnsType,
-		mdnsDomain: cfg.MDNSDomain,
+		mdnsDomain: "local.",
 	}, nil
 }
 
@@ -59,26 +46,17 @@ func NewMDNSServer(cfg *config.ServerConfig) (*MDNSServer, error) {
 func (s *MDNSServer) Start() error {
 	port := s.config.Port
 
-	// Получить текущий IP адрес
-	ip, err := getOutboundIP()
-	if err != nil {
-		log.Printf("Warning: could not determine outbound IP: %v", err)
-	}
-
 	// Преобразуем метаданные в правильный формат для TXT записей
 	txtRecords := []string{
 		fmt.Sprintf("hostname=%s", s.hostname),
-		fmt.Sprintf("os=%s", fmt.Sprintf("%s %s", os.Getenv("DESKTOP_SESSION"), os.Getenv("XDG_CURRENT_DESKTOP"))),
-		fmt.Sprintf("ip=%s", ip.String()),
 		fmt.Sprintf("tls=%v", s.config.EnableTLS),
-		fmt.Sprintf("username=%s", s.username),
 	}
 
 	// Создаем mDNS сервер со стандартным типом
 	server, err := zeroconf.Register(
 		s.mdnsName,   // Имя сервиса (например "pasich-ubuntu")
 		s.mdnsType,   // Тип сервиса (фиксированный "_linqora._tcp")
-		s.mdnsDomain, // Домен (обычно "local.")
+		s.mdnsDomain, // Домен (фиксированный "local.")
 		port,         // Порт
 		txtRecords,   // Метаданные в формате ["key=value", ...]
 		nil,          // Интерфейсы (nil = все)
@@ -109,16 +87,4 @@ func (s *MDNSServer) GetServiceName() string {
 // GetServiceType возвращает тип mDNS сервиса
 func (s *MDNSServer) GetServiceType() string {
 	return s.mdnsType
-}
-
-// getOutboundIP определяет IP адрес для исходящих подключений
-func getOutboundIP() (net.IP, error) {
-	conn, err := net.Dial("udp", "8.8.8.8:80")
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
-
-	localAddr := conn.LocalAddr().(*net.UDPAddr)
-	return localAddr.IP, nil
 }

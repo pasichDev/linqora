@@ -264,15 +264,11 @@ class MDnsProvider {
         _log('Сервис $serviceName не имеет SRV записей');
         return;
       }
-
-      // Обрабатываем первую SRV запись
       final srv = srvRecords.first;
       _log('SRV запись: ${srv.target}:${srv.port}');
 
-      // Централизованно получаем и обрабатываем TXT записи
       final txtData = await _parseTxtRecords(serviceName);
 
-      // Получаем все IP адреса хоста
       final ipAddresses =
           await _client!
               .lookup<IPAddressResourceRecord>(
@@ -297,7 +293,6 @@ class MDnsProvider {
 
       // Создаем устройство с лучшим IP
       final device = DiscoveredService(
-        id: serviceParts,
         name:
             txtData['hostname']?.isNotEmpty == true
                 ? txtData['hostname']!
@@ -305,8 +300,6 @@ class MDnsProvider {
         address: bestIp.address.address,
         port: srv.port.toString(),
         supportsTLS: txtData['supportsTLS'] == 'true',
-        hostname: txtData['hostname'] ?? '',
-        osInfo: txtData['osInfo'] ?? '',
       );
 
       if (!_deviceExists(devices, device)) {
@@ -337,21 +330,14 @@ class MDnsProvider {
               !ip.startsWith('169.254.'); // Link-local
         }).toList();
 
-    // Если есть подходящие адреса, берем первый, иначе возвращаем первый из всех
     return filteredAddresses.isNotEmpty
         ? filteredAddresses.first
         : addresses.first;
   }
 
-  // Полностью переработанный метод обработки TXT записей
+  // Метод обработки TXT записей
   Future<Map<String, String>> _parseTxtRecords(String serviceName) async {
-    final Map<String, String> result = {
-      'supportsTLS': 'false',
-      'hostname': '',
-      'osInfo': '',
-      'username': '',
-      'ip': '',
-    };
+    final Map<String, String> result = {'supportsTLS': 'false', 'hostname': ''};
 
     try {
       final txtRecords =
@@ -360,26 +346,18 @@ class MDnsProvider {
               .toList();
 
       for (final txt in txtRecords) {
-        _log('TXT запись: ${txt.text}');
-
-        // Единый подход к обработке TXT записей
         final entries = _parseTxtString(txt.text);
 
-        // Обновляем результат из полученных данных
         if (entries.containsKey('tls') &&
             entries['tls']!.toLowerCase() == 'true') {
           result['supportsTLS'] = 'true';
         }
 
         // Копируем важные поля
-        final fieldsToMap = ['hostname', 'os', 'username', 'ip'];
+        final fieldsToMap = ['hostname'];
         for (final field in fieldsToMap) {
           if (entries.containsKey(field) && entries[field]!.isNotEmpty) {
-            if (field == 'os') {
-              result['osInfo'] = entries[field]!;
-            } else {
-              result[field] = entries[field]!;
-            }
+            result[field] = entries[field]!;
           }
         }
       }
@@ -390,7 +368,7 @@ class MDnsProvider {
     return result;
   }
 
-  // Новый вспомогательный метод для разбора TXT строки
+  // Вспомогательный метод для разбора TXT строки
   Map<String, String> _parseTxtString(String txtString) {
     final result = <String, String>{};
 

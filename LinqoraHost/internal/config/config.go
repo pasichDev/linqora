@@ -12,7 +12,6 @@ import (
 // ServerConfig містить конфігурацію сервера
 type ServerConfig struct {
 	Port            int                   // Порт для WebSocket сервера
-	MDNSDomain      string                // Домен mDNS сервісу
 	AuthorizedDevs  map[string]DeviceAuth // Авторизовані пристрої
 	ValidDeviceIDs  map[string]bool       // Список разрешенных DeviceID
 	MetricsInterval time.Duration         // Інтервал надсилання метрик
@@ -39,7 +38,6 @@ func DefaultConfig() *ServerConfig {
 
 	return &ServerConfig{
 		Port:            8070,
-		MDNSDomain:      "local.",
 		AuthorizedDevs:  make(map[string]DeviceAuth),
 		ValidDeviceIDs:  make(map[string]bool), // Новое поле
 		MetricsInterval: 2 * time.Second,

@@ -24,13 +24,6 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
   }
 
   @override
-  void dispose() {
-    // authController.leaveRoom();
-
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: const AppBarCustom(),
@@ -66,42 +59,38 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
     );
   }
 
- Widget _buildStatusBar() {
-    return Obx(
-      () {
-        if (authController.statusMessage.value.isNotEmpty) {
-          return Container(
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 0),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  authController.authStatus.value == AuthStatus.scanning
-                      ? Icons.search
-                      : authController.authStatus.value == AuthStatus.connecting
-                      ? Icons.sync
-                      : Icons.info_outline,
-                  size: 20,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    authController.statusMessage.value,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+  Widget _buildStatusBar() {
+    return Obx(() {
+      if (authController.statusMessage.value.isNotEmpty) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 0),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
+          child: Row(
+            children: [
+              Icon(
+                authController.authStatus.value == AuthStatus.scanning
+                    ? Icons.search
+                    : authController.authStatus.value == AuthStatus.connecting
+                    ? Icons.sync
+                    : Icons.info_outline,
+                size: 20,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  authController.statusMessage.value,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
-              ],
-            ),
-          );
-        }
-        return const SizedBox.shrink();
-      },
-    );
+              ),
+            ],
+          ),
+        );
+      }
+      return const SizedBox.shrink();
+    });
   }
 
   Widget _buildScanningView() {
@@ -221,7 +210,7 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
               ),
               const SizedBox(height: 24),
               const Text(
-                'Устройства Linqora не найдены',
+                'Устройства LinqoraHost не найдены',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
@@ -239,7 +228,6 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
         itemCount: authController.discoveredDevices.length,
         itemBuilder: (context, index) {
           final device = authController.discoveredDevices[index];
-          final displayName = device.name.split('_').join(' ');
 
           return Card(
             margin: const EdgeInsets.symmetric(vertical: 6),
@@ -249,32 +237,19 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
                 color:
                     device.supportsTLS
                         ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.secondary,
+                        : Theme.of(context).colorScheme.errorContainer,
               ),
-              title: Text(displayName),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('${device.address}:${device.port}'),
-                  if (device.supportsTLS)
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.lock_outline,
-                          size: 14,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Защищенное соединение',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                ],
+              title: Text(
+                device.name,
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(
+                '${device.address}:${device.port}',
+                style: TextStyle(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withOpacity(0.6),
+                ),
               ),
               trailing: IconButton(
                 icon: const Icon(Icons.arrow_forward),
@@ -302,7 +277,6 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
           onPressed: authController.startDiscovery,
           icon: const Icon(Icons.refresh),
           label: const Text('Обновить'),
-          // ... остальной код ...
         );
       }),
     );
