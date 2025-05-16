@@ -11,7 +11,12 @@ import (
 	"github.com/grandcat/zeroconf"
 )
 
-// MDNSServer представляет mDNS сервер для обнаружения в сети
+const (
+	MDNSType   = "linqora-"
+	MDNSDomain = ".local"
+)
+
+// MDNSServer представляє mDNS сервер для виявлення в мережі
 type MDNSServer struct {
 	server     *zeroconf.Server
 	config     *config.ServerConfig
@@ -27,39 +32,35 @@ func NewMDNSServer(cfg *config.ServerConfig) (*MDNSServer, error) {
 		return nil, fmt.Errorf("failed to get hostname: %w", err)
 	}
 
-	// Используем фиксированный тип сервиса для облегчения обнаружения
-	mdnsType := "_linqora._tcp"
-
-	// Создаем имя сервиса на основе хоста
 	cleanHostname := strings.ToLower(strings.ReplaceAll(hostname, " ", "_"))
 
 	return &MDNSServer{
 		config:     cfg,
 		hostname:   hostname,
 		mdnsName:   cleanHostname,
-		mdnsType:   mdnsType,
-		mdnsDomain: "local.",
+		mdnsType:   MDNSType,
+		mdnsDomain: MDNSDomain,
 	}, nil
 }
 
-// Start запускает mDNS сервер
+// Start запускає mDNS сервер
 func (s *MDNSServer) Start() error {
 	port := s.config.Port
 
-	// Преобразуем метаданные в правильный формат для TXT записей
+	//  Перетворюємо метадані в правильний формат для TXT записів
 	txtRecords := []string{
 		fmt.Sprintf("hostname=%s", s.hostname),
 		fmt.Sprintf("tls=%v", s.config.EnableTLS),
 	}
 
-	// Создаем mDNS сервер со стандартным типом
+	// Create mDNS
 	server, err := zeroconf.Register(
-		s.mdnsName,   // Имя сервиса (например "pasich-ubuntu")
-		s.mdnsType,   // Тип сервиса (фиксированный "_linqora._tcp")
-		s.mdnsDomain, // Домен (фиксированный "local.")
-		port,         // Порт
-		txtRecords,   // Метаданные в формате ["key=value", ...]
-		nil,          // Интерфейсы (nil = все)
+		s.mdnsName,
+		s.mdnsType,
+		s.mdnsDomain,
+		port,
+		txtRecords,
+		nil,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to register mDNS server: %w", err)
@@ -71,7 +72,6 @@ func (s *MDNSServer) Start() error {
 	return nil
 }
 
-// Stop останавливает mDNS сервер
 func (s *MDNSServer) Stop() {
 	if s.server != nil {
 		log.Printf("Shutting down mDNS server")
@@ -79,12 +79,10 @@ func (s *MDNSServer) Stop() {
 	}
 }
 
-// GetServiceName возвращает имя mDNS сервиса
 func (s *MDNSServer) GetServiceName() string {
 	return s.mdnsName
 }
 
-// GetServiceType возвращает тип mDNS сервиса
 func (s *MDNSServer) GetServiceType() string {
 	return s.mdnsType
 }
