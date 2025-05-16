@@ -177,25 +177,18 @@ func (s *WSServer) removeClient(client *Client) {
 // handleClientMessage обробляє повідомлення від клієнта
 func (s *WSServer) handleClientMessage(client *Client, msg *ClientMessage) {
 
-	if msg.Type != "auth_request" && msg.Type != "auth_check" {
+	if msg.Type != "auth_request" && msg.Type != "auth_check" && msg.Type != "ping" {
 		if !s.authManager.IsAuthorized(client.GetDeviceID()) {
 			client.SendError("Unauthorized access")
 			return
 		}
 	}
-	if msg.Type == "ping" {
-		pongMessage := map[string]interface{}{
-			"type":      "pong",
-			"timestamp": msg.Data,
-		}
-		responseJSON, _ := json.Marshal(pongMessage)
-		client.SendMessage(responseJSON)
-		return
-	}
-	switch msg.Type {
 
+	switch msg.Type {
+	case "ping":
+		s.handlePingMessage(client, msg)
 	case "host_info":
-		s.handleHostInfoMessage(client, msg)
+		s.handleHostInfoMessage(client)
 	case "join_room":
 		s.handleJoinRoomMessage(client, msg)
 	case "leave_room":
@@ -222,9 +215,52 @@ func (s *WSServer) handleClientMessage(client *Client, msg *ClientMessage) {
 	}
 }
 
+func (s *WSServer) handlePingMessage(client *Client, msg *ClientMessage) {
+	if len(msg.Data) == 0 {
+		pongMessage := map[string]interface{}{
+			"type":      "pong",
+			"timestamp": time.Now().UnixMilli(),
+		}
+		responseJSON, _ := json.Marshal(pongMessage)
+		client.SendMessage(responseJSON)
+		return
+	}
+
+	var pingData map[string]interface{}
+	if err := json.Unmarshal(msg.Data, &pingData); err != nil {
+		log.Printf("Error unmarshaling ping data: %v", err)
+		// Даже при ошибке отправляем pong с текущим временем
+		pongMessage := map[string]interface{}{
+			"type":      "pong",
+			"timestamp": time.Now().UnixMilli(),
+		}
+		responseJSON, _ := json.Marshal(pongMessage)
+		client.SendMessage(responseJSON)
+		return
+	}
+
+	timestamp, ok := pingData["timestamp"]
+	if !ok {
+		log.Printf("Received ping without timestamp from %s", client.DeviceName)
+		timestamp = time.Now().UnixMilli()
+	}
+
+	pongMessage := map[string]interface{}{
+		"type":      "pong",
+		"timestamp": timestamp,
+	}
+
+	log.Printf("Received ping data from %s", client.DeviceName)
+
+	responseJSON, _ := json.Marshal(pongMessage)
+	client.SendMessage(responseJSON)
+	return
+
+}
+
 // handleHostInfoMessage обробляє відомлення з інформацією про хост
 // Відправляє інформацію про систему назад клієнту
-func (s *WSServer) handleHostInfoMessage(client *Client, msg *ClientMessage) {
+func (s *WSServer) handleHostInfoMessage(client *Client) {
 	// Отримуємо характеристики системи
 	ramTotal, _ := metrics.GetRamTotal()
 

@@ -31,7 +31,7 @@ type Client struct {
 	SendChannel chan []byte
 	roomManager *RoomManager
 	mu          sync.Mutex
-	closed      bool // Флаг закрытия клиента
+	closed      bool
 	DeviceID    string
 }
 
