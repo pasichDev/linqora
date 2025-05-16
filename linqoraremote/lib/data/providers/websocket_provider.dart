@@ -15,8 +15,7 @@ import '../models/ws_message.dart';
 class WebSocketProvider {
   WebSocketChannel? _channel;
   final RxList<String> messages = <String>[].obs;
-  final Duration _defaultPingInterval = const Duration(seconds: 30);
-  Duration _pingInterval = const Duration(seconds: 30);
+  Duration _pingInterval = const Duration(seconds: 50);
   Timer? _pingTimer;
   Function()? onConnected;
   Function()? onDisconnected;
@@ -38,6 +37,8 @@ class WebSocketProvider {
   void setAuthenticated(bool isAuthenticated) {
     _isAuthenticated = isAuthenticated;
   }
+
+  var _lastPingTime = DateTime.now();
 
   // Отримання списку кімнат, до яких приєднаний клієнт
   Set<String> get joinedRooms => Set.from(_joinedRooms);
@@ -111,7 +112,7 @@ class WebSocketProvider {
         cancelOnError: false,
       );
 
-       _startPingTimer();
+      _startPingTimer();
       _isConnected = true;
       onConnected?.call();
 
@@ -140,11 +141,7 @@ class WebSocketProvider {
       }
 
       try {
-        // Отправляем ping в формате JSON
-        sendJson({
-          'type': 'ping',
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-        });
+        sendPing();
 
         if (kDebugMode) {
           print('Ping отправлен');
@@ -156,8 +153,33 @@ class WebSocketProvider {
       }
     });
   }
-  
 
+  Future<void> sendPing() async {
+    if (!isConnected) return;
+
+    try {
+      // Добавляем текущее время в миллисекундах для измерения задержки
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+
+      final pingMessage = {
+        'type': 'ping',
+        'data': {'timestamp': timestamp},
+      };
+
+      sendMessage(pingMessage);
+
+      if (kDebugMode) {
+        print('Sending ping with timestamp: $timestamp');
+      }
+
+      // Начинаем отсчет для измерения времени ответа
+      _lastPingTime = DateTime.now();
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error sending ping: $e');
+      }
+    }
+  }
 
   // Обновляем метод cleanup для отмены ping таймера
   Future<void> _cleanupExistingConnection() async {
@@ -174,7 +196,6 @@ class WebSocketProvider {
       _channel = null;
     }
   }
-
 
   Future<void> _establishConnection(
     String wsUrl,
@@ -394,7 +415,6 @@ class WebSocketProvider {
     if (kDebugMode) {
       print('WebSocket відключено');
     }
-
   }
 
   // Обробка вхідних повідомлень

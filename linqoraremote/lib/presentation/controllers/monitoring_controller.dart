@@ -41,11 +41,11 @@ class MonitoringController extends GetxController {
   }
 
   @override
-  void dispose() {
+  void onClose() {
     webSocketProvider.leaveRoom(TypeMessageWs.metrics.value);
     webSocketProvider.removeHandler(TypeMessageWs.metrics.value);
     _resetMetrics();
-    super.dispose();
+    super.onClose();
   }
 
   void _handleMetricsUpdate(Map<String, dynamic> data) {

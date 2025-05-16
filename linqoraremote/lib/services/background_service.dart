@@ -130,7 +130,6 @@ class BackgroundConnectionService {
 /// Виконується в окремому ізоляті та підтримує з'єднання з сервером.
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) async {
-  //DartPluginRegistrant.ensureInitialized();
   String deviceName = 'Неизвестное устройство';
   String deviceAddress = '';
 

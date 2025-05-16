@@ -29,13 +29,13 @@ class MediaController extends GetxController {
   }
 
   @override
-  void dispose() {
+  void onClose() {
     webSocketProvider.leaveRoom(TypeMessageWs.media.value);
     webSocketProvider.removeHandler(TypeMessageWs.media.value);
 
     capabilities.value = null;
     nowPlaying.value = null;
-    super.dispose();
+    super.onClose();
   }
 
   Future<void> _init() async {
