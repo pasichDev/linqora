@@ -3,27 +3,16 @@ package auth
 import (
 	"encoding/json"
 	"log"
-	"os"
-	"runtime"
 	"time"
 
 	"LinqoraHost/internal/interfaces"
 )
 
 type AuthResponse struct {
-	Type      string `json:"type"`
-	Success   bool   `json:"success"`
-	Code      int    `json:"codeResponse"`
-	Descripte string `json:"data"`
-}
-
-// AuthResponseWithData структура ответа с дополнительными данными
-type AuthResponseWithData struct {
-	Type      string      `json:"type"`
-	Success   bool        `json:"success"`
-	Code      int         `json:"codeResponse"`
-	Descripte string      `json:"data"`
-	Extra     interface{} `json:"extra"`
+	Type    string `json:"type"`
+	Success bool   `json:"success"`
+	Code    int    `json:"code"`
+	Message string `json:"message"`
 }
 
 // AuthRequestData представляет данные запроса авторизации
@@ -33,25 +22,6 @@ type AuthRequestData struct {
 	IP         string `json:"ip"`
 }
 
-// AuthResponseData представляет данные ответа авторизации
-type AuthResponseData struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-}
-type SystemInfo struct {
-	Hostname string `json:"hostname"`
-	OS       string `json:"os"`
-}
-
-// getSystemInfo возвращает информацию о системе
-func getSystemInfo() SystemInfo {
-	hostname, _ := os.Hostname()
-	return SystemInfo{
-		Hostname: hostname,
-		OS:       runtime.GOOS,
-	}
-}
-
 // HandleAuthRequest обрабатывает запрос авторизации от клиента
 func (am *AuthManager) HandleAuthRequest(client interfaces.WSClient, msg interfaces.WSMessage) {
 	log.Printf("Processing auth request from %s", client.GetIP())
@@ -59,14 +29,14 @@ func (am *AuthManager) HandleAuthRequest(client interfaces.WSClient, msg interfa
 	var authData AuthRequestData
 	if err := json.Unmarshal(msg.GetData(), &authData); err != nil {
 		log.Printf("Error unmarshaling auth data: %v", err)
-		sendErrorResponse(client, AuthStatusInvalidFormat)
+		sendResponse(client, AuthStatusInvalidFormat, false, MessageTypeAuthResponse)
 		return
 	}
 
 	deviceID := authData.DeviceID
 	if deviceID == "" {
 		log.Printf("Empty device ID in auth request")
-		sendErrorResponse(client, AuthStatusMissingDeviceID)
+		sendResponse(client, AuthStatusMissingDeviceID, false, MessageTypeAuthResponse)
 		return
 	}
 
@@ -79,9 +49,7 @@ func (am *AuthManager) HandleAuthRequest(client interfaces.WSClient, msg interfa
 		client.SetDeviceID(deviceID)
 		client.SetDeviceName(authData.DeviceName)
 
-		// Отправляем успешный ответ с информацией о хосте
-		hostInfo := getSystemInfo()
-		sendSuccessResponseWithData(client, AuthStatusAuthorized, hostInfo)
+		sendResponse(client, AuthStatusAuthorized, true, MessageTypeAuthResponse)
 		return
 	}
 
@@ -93,13 +61,13 @@ func (am *AuthManager) HandleAuthRequest(client interfaces.WSClient, msg interfa
 		client.SetDeviceName(authData.DeviceName)
 
 		// Отправляем сообщение, что запрос на авторизацию отправлен
-		sendPendingResponse(client, AuthStatusPending)
+		sendResponse(client, AuthStatusPending, false, MessageTypeAuthPending)
 
 		// Запускаем фоновую проверку результата
 		go am.checkAuthResultPeriodically(client)
 		log.Printf("Auth request for %s is pending", authData.DeviceName)
 	} else {
-		sendErrorResponse(client, AuthStatusRequestFailed)
+		sendResponse(client, AuthStatusRequestFailed, false, MessageTypeAuthResponse)
 		log.Printf("Failed to request auth for %s", authData.DeviceName)
 	}
 }
@@ -122,20 +90,18 @@ func (am *AuthManager) checkAuthResultPeriodically(client interfaces.WSClient) {
 			// Проверяем результат авторизации
 			result, exists := am.CheckPendingResult(deviceID)
 			if exists {
-				hostInfo := getSystemInfo()
-
 				if result {
 					// Авторизация одобрена
-					sendSuccessResponseWithData(client, AuthStatusApproved, hostInfo)
+					sendResponse(client, AuthStatusApproved, true, MessageTypeAuthResponse)
 				} else {
 					// Авторизация отклонена
-					sendErrorResponse(client, AuthStatusRejected)
+					sendResponse(client, AuthStatusRejected, false, MessageTypeAuthResponse)
 				}
 				return // Завершаем проверку после отправки результата
 			}
 
 		case <-timeout:
-			sendErrorResponse(client, AuthStatusTimeout)
+			sendResponse(client, AuthStatusTimeout, false, MessageTypeAuthResponse)
 			return
 		}
 	}
@@ -147,14 +113,14 @@ func (am *AuthManager) HandleAuthCheck(client interfaces.WSClient) {
 
 	// Если у клиента нет deviceID, он еще не проходил авторизацию
 	if deviceID == "" {
-		sendErrorResponse(client, AuthStatusNotAuthorized)
+		sendResponse(client, AuthStatusNotAuthorized, false, MessageTypeAuthResponse)
 		return
 	}
 
 	// Проверяем, авторизован ли клиент
 	if am.IsAuthorized(deviceID) {
 		// Клиент авторизован
-		sendSuccessResponse(client, AuthStatusAuthorized)
+		sendResponse(client, AuthStatusAuthorized, true, MessageTypeAuthResponse)
 		return
 	}
 
@@ -163,77 +129,27 @@ func (am *AuthManager) HandleAuthCheck(client interfaces.WSClient) {
 	if exists {
 		if result {
 			// Запрос авторизации был одобрен
-			sendSuccessResponse(client, AuthStatusApproved)
+			sendResponse(client, AuthStatusApproved, true, MessageTypeAuthResponse)
 		} else {
 			// Запрос авторизации был отклонен
-			sendErrorResponse(client, AuthStatusRejected)
+			sendResponse(client, AuthStatusRejected, false, MessageTypeAuthResponse)
 		}
 		return
 	}
 
 	// Запрос авторизации все еще в ожидании
-	sendPendingResponse(client, AuthStatusPending)
+	sendResponse(client, AuthStatusPending, false, MessageTypeAuthPending)
 }
 
-// Вспомогательные функции для отправки ответов
-func sendSuccessResponse(client interfaces.WSClient, code int) {
+//MessageTypeAuthResponse
+
+// Функція для відправки відповіді про успішну авторизацію
+func sendResponse(client interfaces.WSClient, code int, success bool, typeResponse string) {
 	response := AuthResponse{
-		Type:      MessageTypeAuthResponse,
-		Success:   true,
-		Code:      code,
-		Descripte: GetAuthMessage(code),
-	}
-
-	responseJSON, err := json.Marshal(response)
-	if err != nil {
-		log.Printf("Error marshaling auth response: %v", err)
-		return
-	}
-
-	client.SendMessage(responseJSON)
-}
-
-func sendSuccessResponseWithData(client interfaces.WSClient, code int, data interface{}) {
-	response := AuthResponseWithData{
-		Type:      MessageTypeAuthResponse,
-		Success:   true,
-		Code:      code,
-		Descripte: GetAuthMessage(code),
-		Extra:     data,
-	}
-
-	responseJSON, err := json.Marshal(response)
-	if err != nil {
-		log.Printf("Error marshaling auth response: %v", err)
-		return
-	}
-
-	client.SendMessage(responseJSON)
-}
-
-func sendPendingResponse(client interfaces.WSClient, code int) {
-	response := AuthResponse{
-		Type:      MessageTypeAuthPending,
-		Success:   false,
-		Code:      code,
-		Descripte: GetAuthMessage(code),
-	}
-
-	responseJSON, err := json.Marshal(response)
-	if err != nil {
-		log.Printf("Error marshaling auth response: %v", err)
-		return
-	}
-
-	client.SendMessage(responseJSON)
-}
-
-func sendErrorResponse(client interfaces.WSClient, code int) {
-	response := AuthResponse{
-		Type:      MessageTypeAuthResponse,
-		Success:   false,
-		Code:      code,
-		Descripte: GetAuthMessage(code),
+		Type:    typeResponse,
+		Success: success,
+		Code:    code,
+		Message: GetAuthMessage(code),
 	}
 
 	responseJSON, err := json.Marshal(response)

@@ -12,7 +12,7 @@ import (
 // AuthManager управляет авторизацией клиентов
 type AuthManager struct {
 	config        *config.ServerConfig
-	pendingAuth   map[string]*interfaces.PendingAuthRequest // Используем тип из интерфейсов
+	pendingAuth   map[string]*interfaces.PendingAuthRequest
 	pendingChan   chan<- interfaces.PendingAuthRequest
 	pendingResult map[string]bool
 	mu            sync.Mutex

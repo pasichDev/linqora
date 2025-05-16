@@ -191,24 +191,18 @@ class AuthController extends GetxController {
   void _handleAuthResponse(Map<String, dynamic> response) {
     _authTimer?.cancel();
 
-    if (kDebugMode) {
-      print("Auth response received: $response");
-    }
     AuthResponse authResponse;
     try {
       authResponse = AuthResponse.fromJson(response);
     } catch (e) {
-      if (kDebugMode) {
-        print('Error parsing auth response: $e');
-      }
       cancelAuth('Error parsing auth response: $e');
       return;
     }
-    switch (authResponse.codeResponse) {
+    switch (authResponse.code) {
       // Успешная авторизация - устройство уже авторизовано
       case AuthStatusCode.authorized || AuthStatusCode.approved:
         webSocketProvider.setAuthenticated(true);
-        _navigateToDeviceHome(authResponse.extra);
+        _navigateToDeviceHome();
         break;
 
       // Авторизация отклонена хостом
@@ -217,26 +211,17 @@ class AuthController extends GetxController {
           AuthStatusCode.missingDeviceID ||
           AuthStatusCode.timeout ||
           AuthStatusCode.requestFailed:
-        cancelAuth(
-          AuthResponseHandler.getAuthMessage(authResponse.codeResponse),
-        );
+        cancelAuth(authResponse.localMessage);
         break;
 
-      // Устройство не авторизовано
       case AuthStatusCode.notAuthorized:
-        // Продолжаем ожидать авторизацию
         break;
 
-      // Обработка неизвестных кодов
       default:
-        if (authResponse.success) {
-          webSocketProvider.setAuthenticated(true);
-          _navigateToDeviceHome(authResponse.extra);
-        } else {
-          cancelAuth(
-            'Неизвестная ошибка авторизации (код: ${authResponse.extra})',
-          );
-        }
+        cancelAuth(
+          'Неизвестная ошибка авторизации (код: ${authResponse.code})',
+        );
+
         break;
     }
   }
@@ -257,8 +242,7 @@ class AuthController extends GetxController {
       cancelAuth('Error parsing auth response: $e');
       return;
     }
-    switch (authResponse.codeResponse) {
-      // Очкування авторизації
+    switch (authResponse.code) {
       case AuthStatusCode.pending:
         statusMessage.value = 'Ожидание подтверждения на устройстве хоста...';
 
@@ -276,13 +260,13 @@ class AuthController extends GetxController {
     }
   }
 
-  void _navigateToDeviceHome(Map<String, dynamic>? hostInfo) {
+  void _navigateToDeviceHome() {
     if (authDevice.value == null) {
-      if (kDebugMode) {
-        print(
-          'Невозможно перейти на страницу устройства: нет информации об устройстве',
-        );
-      }
+      showErrorSnackbar(
+        'Ошибка',
+        "Невозможно перейти на страницу устройства: нет информации об устройстве",
+      );
+
       return;
     }
 
@@ -291,10 +275,7 @@ class AuthController extends GetxController {
 
     Get.toNamed(
       AppRoutes.DEVICE_HOME,
-      arguments: {
-        'device': authDevice.value!.toJson(),
-        'hostInfo': hostInfo ?? {},
-      },
+      arguments: {'device': authDevice.value!.toJson()},
     );
   }
 
