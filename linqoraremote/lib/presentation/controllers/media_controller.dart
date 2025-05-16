@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:linqoraremote/data/media_commands.dart';
 import 'package:linqoraremote/data/providers/websocket_provider.dart';
 
+import '../../core/utils/error_handler.dart';
 import '../../core/utils/formatter.dart';
 import '../../data/enums/type_messages_ws.dart';
 import '../../data/models/media_capabilities.dart';
@@ -50,13 +51,9 @@ class MediaController extends GetxController {
   void _handleMediaData(dynamic data) {
     final mediaData = data['data'];
     if (mediaData != null && mediaData is Map<String, dynamic>) {
-      // Handle nowPlaying data separately
       _handleNowPlayingData(mediaData);
-
-      // Handle capabilities data separately
       _handleCapabilitiesData(mediaData);
 
-      // Reset loading state if needed
       if (isLoadingMedia.value) {
         isLoadingMedia.value = false;
       }
@@ -84,7 +81,7 @@ class MediaController extends GetxController {
   }
 
   Future<void> sendMediaCommand(int action, {int value = 0}) async {
-    await webSocketProvider.sendMediaCommand(action, value);
+    await _sendMediaCommand(action, value);
 
     final current = nowPlaying.value;
     if (current == null) return;
@@ -147,5 +144,31 @@ class MediaController extends GetxController {
   Future<void> setMuted() async {
     isMuted.value = !isMuted.value;
     await sendMediaCommand(AudioActions.mute, value: isMuted.value ? 1 : 0);
+  }
+
+  // Отправить команду управления мультимедиа
+  Future<bool> _sendMediaCommand(int action, int value) async {
+    if (!webSocketProvider.isReadyForCommand() ||
+        !await webSocketProvider.isJoinedRoom(TypeMessageWs.media.value)) {
+      showErrorSnackbar(
+        'Помилка відправки медіа команди:',
+        'Операція не може бути виконана: клієнт не підключений або не авторизований',
+      );
+      return false;
+    }
+
+    try {
+      final message = {
+        'type': TypeMessageWs.media.value,
+        'room': TypeMessageWs.media.value,
+        'data': {'action': action, 'value': value},
+      };
+
+      webSocketProvider.sendMessage(message);
+      return true;
+    } catch (e) {
+      showErrorSnackbar('Помилка відправки медіа команди:', e.toString());
+      return false;
+    }
   }
 }

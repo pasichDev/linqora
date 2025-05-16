@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:get/get.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/status.dart' as status;
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -14,19 +13,18 @@ import '../models/ws_message.dart';
 
 class WebSocketProvider {
   WebSocketChannel? _channel;
-  final RxList<String> messages = <String>[].obs;
-  Duration _pingInterval = const Duration(seconds: 50);
-  Timer? _pingTimer;
+
   Function()? onConnected;
   Function()? onDisconnected;
   Function(Object error)? onError;
 
   final Map<String, Function(Map<String, dynamic>)> _messageHandlers = {};
-
   final Set<String> _joinedRooms = {};
   bool _isConnected = false;
   bool _isAuthenticated = false;
   StreamSubscription? _subscription;
+  Duration _pingInterval = const Duration(seconds: 50);
+  Timer? _pingTimer;
 
   // Перевірка стану підключення
   bool get isConnected => _isConnected;
@@ -34,36 +32,8 @@ class WebSocketProvider {
   // Перевірка стану авторизації
   bool get isAuthenticated => _isAuthenticated;
 
-  void setAuthenticated(bool isAuthenticated) {
-    _isAuthenticated = isAuthenticated;
-  }
-
-  var _lastPingTime = DateTime.now();
-
   // Отримання списку кімнат, до яких приєднаний клієнт
   Set<String> get joinedRooms => Set.from(_joinedRooms);
-
-  // Добавляем метод для отправки JSON объекта
-  void sendJson(Map<String, dynamic> message) {
-    if (kDebugMode) {
-      print('Sending message: ${jsonEncode(message)}');
-    }
-    send(jsonEncode(message));
-  }
-
-  // Обновляем метод send с дополнительным логированием
-  void send(String message) {
-    if (_channel != null) {
-      if (kDebugMode) {
-        print('WebSocket message sent');
-      }
-      _channel!.sink.add(message);
-    } else {
-      if (kDebugMode) {
-        print('WebSocket not connected, cannot send message');
-      }
-    }
-  }
 
   Future<bool> connect(
     DiscoveredService device, {
@@ -98,7 +68,6 @@ class WebSocketProvider {
 
       _subscription = _channel!.stream.listen(
         (message) {
-          messages.add(message);
           _handleMessage(message);
         },
         onError: (error) {
@@ -131,7 +100,7 @@ class WebSocketProvider {
     }
   }
 
-  // Новый метод для запуска периодических ping сообщений
+  //Метод для запуска периодических ping сообщений
   void _startPingTimer() {
     _pingTimer?.cancel();
     _pingTimer = Timer.periodic(_pingInterval, (timer) {
@@ -139,41 +108,22 @@ class WebSocketProvider {
         timer.cancel();
         return;
       }
-
-      try {
-        sendPing();
-
-        if (kDebugMode) {
-          print('Ping отправлен');
-        }
-      } catch (e) {
-        if (kDebugMode) {
-          print('Ошибка отправки ping: $e');
-        }
-      }
+      sendPing();
     });
   }
 
   Future<void> sendPing() async {
     if (!isConnected) return;
-
     try {
-      // Добавляем текущее время в миллисекундах для измерения задержки
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 
-      final pingMessage = {
-        'type': 'ping',
-        'data': {'timestamp': timestamp},
-      };
-
-      sendMessage(pingMessage);
+      final message = WsMessage(type: 'ping')
+        ..setField('data', {'timestamp': timestamp});
+      sendMessage(message.toJson());
 
       if (kDebugMode) {
         print('Sending ping with timestamp: $timestamp');
       }
-
-      // Начинаем отсчет для измерения времени ответа
-      _lastPingTime = DateTime.now();
     } catch (e) {
       if (kDebugMode) {
         print('Error sending ping: $e');
@@ -202,93 +152,54 @@ class WebSocketProvider {
     bool supportsTLS,
     bool allowSelfSigned,
   ) async {
-    // Проверяем доступность хоста перед WebSocket подключением
-    final uri = Uri.parse(wsUrl);
-    try {
-      // Быстрая проверка доступности хоста - таймаут 2 секунды
-      final socket = await Socket.connect(
-        uri.host,
-        uri.port,
-        timeout: const Duration(seconds: 2),
-      );
-      await socket.close();
-    } catch (e) {
-      // Если хост недоступен, сразу выбрасываем исключение
-      if (kDebugMode) {
-        print('Хост недоступен: ${uri.host}:${uri.port}');
-      }
-      throw SocketException('Хост недоступен');
-    }
-
-    // Продолжаем только если хост доступен
     if (supportsTLS) {
       try {
-        final client =
-            HttpClient()
-              ..badCertificateCallback = (_, __, ___) => allowSelfSigned;
-
-        // Используем таймаут для TLS подключения
-        final webSocket = await WebSocket.connect(
-          wsUrl,
-          customClient: client,
-        ).timeout(
-          const Duration(seconds: 5),
-          onTimeout: () => throw TimeoutException('Таймаут TLS подключения'),
-        );
-
-        _channel = IOWebSocketChannel(webSocket);
-
-        if (kDebugMode) {
-          print('Підключено через самопідписаний TLS сертифікат');
-        }
+        await _establishTLSConnection(wsUrl, allowSelfSigned);
       } catch (e) {
         if (kDebugMode) {
-          print('Помилка підключення через самопідписаний сертифікат: $e');
-          print('Пробуємо звичайне підключення...');
-        }
-
-        // Используем таймаут для обычного подключения
-        final completer = Completer<WebSocketChannel>();
-
-        // Запускаем таймер для ограничения времени ожидания
-        final timer = Timer(const Duration(seconds: 5), () {
-          if (!completer.isCompleted) {
-            completer.completeError(
-              TimeoutException('Таймаут обычного подключения'),
-            );
-          }
-        });
-
-        // Запускаем подключение в отдельной зоне
-        try {
-          final channel = WebSocketChannel.connect(Uri.parse(wsUrl));
-          // Ждем событие открытия соединения или ошибки
-          await channel.ready.timeout(
-            const Duration(seconds: 5),
-            onTimeout: () => throw TimeoutException('Channel ready timeout'),
+          print(
+            'Помилка TLS підключення: $e. Спроба звичайного підключення...',
           );
-
-          timer.cancel();
-          if (!completer.isCompleted) {
-            completer.complete(channel);
-          }
-        } catch (e) {
-          timer.cancel();
-          if (!completer.isCompleted) {
-            completer.completeError(e);
-          }
         }
-
-        _channel = await completer.future;
+        await _establishStandardConnection(wsUrl);
       }
     } else {
-      // Обычное подключение с таймаутом
-      final channel = WebSocketChannel.connect(Uri.parse(wsUrl));
-      await channel.ready.timeout(
-        const Duration(seconds: 5),
-        onTimeout: () => throw TimeoutException('Таймаут обычного подключения'),
-      );
-      _channel = channel;
+      await _establishStandardConnection(wsUrl);
+    }
+  }
+
+  Future<void> _establishTLSConnection(
+    String wsUrl,
+    bool allowSelfSigned,
+  ) async {
+    final client =
+        HttpClient()..badCertificateCallback = (_, __, ___) => allowSelfSigned;
+
+    final webSocket = await WebSocket.connect(
+      wsUrl,
+      customClient: client,
+    ).timeout(
+      const Duration(seconds: 5),
+      onTimeout: () => throw TimeoutException('Таймаут TLS підключення'),
+    );
+
+    _channel = IOWebSocketChannel(webSocket);
+
+    if (kDebugMode) {
+      print('Підключено через TLS');
+    }
+  }
+
+  Future<void> _establishStandardConnection(String wsUrl) async {
+    final channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+    await channel.ready.timeout(
+      const Duration(seconds: 5),
+      onTimeout: () => throw TimeoutException('Таймаут підключення'),
+    );
+    _channel = channel;
+
+    if (kDebugMode) {
+      print('Підключено через звичайне з\'єднання');
     }
   }
 
@@ -297,21 +208,14 @@ class WebSocketProvider {
   }
 
   Future<bool> joinRoom(String roomName) async {
-    if (!_isConnected || !_isAuthenticated || _channel == null) {
-      if (kDebugMode) {
-        print(
-          'Неможливо приєднатися до кімнати: клієнт не підключений або не авторизований',
-        );
-      }
-      return false;
-    }
+    if (!isReadyForCommand()) return false;
 
     try {
       final WsMessage joinRoomMessage = WsMessage(
         type: TypeMessageWs.join_room.value,
       )..setField('room', roomName);
 
-      _channel!.sink.add(jsonEncode(joinRoomMessage));
+      sendMessage(joinRoomMessage.toJson());
       _joinedRooms.add(roomName);
       if (kDebugMode) {
         print('Приєднано до кімнати: $roomName');
@@ -327,24 +231,17 @@ class WebSocketProvider {
 
   // Вийти з кімнати
   Future<bool> leaveRoom(String roomName) async {
-    if (!_isConnected || !_isAuthenticated || _channel == null) {
-      if (kDebugMode) {
-        print(
-          'Неможливо вийти з кімнати: клієнт не підключений або не авторизований',
-        );
-      }
-      return false;
-    }
+    if (!isReadyForCommand()) return false;
 
     try {
       final WsMessage leaveRoomMessage = WsMessage(
         type: TypeMessageWs.leave_room.value,
       )..setField('room', roomName);
 
-      _channel!.sink.add(jsonEncode(leaveRoomMessage));
+      sendMessage(leaveRoomMessage.toJson());
       _joinedRooms.remove(roomName);
       if (kDebugMode) {
-        print('Вихід з кімнати: $roomName');
+        print('Залишено кімнату: $roomName');
       }
       return true;
     } catch (e) {
@@ -355,61 +252,50 @@ class WebSocketProvider {
     }
   }
 
-  // Отправить команду управления мультимедиа
-  Future<bool> sendMediaCommand(int action, int value) async {
-    if (!_isConnected || !_isAuthenticated || _channel == null) {
-      if (kDebugMode) {
-        print(
-          'Неможливо надіслати медіа команду: клієнт не підключений або не авторизований',
-        );
-      }
-      return false;
-    }
-
-    if (!_joinedRooms.contains(TypeMessageWs.media.value)) {
-      if (kDebugMode) {
-        print(
-          'Необхідно спочатку приєднатися до кімнати ${TypeMessageWs.media.value}',
-        );
-      }
-      return false;
-    }
-
-    try {
-      final mediaData = {'action': action, 'value': value};
-      final message = {
-        'type': TypeMessageWs.media.value,
-        'room': TypeMessageWs.media.value,
-        'data': mediaData,
-      };
-
-      _channel!.sink.add(jsonEncode(message));
-      return true;
-    } catch (e) {
-      if (kDebugMode) {
-        print('Помилка відправки медіа команди: $e');
-      }
-      return false;
-    }
+  Future<bool> isJoinedRoom(String nameRoom) async {
+    return _joinedRooms.contains(nameRoom);
   }
 
-  // Відключення від WebSocket сервера
-  Future<void> disconnect() async {
+  Future<void> disconnect({bool clearHandlers = false}) async {
     _pingTimer?.cancel();
     _pingTimer = null;
 
-    _isConnected = false;
-    _isAuthenticated = false;
-    _joinedRooms.clear();
+    if (_isConnected && _isAuthenticated && _channel != null) {
+      for (var room in _joinedRooms.toList()) {
+        try {
+          final leaveRoomMessage = WsMessage(
+            type: TypeMessageWs.leave_room.value,
+          )..setField('room', room);
+          sendMessage(leaveRoomMessage.toJson());
+        } catch (e) {
+          if (kDebugMode) {
+            print('Помилка при виході з кімнати $room: $e');
+          }
+        }
+      }
+    }
 
     if (_subscription != null) {
       await _subscription!.cancel();
       _subscription = null;
     }
-
     if (_channel != null) {
-      await _channel!.sink.close(status.normalClosure);
+      try {
+        await _channel!.sink.close(status.normalClosure);
+      } catch (e) {
+        if (kDebugMode) {
+          print('Помилка при закритті WebSocket: $e');
+        }
+      }
       _channel = null;
+    }
+
+    _isConnected = false;
+    _isAuthenticated = false;
+    _joinedRooms.clear();
+
+    if (clearHandlers) {
+      _messageHandlers.clear();
     }
 
     if (kDebugMode) {
@@ -445,12 +331,28 @@ class WebSocketProvider {
     }
   }
 
+  bool isReadyForCommand() {
+    if (!_isConnected || !_isAuthenticated || _channel == null) {
+      if (kDebugMode) {
+        print(
+          'Операція не може бути виконана: клієнт не підключений або не авторизований',
+        );
+      }
+      return false;
+    }
+    return true;
+  }
+
   // Реєстрація обробника повідомлень певного типу
   void registerHandler(
     String messageType,
     Function(Map<String, dynamic>) handler,
   ) {
     _messageHandlers[messageType] = handler;
+  }
+
+  void setAuthenticated(bool isAuthenticated) {
+    _isAuthenticated = isAuthenticated;
   }
 
   // Видалення обробника повідомлень
@@ -471,22 +373,13 @@ class WebSocketProvider {
     if (kDebugMode) {
       print('WebSocket з\'єднання закрито');
     }
-    onDisconnected?.call();
     _isConnected = false;
     _isAuthenticated = false;
     _joinedRooms.clear();
+    onDisconnected?.call();
   }
 
   void close() {
-    for (var room in _joinedRooms.toList()) {
-      leaveRoom(room);
-    }
-    if (_channel != null) {
-      _channel = null;
-    }
-
-    _isConnected = false;
-    _messageHandlers.clear();
-    _joinedRooms.clear();
+    disconnect(clearHandlers: true);
   }
 }

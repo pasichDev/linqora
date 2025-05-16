@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:linqoraremote/data/enums/type_messages_ws.dart';
 import 'package:linqoraremote/data/models/auth_response_handler.dart';
+import 'package:linqoraremote/data/models/ws_message.dart';
 import 'package:linqoraremote/data/providers/mdns_provider.dart';
 import 'package:linqoraremote/data/providers/websocket_provider.dart';
 
@@ -84,7 +85,7 @@ class AuthController extends GetxController {
     authStatus.value = AuthStatus.scanning;
 
     try {
-      final devices = await mDnsProvider.discoverAllLinqoraDevices();
+      final devices = await mDnsProvider.discoverLinqoraDevices();
 
       if (devices.isNotEmpty) {
         discoveredDevices.addAll(devices);
@@ -130,7 +131,7 @@ class AuthController extends GetxController {
       if (kDebugMode) print("onError: $error");
       _notConnectDevice(
         errorMessage:
-            'Ошибка соединения: ${error.toString().split('\n').first}',
+            error.toString().split('\n').first,
       );
     };
 
@@ -143,14 +144,7 @@ class AuthController extends GetxController {
     } catch (e) {
       if (kDebugMode) print("connect Exception: $e");
       _notConnectDevice(
-        errorMessage: 'Ошибка подключения: ${e.toString().split('\n').first}',
-      );
-      Get.snackbar(
-        'Ошибка авторизации',
-        "Ошибка подключения: ${e.toString().split('\n').first}",
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange.shade800,
-        colorText: Colors.white,
+        errorMessage: e.toString().split('\n').first,
       );
     }
   }
@@ -201,26 +195,20 @@ class AuthController extends GetxController {
     try {
       final deviceName = await getDeviceName();
 
-      // Правильная сборка данных запроса
-      final Map<String, dynamic> authData = {
-        'deviceName': deviceName,
-        'deviceId':
-            Platform.isAndroid
-                ? 'android_${await getDeviceId()}'
-                : 'ios_${await getDeviceId()}',
-        'ip': await getLocalIpAddress(),
-      };
-
-      // Формируем сообщение авторизации
-      final message = {
-        'type': TypeMessageWs.auth_request.value,
-        'data': authData,
-      };
+      final message = WsMessage(type: TypeMessageWs.auth_request.value)
+        ..setField('data', {
+          'deviceName': deviceName,
+          'deviceId':
+              Platform.isAndroid
+                  ? 'android_${await getDeviceId()}'
+                  : 'ios_${await getDeviceId()}',
+          'ip': await getLocalIpAddress(),
+        });
 
       if (kDebugMode) {
         print('Sending auth request: ${jsonEncode(message)}');
       }
-      webSocketProvider.send(jsonEncode(message));
+      webSocketProvider.sendMessage(message.toJson());
     } catch (e) {
       cancelAuth('Ошибка при отправке запроса авторизации: $e');
     }

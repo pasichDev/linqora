@@ -53,7 +53,6 @@ class WsMessage {
  *  // Приклад 1: Повідомлення з полем room як String
     final WsMessage leaveRoomMessage = WsMessage(
     type: 'leave_room',
-    deviceCode: 'device123',
     )..setField('room', 'room456');
 
     print('Приклад 1:');

@@ -7,9 +7,11 @@ import 'package:get/get.dart';
 import 'package:linqoraremote/data/enums/type_messages_ws.dart';
 import 'package:linqoraremote/data/models/discovered_service.dart';
 import 'package:linqoraremote/data/models/host_system_info.dart';
+import 'package:linqoraremote/data/models/ws_message.dart';
 import 'package:linqoraremote/presentation/controllers/settings_controller.dart';
 import 'package:linqoraremote/services/background_service.dart';
 
+import '../../core/utils/error_handler.dart';
 import '../../data/providers/websocket_provider.dart';
 import '../../routes/app_routes.dart';
 
@@ -115,7 +117,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
           authDevice.value = DiscoveredService.fromJson(args['device']);
         } catch (e) {
           if (kDebugMode) {
-            print("Device data: ${args['device']}");
+            print("Error parse device data: ${args['device']}");
           }
         }
       }
@@ -123,17 +125,12 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
       isConnected.value = webSocketProvider.isConnected;
 
       if (!isConnected.value) {
-        if (kDebugMode) {
-          print("WebSocket connection is not established");
-        }
         WidgetsBinding.instance.addPostFrameCallback((_) {
           Get.back();
-          Get.snackbar(
+          Get.offAllNamed(AppRoutes.DEVICE_AUTH);
+          showErrorSnackbar(
             'Ошибка соединения',
             'Соединение с устройством потеряно',
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.orange.shade800,
-            colorText: Colors.white,
           );
         });
       }
@@ -144,12 +141,9 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
     webSocketProvider.onDisconnected = () {
       isConnected.value = false;
       Get.offAllNamed(AppRoutes.DEVICE_AUTH);
-      Get.snackbar(
+      showErrorSnackbar(
         'Соединение разорвано',
         'Соединение с устройством Linqora было прервано',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange.shade800,
-        colorText: Colors.white,
       );
     };
     webSocketProvider.registerHandler(
@@ -244,13 +238,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
       final settingsController = Get.find<SettingsController>();
       if (settingsController.notificationPermissionGranted.value &&
           settingsController.enableNotifications.value) {
-        Get.snackbar(
-          'Ошибка',
-          'Не удалось запустить фоновую службу: $e',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red.shade700,
-          colorText: Colors.white,
-        );
+        showErrorSnackbar('Ошибка', 'Не удалось запустить фоновую службу: $e');
       }
     }
   }
@@ -301,9 +289,9 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
     if (!isConnected.value) return;
 
     try {
-      final message = {'type': 'host_info', 'data': {}};
-
-      webSocketProvider.sendJson(message);
+      webSocketProvider.sendMessage(
+        WsMessage(type: TypeMessageWs.host_info.value),
+      );
     } catch (e) {
       if (kDebugMode) {
         print('Error requesting system info: $e');
@@ -320,13 +308,9 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
       final newHostInfo = HostSystemInfo.fromJson(data['host_info']);
       hostInfo.value = newHostInfo;
     } catch (e) {
-      if (kDebugMode) {
-        print('Error parsing system info: $e');
-      }
-      Get.snackbar(
+      showErrorSnackbar(
         'Ошибка обработки данных',
         'Не удалось обработать информацию о системе',
-        snackPosition: SnackPosition.BOTTOM,
       );
     }
   }
@@ -339,7 +323,9 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
         return;
       }
       try {
-        webSocketProvider.sendJson({'type': 'auth_check', 'data': {}});
+        webSocketProvider.sendMessage(
+          WsMessage(type: TypeMessageWs.auth_check.value),
+        );
 
         Future.delayed(Duration(seconds: 2), () {
           if (!isConnected.value && webSocketProvider.isConnected) {
@@ -370,12 +356,9 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
     stopBackgroundService();
 
     Get.offAllNamed(AppRoutes.DEVICE_AUTH);
-    Get.snackbar(
+    showErrorSnackbar(
       'Соединение потеряно',
-      'Соединение с устройством было прервано: $reason',
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.orange.shade800,
-      colorText: Colors.white,
+      'Соединение с устройством было прервано: \n$reason',
     );
   }
 
