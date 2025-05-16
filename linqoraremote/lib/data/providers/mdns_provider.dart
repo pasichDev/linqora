@@ -155,10 +155,10 @@ class MDnsProvider {
   // Прямой поиск по типу сервиса
   Future<void> _performDirectSearch(List<DiscoveredService> devices) async {
     try {
-      _log('Ищем Linqora сервисы с типом "_linqora._tcp.local"');
+      _log('Ищем Linqora сервисы с типом "_linqora.local"');
 
       await for (final ptr in _client!.lookup<PtrResourceRecord>(
-        ResourceRecordQuery.serverPointer('_linqora._tcp.local'),
+        ResourceRecordQuery.serverPointer('_linqora.local'),
       )) {
         _log('Найден Linqora сервис: ${ptr.domainName}');
         await _processLinqoraInstance(ptr.domainName, devices);
@@ -178,6 +178,7 @@ class MDnsProvider {
       )) {
         _log('Найден тип сервиса через DNS-SD: ${serviceType.domainName}');
 
+        print(serviceType.domainName);
         if (_isLinqoraServiceType(serviceType.domainName)) {
           await for (final instance in _client!.lookup<PtrResourceRecord>(
             ResourceRecordQuery.serverPointer(serviceType.domainName),

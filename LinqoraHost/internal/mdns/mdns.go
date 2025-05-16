@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	MDNSType   = "linqora-"
-	MDNSDomain = ".local"
+	MDNSType   = "_linqora"
+	MDNSDomain = "local"
 )
 
 // MDNSServer представляє mDNS сервер для виявлення в мережі
@@ -47,7 +47,7 @@ func NewMDNSServer(cfg *config.ServerConfig) (*MDNSServer, error) {
 func (s *MDNSServer) Start() error {
 	port := s.config.Port
 
-	//  Перетворюємо метадані в правильний формат для TXT записів
+	// Перетворюємо метадані в правильний формат для TXT записів
 	txtRecords := []string{
 		fmt.Sprintf("hostname=%s", s.hostname),
 		fmt.Sprintf("tls=%v", s.config.EnableTLS),
