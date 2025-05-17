@@ -75,11 +75,9 @@ class _MetricsCardState extends State<MetricsCard> {
             if (widget.widget != null && _isExpanded)
               AnimatedSize(
                 duration: const Duration(milliseconds: 200),
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 16),
-                  child: widget.widget!,
+                child:  widget.widget!,
                 ),
-              ),
+             
           ],
         ),
       ),

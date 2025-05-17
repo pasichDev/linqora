@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 
 class MetricDetailRow extends StatelessWidget {
   final String label;
@@ -13,7 +13,13 @@ class MetricDetailRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 14)),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+            ),
+          ),
           Text(value, style: const TextStyle(fontSize: 14)),
         ],
       ),

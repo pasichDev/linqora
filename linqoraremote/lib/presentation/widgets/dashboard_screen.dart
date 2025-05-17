@@ -7,12 +7,7 @@ import '../controllers/device_home_controller.dart';
 import '../dashboard_items.dart';
 import 'menu_option_card.dart';
 
-/**
- * 
- *  Зміна шаблона відображення моніторнигу (стандартний - той що є, спрощений). Спрощений - це відображення без графіка, але згрупувати по категоріям (CPU, RAM, GPU,DISK)
- *  Реалізувати Always режим з заниженою підсвіткою, чорним фоном та мінімалістичним білим текстом. в альбомному режимі.
- *  Реалізувати можливість вибирати віджети в моніторингу які показувати які приховувати, зьерігаати в налаштуваннях.
- */
+
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
