@@ -251,7 +251,13 @@ func (s *WSServer) handleClientMessage(client *Client, msg *ClientMessage) {
 		s.handleLeaveRoomMessage(client, msg)
 	case "media":
 		s.handleMediaCommand(client, msg)
-
+	case "auth_request":
+		if s.authManager != nil {
+			s.authManager.HandleAuthRequest(client, msg)
+		} else {
+			log.Printf("ERROR: authManager is nil, cannot process auth_request")
+			client.SendError("Internal server error: auth manager not initialized")
+		}
 	default:
 		log.Printf("Unknown message type: %s", msg.Type)
 
