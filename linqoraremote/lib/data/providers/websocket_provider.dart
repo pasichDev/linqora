@@ -81,7 +81,6 @@ class WebSocketProvider {
         cancelOnError: false,
       );
 
-      _startPingTimer();
       _isConnected = true;
       onConnected?.call();
 
@@ -101,8 +100,9 @@ class WebSocketProvider {
   }
 
   //Метод для запуска периодических ping сообщений
-  void _startPingTimer() {
+  void startPingTimer({Duration? customInterval}) {
     _pingTimer?.cancel();
+    _pingInterval = customInterval ?? _pingInterval;
     _pingTimer = Timer.periodic(_pingInterval, (timer) {
       if (!_isConnected || _channel == null) {
         timer.cancel();
@@ -110,6 +110,18 @@ class WebSocketProvider {
       }
       sendPing();
     });
+
+    if (kDebugMode) {
+      print('PING таймер запущен с интервалом ${_pingInterval.inSeconds} сек');
+    }
+  }
+
+  void stopPingTimer() {
+    _pingTimer?.cancel();
+    _pingTimer = null;
+    if (kDebugMode) {
+      print('PING таймер остановлен');
+    }
   }
 
   Future<void> sendPing() async {

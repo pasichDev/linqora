@@ -47,6 +47,8 @@ func NewWSServer(config *config.ServerConfig, authManager interfaces.AuthManager
 	// Инициализируем broadcaster после создания server
 	server.broadcaster = NewBroadcaster(roomManager)
 
+	// Запускаем мониторинг неактивных клиентов
+	server.StartInactiveClientsMonitor()
 	return server
 }
 
@@ -168,7 +170,62 @@ func (s *WSServer) removeClient(client *Client) {
 	s.clientsMutex.Lock()
 	defer s.clientsMutex.Unlock()
 
-	delete(s.clients, client)
+	if _, exists := s.clients[client]; exists {
+		delete(s.clients, client)
+		log.Printf("Client %s removed from active clients list (remaining: %d)",
+			client.DeviceName, len(s.clients))
+	}
+}
+
+// Новый метод для запуска проверки неактивных клиентов
+func (s *WSServer) StartInactiveClientsMonitor() {
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				s.checkInactiveClients()
+			}
+		}
+	}()
+}
+
+// Метод для проверки неактивных клиентов
+func (s *WSServer) checkInactiveClients() {
+	s.clientsMutex.Lock()
+	inactiveClients := make([]*Client, 0)
+
+	for client := range s.clients {
+		// Проверяем время последнего PING
+		if client.TimeSinceLastPing() > 2*time.Minute {
+			inactiveClients = append(inactiveClients, client)
+		}
+	}
+	s.clientsMutex.Unlock()
+
+	// Отключаем неактивных клиентов
+	for _, client := range inactiveClients {
+		log.Printf("Disconnecting inactive client %s (no PING for over 2 minutes)",
+			client.DeviceName)
+
+		// Отправляем сообщение о закрытии соединения
+		closeMsg := websocket.FormatCloseMessage(
+			websocket.CloseGoingAway,
+			"inactive client timeout (no PING)",
+		)
+		client.Conn.WriteControl(
+			websocket.CloseMessage,
+			closeMsg,
+			time.Now().Add(time.Second),
+		)
+
+		// Закрываем соединение и удаляем клиента
+		client.Conn.Close()
+		s.removeClient(client)
+		s.roomManager.RemoveClientFromAllRooms(client)
+	}
 }
 
 // handleClientMessage обробляє повідомлення від клієнта
@@ -183,7 +240,9 @@ func (s *WSServer) handleClientMessage(client *Client, msg *ClientMessage) {
 
 	switch msg.Type {
 	case "ping":
+		client.UpdateLastPingTime()
 		s.handlePingMessage(client, msg)
+
 	case "host_info":
 		s.handleHostInfoMessage(client)
 	case "join_room":
@@ -192,67 +251,40 @@ func (s *WSServer) handleClientMessage(client *Client, msg *ClientMessage) {
 		s.handleLeaveRoomMessage(client, msg)
 	case "media":
 		s.handleMediaCommand(client, msg)
-	case "auth_request":
-		if s.authManager != nil {
-			s.authManager.HandleAuthRequest(client, msg)
-		} else {
-			log.Printf("ERROR: authManager is nil, cannot process auth_request")
-			client.SendError("Internal server error: auth manager not initialized")
-		}
-	case "auth_check":
-		if s.authManager != nil {
-			s.authManager.HandleAuthCheck(client)
-		} else {
-			log.Printf("ERROR: authManager is nil, cannot process auth_check")
-			client.SendError("Internal server error: auth manager not initialized")
-		}
+
 	default:
 		log.Printf("Unknown message type: %s", msg.Type)
 
 	}
 }
-
 func (s *WSServer) handlePingMessage(client *Client, msg *ClientMessage) {
-	if len(msg.Data) == 0 {
-		pongMessage := map[string]interface{}{
-			"type":      "pong",
-			"timestamp": time.Now().UnixMilli(),
+	// Обновляем время активности
+	client.UpdateLastPingTime()
+
+	// Извлекаем timestamp из данных (если есть)
+	var timestamp interface{} = time.Now().UnixMilli()
+	if len(msg.Data) > 0 {
+		if pingData, err := extractPingData(msg.Data); err == nil && pingData["timestamp"] != nil {
+			timestamp = pingData["timestamp"]
 		}
-		responseJSON, _ := json.Marshal(pongMessage)
-		client.SendMessage(responseJSON)
-		return
 	}
 
-	var pingData map[string]interface{}
-	if err := json.Unmarshal(msg.Data, &pingData); err != nil {
-		log.Printf("Error unmarshaling ping data: %v", err)
-		// Даже при ошибке отправляем pong с текущим временем
-		pongMessage := map[string]interface{}{
-			"type":      "pong",
-			"timestamp": time.Now().UnixMilli(),
-		}
-		responseJSON, _ := json.Marshal(pongMessage)
-		client.SendMessage(responseJSON)
-		return
-	}
-
-	timestamp, ok := pingData["timestamp"]
-	if !ok {
-		log.Printf("Received ping without timestamp from %s", client.DeviceName)
-		timestamp = time.Now().UnixMilli()
-	}
-
+	// Создаем и отправляем один PONG
 	pongMessage := map[string]interface{}{
 		"type":      "pong",
 		"timestamp": timestamp,
 	}
 
-	log.Printf("Received ping data from %s", client.DeviceName)
+	if jsonMsg, err := json.Marshal(pongMessage); err == nil {
+		client.SendMessage(jsonMsg)
+	}
+}
 
-	responseJSON, _ := json.Marshal(pongMessage)
-	client.SendMessage(responseJSON)
-	return
-
+// Вспомогательный метод для извлечения данных
+func extractPingData(data json.RawMessage) (map[string]interface{}, error) {
+	var pingData map[string]interface{}
+	err := json.Unmarshal(data, &pingData)
+	return pingData, err
 }
 
 // handleHostInfoMessage обробляє відомлення з інформацією про хост

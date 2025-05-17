@@ -24,6 +24,8 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
   final RxInt selectedMenuIndex = (-1).obs;
   final RxBool isBackgroundServiceRunning = false.obs;
   final RxBool isReconnecting = false.obs;
+  int _missedPongCount = 0;
+  final latency = RxInt(0);
 
   final RxMap deviceInfo = {}.obs;
   final Rxn<HostSystemInfo> hostInfo = Rxn<HostSystemInfo>();
@@ -46,7 +48,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
     _setupWebSocketHandlers();
 
     // Запускаем таймер для проверки соединения
-    _startConnectionCheck();
+    _startPingMonitor();
 
     // Запускаем таймер для проверки статуса сервиса
     _startServiceStatusCheck();
@@ -73,6 +75,20 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
     if (kDebugMode) {
       print('App lifecycle state changed: $state');
     }
+    final settings = Get.find<SettingsController>();
+
+    // Меняем режим
+    bool wasBackground = settings.backgroundMode.value;
+    bool isNowBackground = state == AppLifecycleState.paused;
+    settings.setBackgroundMode(isNowBackground);
+
+    // Перезапускаем PING только при изменении режима
+    if (wasBackground != isNowBackground) {
+      if (kDebugMode) {
+        print('Режим изменился: ${isNowBackground ? "фоновый" : "активный"}');
+      }
+      _startPingMonitor(); // Перезапустить с новым интервалом
+    }
 
     switch (state) {
       case AppLifecycleState.resumed:
@@ -84,6 +100,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
         break;
       case AppLifecycleState.paused:
         // Приложение свернуто - проверяем, нужно ли запустить фоновый сервис
+
         _handleAppPaused();
         break;
       case AppLifecycleState.detached:
@@ -150,7 +167,35 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
       TypeMessageWs.host_info.value,
       _handleSystemInfo,
     );
+
+    // Добавляем обработчик PONG для мониторинга времени отклика
+    webSocketProvider.registerHandler('pong', _handlePong);
+
     _requestSystemInfo();
+  }
+
+  // Обработчик PONG для измерения задержки
+  void _handlePong(Map<String, dynamic> data) {
+    _missedPongCount = 0; // Сбрасываем счетчик при получении PONG
+
+    try {
+      final timestamp = data['timestamp'];
+      if (timestamp != null) {
+        // Вычисляем задержку
+        final int pingTime = int.tryParse(timestamp.toString()) ?? 0;
+        final now = DateTime.now().millisecondsSinceEpoch;
+        final rtt = now - pingTime;
+        latency.value = rtt;
+
+        if (kDebugMode && rtt > 500) {
+          print('Высокая задержка сети: $rtt мс');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Ошибка обработки PONG: $e');
+      }
+    }
   }
 
   // Запускаем таймер проверки статуса фонового сервиса
@@ -315,31 +360,40 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
     }
   }
 
-  // Запуск таймера для проверки состояния соединения
-  void _startConnectionCheck() {
-    _connectionCheckTimer = Timer.periodic(Duration(seconds: 10), (timer) {
-      if (!webSocketProvider.isConnected) {
-        _handleConnectionLost('WebSocket соединение закрыто');
-        return;
-      }
-      try {
-        webSocketProvider.sendMessage(
-          WsMessage(type: TypeMessageWs.auth_check.value),
-        );
+  // Новый метод для управления PING/PONG
+  void _startPingMonitor() {
+    final settings = Get.find<SettingsController>();
+    _connectionCheckTimer?.cancel();
 
-        Future.delayed(Duration(seconds: 2), () {
-          if (!isConnected.value && webSocketProvider.isConnected) {
-            _handleConnectionLost(
-              'Сервер не отвечает на запросы проверки авторизации',
-            );
-          }
-        });
-      } catch (e) {
-        if (kDebugMode) {
-          print('Ошибка отправки auth_check: $e');
+    _connectionCheckTimer = Timer.periodic(
+      // Интервал между PING запросами зависит от режима
+      settings.getCurrentPingInterval(),
+      (timer) {
+        if (!webSocketProvider.isConnected) {
+          _handleConnectionLost('WebSocket соединение закрыто');
+          return;
         }
-      }
-    });
+
+        // Проверка счетчика пропущенных PONG
+        if (_missedPongCount >= settings.maxMissedPings.value) {
+          _handleConnectionLost('Сервер не отвечает на PING');
+          return;
+        }
+
+        // Увеличиваем счетчик и отправляем PING
+        _missedPongCount++;
+        try {
+          webSocketProvider.sendPing();
+          if (kDebugMode) {
+            print('PING отправлен. Пропущено ответов: $_missedPongCount');
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('Ошибка отправки PING: $e');
+          }
+        }
+      },
+    );
   }
 
   // Обработка потери соединения

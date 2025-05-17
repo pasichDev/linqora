@@ -23,26 +23,28 @@ const (
 
 // Client представляє WebSocket клієнта
 type Client struct {
-	Conn        *websocket.Conn
-	DeviceCode  string
-	DeviceName  string
-	IP          string
-	Rooms       map[string]bool
-	SendChannel chan []byte
-	roomManager *RoomManager
-	mu          sync.Mutex
-	closed      bool
-	DeviceID    string
+	Conn         *websocket.Conn
+	DeviceCode   string
+	DeviceName   string
+	IP           string
+	Rooms        map[string]bool
+	SendChannel  chan []byte
+	roomManager  *RoomManager
+	mu           sync.Mutex
+	closed       bool
+	DeviceID     string
+	lastPingTime time.Time
 }
 
 // NewClient створює нового клієнта
 func NewClient(conn *websocket.Conn, ip string, roomManager *RoomManager) *Client {
 	return &Client{
-		Conn:        conn,
-		IP:          ip,
-		Rooms:       make(map[string]bool),
-		SendChannel: make(chan []byte, 256),
-		roomManager: roomManager,
+		Conn:         conn,
+		IP:           ip,
+		Rooms:        make(map[string]bool),
+		SendChannel:  make(chan []byte, 256),
+		roomManager:  roomManager,
+		lastPingTime: time.Now(),
 	}
 }
 
@@ -207,6 +209,20 @@ func (c *Client) SendMessage(message []byte) error {
 		c.Conn.Close()
 		return fmt.Errorf("send channel full or closed")
 	}
+}
+
+// Обновляем время последнего PING при получении сообщения
+func (c *Client) UpdateLastPingTime() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.lastPingTime = time.Now()
+}
+
+// Проверка времени последнего PING
+func (c *Client) TimeSinceLastPing() time.Duration {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return time.Since(c.lastPingTime)
 }
 
 // SendError sends an error message to the client
