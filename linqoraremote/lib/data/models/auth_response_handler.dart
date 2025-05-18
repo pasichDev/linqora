@@ -11,6 +11,8 @@ class AuthStatusCode {
   static const int missingDeviceID = 402; // Ошибка отсутствует ID устройства
   static const int timeout = 500; // Истекло время ожидания авторизации
   static const int requestFailed = 501; // Ошибка запроса авторизации
+  static const int unsupportedVersion = 502; // Ошибка устаревшая версия клиента
+
 }
 
 /// Класс для обработки ответов авторизации
@@ -26,6 +28,7 @@ class AuthResponseHandler {
       AuthStatusCode.invalidFormat: 'Invalid authorization data format',
       AuthStatusCode.missingDeviceID: 'Device ID is missing',
       AuthStatusCode.requestFailed: 'Authorization request failed',
+      AuthStatusCode.unsupportedVersion: 'Client version is outdated and not supported',
     };
 
     return messages[code] ?? 'Unknown authorization error';

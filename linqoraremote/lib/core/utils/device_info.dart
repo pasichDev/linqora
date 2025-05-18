@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 Future<String> getDeviceName() async {
   final deviceInfoPlugin = DeviceInfoPlugin();
@@ -48,4 +49,10 @@ Future<String> getLocalIpAddress() async {
     }
   }
   return '0.0.0.0'; // Fallback
+}
+
+Future<String> getAppVersion() async {
+  final packageInfo = await PackageInfo.fromPlatform();
+
+  return packageInfo.version;
 }

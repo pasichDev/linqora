@@ -37,19 +37,23 @@ const (
 
 	// Ошибка запроса авторизации
 	AuthStatusRequestFailed = 501
+
+	// Ошибка устаревшая версия клиента
+	AuthStatusUnsupportedVersion = 502
 )
 
 // Сообщения для кодов статуса
 var authMessages = map[int]string{
-	AuthStatusNotAuthorized:   "Device not authorized",
-	AuthStatusAuthorized:      "Device authorized",
-	AuthStatusApproved:        "Authorization approved",
-	AuthStatusRejected:        "Authorization rejected",
-	AuthStatusPending:         "Waiting for authorization",
-	AuthStatusTimeout:         "Authorization timeout",
-	AuthStatusInvalidFormat:   "Invalid authorization data format",
-	AuthStatusMissingDeviceID: "Device ID is missing",
-	AuthStatusRequestFailed:   "Authorization request failed",
+	AuthStatusNotAuthorized:      "Device not authorized",
+	AuthStatusAuthorized:         "Device authorized",
+	AuthStatusApproved:           "Authorization approved",
+	AuthStatusRejected:           "Authorization rejected",
+	AuthStatusPending:            "Waiting for authorization",
+	AuthStatusTimeout:            "Authorization timeout",
+	AuthStatusInvalidFormat:      "Invalid authorization data format",
+	AuthStatusMissingDeviceID:    "Device ID is missing",
+	AuthStatusRequestFailed:      "Authorization request failed",
+	AuthStatusUnsupportedVersion: "Client version is outdated and not supported",
 }
 
 // GetAuthMessage возвращает описание для кода статуса

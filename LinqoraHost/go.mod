@@ -71,6 +71,7 @@ require (
 )
 
 require (
+	github.com/Masterminds/semver v1.5.0
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-vgo/robotgo v0.110.7
 	github.com/mdp/qrterminal/v3 v3.2.1

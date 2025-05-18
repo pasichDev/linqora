@@ -6,6 +6,13 @@ import (
 	"time"
 
 	"LinqoraHost/internal/interfaces"
+
+	"github.com/Masterminds/semver"
+)
+
+const (
+	// Мінімальна версія клієнта
+	MinVersionClient = "1.0.0"
 )
 
 type AuthResponse struct {
@@ -17,9 +24,21 @@ type AuthResponse struct {
 
 // AuthRequestData представляет данные запроса авторизации
 type AuthRequestData struct {
-	DeviceID   string `json:"deviceId"`
-	DeviceName string `json:"deviceName"`
-	IP         string `json:"ip"`
+	DeviceID      string `json:"deviceId"`
+	DeviceName    string `json:"deviceName"`
+	IP            string `json:"ip"`
+	VersionClient string `json:"versionClient"`
+}
+
+// IsVersionSupported checks if the client version is supported
+func (am *AuthManager) IsVersionClientSupported(version string) bool {
+	clientVersion, err := semver.NewVersion(version)
+	if err != nil {
+		return false
+	}
+	minVersion, _ := semver.NewVersion(MinVersionClient)
+
+	return clientVersion.GreaterThan(minVersion) || clientVersion.Equal(minVersion)
 }
 
 // HandleAuthRequest обрабатывает запрос авторизации от клиента
@@ -37,6 +56,13 @@ func (am *AuthManager) HandleAuthRequest(client interfaces.WSClient, msg interfa
 	if deviceID == "" {
 		log.Printf("Empty device ID in auth request")
 		sendResponse(client, AuthStatusMissingDeviceID, false, MessageTypeAuthResponse)
+		return
+	}
+
+	// Перевіряємо версію клієнта
+	if !am.IsVersionClientSupported(authData.VersionClient) {
+		log.Printf("Unsupported client version: %s", authData.VersionClient)
+		sendResponse(client, AuthStatusUnsupportedVersion, false, MessageTypeAuthResponse)
 		return
 	}
 

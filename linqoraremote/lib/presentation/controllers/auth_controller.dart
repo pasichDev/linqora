@@ -177,6 +177,7 @@ class AuthController extends GetxController {
                   ? 'android_${await getDeviceId()}'
                   : 'ios_${await getDeviceId()}',
           'ip': await getLocalIpAddress(),
+          'versionClient': await getAppVersion(),
         });
 
       if (kDebugMode) {
@@ -213,6 +214,9 @@ class AuthController extends GetxController {
           AuthStatusCode.requestFailed:
         cancelAuth(authResponse.localMessage);
         break;
+
+      case AuthStatusCode.unsupportedVersion:
+        cancelAuth(authResponse.localMessage);
 
       case AuthStatusCode.notAuthorized:
         break;
