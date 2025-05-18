@@ -181,6 +181,7 @@ class SettingsController extends GetxController {
     }
   }
 
+
   Future<void> saveThemeMode(ThemeMode mode) async {
     try {
       themeMode.value = mode;

@@ -33,6 +33,7 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: MaterialTheme.lightTheme,
         darkTheme: MaterialTheme.darkTheme,
+
         themeMode: settingsController.themeMode.value,
         initialRoute: AppRoutes.DEVICE_AUTH,
 

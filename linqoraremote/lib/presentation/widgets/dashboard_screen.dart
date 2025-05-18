@@ -108,14 +108,14 @@ class HostInfoCard extends StatelessWidget {
               "${host.cpuModel}, ${host.cpuFrequency} MHz, ${host.cpuPhysicalCores}/${host.cpuLogicalCores} cores",
               style: TextStyle(
                 fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ),
             Text(
               "RAM: ${host.virtualMemoryTotal} GB",
               style: TextStyle(
                 fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ),
           ],

@@ -349,7 +349,7 @@ class MaterialTheme {
 
   List<ExtendedColor> get extendedColors => [];
 
-  static ThemeData get lightTheme => ThemeData(colorScheme: lightScheme());
+  static ThemeData get lightTheme => ThemeData(colorScheme: lightHighContrastScheme());
 
   static ThemeData get darkTheme =>
       ThemeData(colorScheme: darkHighContrastScheme());

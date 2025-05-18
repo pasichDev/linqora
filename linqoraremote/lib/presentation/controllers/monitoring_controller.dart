@@ -9,7 +9,7 @@ class MonitoringController extends GetxController {
 
   MonitoringController({required this.webSocketProvider});
 
-  static const int maxMetricsCount = 20;
+  static const int maxMetricsCount = 40;
 
   final temperatures = <int>[].obs;
   final cpuLoads = <int>[].obs;

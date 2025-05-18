@@ -4,15 +4,12 @@ import 'package:linqoraremote/data/providers/websocket_provider.dart';
 import 'package:linqoraremote/presentation/controllers/monitoring_controller.dart';
 import 'package:linqoraremote/presentation/widgets/loading_view.dart';
 
+import '../../data/models/metrics.dart';
 import 'banner.dart';
-import 'metrics/metric_card.dart';
 import 'metrics/metric_chart.dart';
+import 'metrics/metric_standart_card.dart';
 import 'metrics/metrics_row.dart';
 
-/// - Зміна шаблона відображення моніторнигу (стандартний - той що є, спрощений). Спрощений - це відображення без графіка, але згрупувати по категоріям (CPU,RAM,GPU,DISK)
-/// - Реалізувати Always режим з заниженою підсвіткою, чорним фоном та мінімалістичним білим текстом. в альбомному режимі.
-/// - Реалізувати можливість вибирати віджети в моніторингу які показувати які приховувати, зьерігаати в налаштуваннях.
-///
 class MonitoringView extends StatefulWidget {
   const MonitoringView({super.key});
 
@@ -82,74 +79,15 @@ class _MonitoringViewState extends State<MonitoringView>
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.start,
                       children: [
+                        const SizedBox(height: 16),
                         !_monitoringController.hasEnoughMetricsData
                             ? MessageBanner(
                               message:
                                   'Зачекайте, відбувається калібрація даних',
                             )
                             : SizedBox.shrink(),
-                        MetricsCard(
-                          title: 'Температура CPU',
-                          value: '${cpuMetrics.temperature}°C',
-                          widget: MetricChart(
-                            metricsData:
-                                _monitoringController.getTemperatures(),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        MetricsCard(
-                          title: 'Навантаження CPU',
-                          value: '${cpuMetrics.loadPercent}%',
-                          widget: Column(
-                            children: [
-                              MetricChart(
-                                metricsData:
-                                    _monitoringController.getCPULoads(),
-                              ),
 
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                ),
-                                child: Column(
-                                  children: [
-                                    MetricDetailRow(
-                                      label: "Процеси",
-                                      value:
-                                          _monitoringController
-                                              .currentCPUMetrics
-                                              .value
-                                              ?.processes
-                                              .toString() ??
-                                          "",
-                                    ),
-                                    MetricDetailRow(
-                                      label: "Нитки",
-                                      value:
-                                          _monitoringController
-                                              .currentCPUMetrics
-                                              .value
-                                              ?.threads
-                                              .toString() ??
-                                          "",
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        MetricsCard(
-                          title: 'Використання RAM',
-                          value:
-                              '${ramMetrics.loadPercent}% (${ramMetrics.usage} ГБ)',
-                          widget: MetricChart(
-                            metricsData:
-                                _monitoringController.getRAMUsagesPercent(),
-                          ),
-                        ),
+                        _buildStandartMode(ramMetrics, cpuMetrics),
                       ],
                     ),
                   ),
@@ -159,6 +97,65 @@ class _MonitoringViewState extends State<MonitoringView>
           ),
         ],
       ),
+    );
+  }
+
+  _buildStandartMode(RAMMetrics ramMetrics, CPUMetrics cpuMetrics) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        MetricsStandartCard(
+          title: 'Температура CPU',
+          value: '${cpuMetrics.temperature}°C',
+          widget: MetricChart(
+            metricsData: _monitoringController.getTemperatures(),
+          ),
+        ),
+        const SizedBox(height: 16),
+        MetricsStandartCard(
+          title: 'Навантаження CPU',
+          value: '${cpuMetrics.loadPercent}%',
+          widget: Column(
+            children: [
+              MetricChart(metricsData: _monitoringController.getCPULoads()),
+
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  children: [
+                    MetricDetailRow(
+                      label: "Процеси",
+                      value:
+                          _monitoringController
+                              .currentCPUMetrics
+                              .value
+                              ?.processes
+                              .toString() ??
+                          "",
+                    ),
+                    MetricDetailRow(
+                      label: "Нитки",
+                      value:
+                          _monitoringController.currentCPUMetrics.value?.threads
+                              .toString() ??
+                          "",
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        MetricsStandartCard(
+          title: 'Використання RAM',
+          value: '${ramMetrics.loadPercent}% (${ramMetrics.usage} ГБ)',
+          widget: MetricChart(
+            metricsData: _monitoringController.getRAMUsagesPercent(),
+          ),
+        ),
+      ],
     );
   }
 }
