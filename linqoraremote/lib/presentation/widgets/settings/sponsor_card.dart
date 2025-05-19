@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:linqoraremote/presentation/widgets/settings/section_header.dart';
 
-import '../../core/constants/urls.dart';
-import '../../core/utils/lauch_url.dart';
+import '../../../core/constants/urls.dart';
+import '../../../core/utils/lauch_url.dart';
 
 class SponsorCard extends StatelessWidget {
   final VoidCallback? onClose;
@@ -20,24 +21,11 @@ class SponsorCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.favorite_outline,
-                      color: Get.theme.colorScheme.primary,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Поддержка проекта',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Get.theme.colorScheme.primary,
-                      ),
-                    ),
-                  ],
+                SectionHeader(
+                  title: "Поддержка проекта",
+                  icon: Icons.favorite_outline,
                 ),
+
                 if (onClose != null)
                   InkWell(onTap: onClose, child: Icon(Icons.close, size: 20)),
               ],

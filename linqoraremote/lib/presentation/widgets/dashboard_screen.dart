@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:linqoraremote/presentation/controllers/settings_controller.dart';
-import 'package:linqoraremote/presentation/widgets/sponsor_card.dart';
+import 'package:linqoraremote/presentation/widgets/settings/sponsor_card.dart';
 
 import '../controllers/device_home_controller.dart';
 import '../dashboard_items.dart';

@@ -40,7 +40,6 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
   final List<bool> _recentPingResults = [];
   final int _slidingWindowSize = 5;
 
-
   @override
   void onInit() {
     super.onInit();
@@ -244,7 +243,6 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
 
       // Получаем настройки уведомлений
       final settingsController = Get.find<SettingsController>();
-      //final notificationsEnabled = settingsController.enableNotifications.value;
 
       // Первым делом проверим, не запущен ли уже сервис
       if (await BackgroundConnectionService.isRunning()) {
@@ -418,7 +416,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
 
     _connectionCheckTimer = Timer.periodic(
       getCurrentPingInterval(settings.backgroundMode.value),
-          (timer) {
+      (timer) {
         if (!webSocketProvider.isConnected) {
           _handleConnectionLost('WebSocket соединение закрыто');
           return;
@@ -426,12 +424,15 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
 
         // Проверяем статистику в скользящем окне
         if (_recentPingResults.length >= _slidingWindowSize) {
-          int failedCount = _recentPingResults.where((success) => !success).length;
+          int failedCount =
+              _recentPingResults.where((success) => !success).length;
           double failRate = failedCount / _recentPingResults.length;
 
           // Если более 70% пингов в окне не получили ответ - разрываем соединение
           if (failRate > 0.7) {
-            _handleConnectionLost('Нестабильное соединение: ${(failRate * 100).toInt()}% потерянных пакетов');
+            _handleConnectionLost(
+              'Нестабильное соединение: ${(failRate * 100).toInt()}% потерянных пакетов',
+            );
             return;
           }
         }
@@ -443,10 +444,8 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
             _recentPingResults.removeAt(0);
           }
 
-          final pingId = DateTime.now().millisecondsSinceEpoch.toString();
           webSocketProvider.sendPing();
-        } catch (_) {
-        }
+        } catch (_) {}
       },
     );
   }

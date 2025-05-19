@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:linqoraremote/presentation/controllers/settings_controller.dart';
-import 'package:linqoraremote/presentation/widgets/sponsor_card.dart';
+import 'package:linqoraremote/presentation/widgets/settings/sponsor_card.dart';
 
 import '../../core/constants/urls.dart';
 import '../../core/utils/lauch_url.dart';
+import '../widgets/settings/section_header.dart';
 
 class SettingsPage extends GetView<SettingsController> {
   const SettingsPage({super.key});
@@ -39,23 +40,6 @@ class SettingsPage extends GetView<SettingsController> {
     );
   }
 
-  Widget _buildSectionHeader(String title, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, color: Get.theme.colorScheme.primary),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Get.theme.colorScheme.primary,
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildCard(BuildContext context, Widget child) {
     return Card(
       elevation: 2,
@@ -69,7 +53,7 @@ class SettingsPage extends GetView<SettingsController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader('Оформление', Icons.palette_outlined),
+        SectionHeader(title: "Оформление", icon: Icons.palette_outlined),
         _buildCard(
           context,
           Column(
@@ -174,7 +158,7 @@ class SettingsPage extends GetView<SettingsController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader('Подключение', Icons.link_outlined),
+        SectionHeader(title: "Подключение", icon: Icons.link_outlined),
         _buildCard(
           context,
           Column(
@@ -248,7 +232,7 @@ class SettingsPage extends GetView<SettingsController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader('О приложении', Icons.info_outline),
+        SectionHeader(title: "О приложении", icon: Icons.info_outline),
         _buildCard(
           context,
           Column(
@@ -302,64 +286,4 @@ class SettingsPage extends GetView<SettingsController> {
       ],
     );
   }
-
-  /*
-  Widget _buildSponsorshipSection(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionHeader('Поддержка проекта', Icons.favorite_outline),
-        _buildCard(
-          context,
-          Column(
-            children: [
-              const Text(
-                'Linqora — это проект с открытым исходным кодом, разрабатываемый энтузиастами. Вы можете помочь проекту, став спонсором или поделившись отзывом.',
-                style: TextStyle(fontSize: 14, height: 1.4),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.favorite),
-                    label: const Text('Поддержать проект'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Get.theme.colorScheme.primary,
-                      foregroundColor: Get.theme.colorScheme.onPrimary,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 12,
-                        horizontal: 16,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: () => launchUrlHandler(supportLinqora),
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.star_outline),
-                    label: const Text('Оставить отзыв'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 12,
-                        horizontal: 16,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: () => launchUrlHandler(sendFeedback),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
- */
 }
