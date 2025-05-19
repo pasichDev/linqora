@@ -21,6 +21,7 @@ type WSClient interface {
 	GetDeviceName() string
 	SetDeviceID(id string)
 	SetDeviceName(name string)
+	IsClosed() bool
 }
 
 // WSMessage определяет интерфейс для сообщений WebSocket

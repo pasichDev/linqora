@@ -65,6 +65,12 @@ func (c *Client) SetDeviceID(id string) {
 	c.DeviceID = id
 }
 
+func (c *Client) IsClosed() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.closed
+}
+
 func (c *Client) SetDeviceName(name string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -151,6 +157,10 @@ func (c *Client) StartWritePump() {
 	}()
 
 	for {
+		if c.closed {
+			return
+		}
+
 		select {
 		case message, ok := <-c.SendChannel:
 			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
@@ -192,22 +202,20 @@ func (c *Client) sendMessage(message []byte) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Проверка на nil для защиты от использования закрытого клиента
-	if c.SendChannel == nil {
-		log.Printf("Attempt to send message to closed client %s", c.DeviceName)
-		return fmt.Errorf("client channel is nil")
+	// Проверяем, закрыт ли клиент
+	if c.closed || c.SendChannel == nil {
+		return fmt.Errorf("attempting to send message to closed client: %s", c.DeviceName)
 	}
 
+	// Отправляем сообщение неблокирующим способом
 	select {
 	case c.SendChannel <- message:
-		// Сообщение отправлено успешно
 		return nil
 	default:
-		log.Printf("Failed to send message to client %s - channel full or closed", c.DeviceName)
-
-		// Если канал заполнен, закрываем соединение
+		// Если канал полон, закрываем соединение
+		c.closed = true // Помечаем как закрытый
 		c.Conn.Close()
-		return fmt.Errorf("send channel full or closed")
+		return fmt.Errorf("send channel full for client: %s", c.DeviceName)
 	}
 }
 
@@ -258,17 +266,29 @@ func (c *Client) SendSuccess(responseType string, data interface{}) error {
 	}
 }
 
-// Добавьте метод Close для безопасного закрытия клиента
+// Close безопасно закрывает клиента и освобождает все ресурсы
 func (c *Client) Close() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	// Проверяем, не закрыт ли клиент уже
+	if c.closed {
+		return
+	}
+
+	// Помечаем как закрытый
+	c.closed = true
+
 	// Закрываем соединение
-	c.Conn.Close()
+	if c.Conn != nil {
+		c.Conn.Close()
+	}
 
-	// Безопасно закрываем канал отправки
-	close(c.SendChannel)
+	// Безопасно закрываем канал отправки, если он не nil
+	if c.SendChannel != nil {
+		close(c.SendChannel)
+		c.SendChannel = nil // Предотвращает повторное использование
+	}
 
-	// Логируем отключение
 	log.Printf("Client %s closed gracefully", c.DeviceName)
 }

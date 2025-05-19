@@ -167,11 +167,21 @@ func (s *WSServer) handleWSConnection(w http.ResponseWriter, r *http.Request) {
 
 // removeClient видаляє клієнта з сервера
 func (s *WSServer) removeClient(client *Client) {
+	// Проверяем текущее состояние клиента
+	if client == nil {
+		return
+	}
+
 	s.clientsMutex.Lock()
 	defer s.clientsMutex.Unlock()
 
 	if _, exists := s.clients[client]; exists {
+		// Удаляем из списка активных клиентов
 		delete(s.clients, client)
+
+		// Закрываем клиента (это безопасная операция)
+		client.Close()
+
 		log.Printf("Client %s removed from active clients list",
 			client.DeviceName)
 	}
