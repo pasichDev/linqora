@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
-import 'package:linqoraremote/presentation/controllers/device_home_controller.dart';
 import 'package:linqoraremote/services/permissions_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -11,7 +10,6 @@ class SettingsController extends GetxController {
   static const _kThemeMode = 'theme_mode';
   static const _kEnableNotifications = 'enable_notifications';
   static const _kEnableAutoConnect = 'enable_auto_connect';
-  static const _kEnableBackgroundService = 'enable_background_service';
   static const _kShowSponsorHome = 'show_sponsor_home';
 
   final _storage = GetStorage('settings');
@@ -19,15 +17,11 @@ class SettingsController extends GetxController {
   final Rx<ThemeMode> themeMode = ThemeMode.system.obs;
   final RxBool enableNotifications = false.obs;
   final RxBool enableAutoConnect = false.obs;
-  final RxBool enableBackgroundService = false.obs;
   final RxBool notificationPermissionGranted = false.obs;
   final RxBool showSponsorHome = true.obs;
 
   final FlutterLocalNotificationsPlugin notificationsPlugin =
       FlutterLocalNotificationsPlugin();
-
-  // Добавьте флаг для отслеживания фонового режима
-  final RxBool backgroundMode = false.obs;
 
   @override
   void onInit() {
@@ -42,9 +36,7 @@ class SettingsController extends GetxController {
     themeMode.close();
     enableNotifications.close();
     enableAutoConnect.close();
-    enableBackgroundService.close();
     notificationPermissionGranted.close();
-    backgroundMode.close();
     showSponsorHome.close();
 
     // Clean up notifications plugin resources
@@ -73,8 +65,7 @@ class SettingsController extends GetxController {
           _storage.read<bool>(_kEnableNotifications) ?? false;
       enableAutoConnect.value =
           _storage.read<bool>(_kEnableAutoConnect) ?? false;
-      enableBackgroundService.value =
-          _storage.read<bool>(_kEnableBackgroundService) ?? false;
+
       showSponsorHome.value = _storage.read<bool>(_kShowSponsorHome) ?? true;
       Get.changeThemeMode(themeMode.value);
     } catch (e) {
@@ -143,18 +134,6 @@ class SettingsController extends GetxController {
     }
   }
 
-  Future<void> toggleBackgroundService(bool value) async {
-    enableBackgroundService.value = value;
-    await _storage.write(_kEnableBackgroundService, value);
-
-    if (!value && Get.isRegistered<DeviceHomeController>()) {
-      final controller = Get.find<DeviceHomeController>();
-      if (controller.isBackgroundServiceRunning.value) {
-        controller.stopBackgroundService();
-      }
-    }
-  }
-
   Future<void> saveThemeMode(ThemeMode mode) async {
     try {
       themeMode.value = mode;
@@ -173,11 +152,6 @@ class SettingsController extends GetxController {
   Future<void> toggleShowSponsorHome(bool value) async {
     showSponsorHome.value = value;
     await _storage.write(_kShowSponsorHome, value);
-  }
-
-  // Метод для установки режима приложения
-  void setBackgroundMode(bool isBackground) {
-    backgroundMode.value = isBackground;
   }
 
   ThemeMode _getThemeMode(String value) {

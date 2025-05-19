@@ -164,19 +164,7 @@ class SettingsPage extends GetView<SettingsController> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Добавьте этот переключатель перед остальными
-              Obx(
-                () => SwitchListTile(
-                  title: const Text('Фоновый режим'),
-                  subtitle: const Text(
-                    'Поддерживать соединение при свёрнутом приложении',
-                  ),
-                  value: controller.enableBackgroundService.value,
-                  onChanged:
-                      (value) => controller.toggleBackgroundService(value),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
+
               Obx(
                 () => SwitchListTile(
                   title: Row(

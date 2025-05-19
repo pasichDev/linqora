@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:linqoraremote/services/background_service.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/status.dart' as status;
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -87,6 +88,10 @@ class WebSocketProvider {
       if (kDebugMode) {
         print('WebSocket підключено');
       }
+      registerHandler('pong', _handlePongMessage);
+
+      // Запускаем таймер PING
+      startPingTimer(customInterval: pingInterval);
       return true;
     } catch (e) {
       await _cleanupExistingConnection();
@@ -121,25 +126,6 @@ class WebSocketProvider {
     _pingTimer = null;
     if (kDebugMode) {
       print('PING таймер остановлен');
-    }
-  }
-
-  Future<void> sendPing() async {
-    if (!isConnected) return;
-    try {
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-
-      final message = WsMessage(type: 'ping')
-        ..setField('data', {'timestamp': timestamp});
-      sendMessage(message.toJson());
-
-      if (kDebugMode) {
-        print('Sending ping with timestamp: $timestamp');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error sending ping: $e');
-      }
     }
   }
 
@@ -331,7 +317,7 @@ class WebSocketProvider {
       final messageType = decodedMessage['type'] as String?;
       if (messageType != null && _messageHandlers.containsKey(messageType)) {
         _messageHandlers[messageType]!(decodedMessage);
-        if(kDebugMode) {
+        if (kDebugMode) {
           print('Оброблено повідомлення типу $messageType: $decodedMessage');
         }
       } else {
@@ -381,6 +367,44 @@ class WebSocketProvider {
     if (kDebugMode) {
       print('Помилка WebSocket: $error');
     }
+  }
+
+  // Обновите метод для отправки ping
+  Future<void> sendPing() async {
+    if (!isConnected) return;
+
+    try {
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final message = WsMessage(type: 'ping')
+        ..setField('data', {'timestamp': timestamp});
+
+      sendMessage(message.toJson());
+
+      if (kDebugMode) {
+        print('Sending ping with timestamp: $timestamp');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error sending ping: $e');
+      }
+
+      // Сообщаем фоновому сервису о проблеме с соединением
+      BackgroundConnectionService.reportConnectionState(false);
+    }
+  }
+
+  // Обновите обработку сообщений типа pong
+  void _handlePongMessage(Map<String, dynamic> data) {
+    // Добавьте отправку отчета о успешном pong в фоновый сервис
+    int? latency;
+    if (data['data'] != null && data['data']['timestamp'] != null) {
+      final timestamp = data['data']['timestamp'] as int;
+      final now = DateTime.now().millisecondsSinceEpoch;
+      latency = now - timestamp;
+    }
+
+    // Сообщаем об успешном соединении фоновому сервису
+    BackgroundConnectionService.reportConnectionState(true, latency: latency);
   }
 
   // Обробка закриття WebSocket
