@@ -188,7 +188,7 @@ func (c *Client) StartWritePump() {
 	}
 }
 
-func (c *Client) SendMessage(message []byte) error {
+func (c *Client) sendMessage(message []byte) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -225,17 +225,36 @@ func (c *Client) TimeSinceLastPing() time.Duration {
 	return time.Since(c.lastPingTime)
 }
 
-// SendError sends an error message to the client
-func (c *Client) SendError(message string) error {
-	errorMsg := map[string]interface{}{
-		"type":    "error",
-		"message": message,
-	}
-	if jsonMsg, err := json.Marshal(errorMsg); err == nil {
-		c.SendMessage(jsonMsg)
-		return nil
+// SendError отправляет сообщение об ошибке клиенту
+// requestType - тип запроса, из которого пришла ошибка
+// message - текст сообщения об ошибке
+// errorCode - опциональный код ошибки
+func (c *Client) SendError(requestType string, message string, errorCode ...int) error {
+	// Создаем ответ с ошибкой, используя новую модель
+	errorResponse := NewErrorResponse(requestType, message, errorCode...)
+
+	// Сериализуем в JSON и отправляем клиенту
+	if jsonMsg, err := json.Marshal(errorResponse); err == nil {
+		return c.sendMessage(jsonMsg)
 	} else {
-		return err // Возвращаем ошибку маршалинга
+		log.Printf("Error marshaling error message: %v", err)
+		return err
+	}
+}
+
+// SendSuccess отправляет успешный ответ клиенту
+// responseType - тип ответа
+// data - данные для отправки
+func (c *Client) SendSuccess(responseType string, data interface{}) error {
+	// Создаем успешный ответ, используя новую модель
+	successResponse := NewSuccessResponse(responseType, data)
+
+	// Сериализуем в JSON и отправляем клиенту
+	if jsonMsg, err := json.Marshal(successResponse); err == nil {
+		return c.sendMessage(jsonMsg)
+	} else {
+		log.Printf("Error marshaling success message: %v", err)
+		return err
 	}
 }
 

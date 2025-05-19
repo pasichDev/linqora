@@ -16,7 +16,7 @@ const (
 )
 
 type AuthResponse struct {
-	Type    string `json:"type"`
+	//	Type    string `json:"type"`
 	Success bool   `json:"success"`
 	Code    int    `json:"code"`
 	Message string `json:"message"`
@@ -167,22 +167,13 @@ func (am *AuthManager) HandleAuthCheck(client interfaces.WSClient) {
 	sendResponse(client, AuthStatusPending, false, MessageTypeAuthPending)
 }
 
-//MessageTypeAuthResponse
-
 // Функція для відправки відповіді про успішну авторизацію
 func sendResponse(client interfaces.WSClient, code int, success bool, typeResponse string) {
 	response := AuthResponse{
-		Type:    typeResponse,
 		Success: success,
 		Code:    code,
 		Message: GetAuthMessage(code),
 	}
 
-	responseJSON, err := json.Marshal(response)
-	if err != nil {
-		log.Printf("Error marshaling auth response: %v", err)
-		return
-	}
-
-	client.SendMessage(responseJSON)
+	client.SendSuccess(typeResponse, response)
 }

@@ -15,6 +15,7 @@ import '../../core/constants/constants.dart';
 import '../../core/utils/device_info.dart';
 import '../../core/utils/error_handler.dart';
 import '../../data/models/discovered_service.dart';
+import '../../data/models/server_response.dart';
 import '../../routes/app_routes.dart';
 
 enum AuthStatus { noWifi, scanning, listDevices, pendingAuth, connecting }
@@ -218,14 +219,17 @@ class AuthController extends GetxController {
   void _handleAuthResponse(Map<String, dynamic> response) {
     _authTimer?.cancel();
 
-    AuthResponse authResponse;
-    try {
-      authResponse = AuthResponse.fromJson(response);
-    } catch (e) {
-      cancelAuth('Error parsing auth response: $e');
+    final serverResponse = ServerResponse<AuthData>.fromJson(
+      response,
+      (data) => AuthData.fromJson(data),
+    );
+
+    if (serverResponse.hasError) {
+      cancelAuth(serverResponse.error!.message);
       return;
     }
-    switch (authResponse.code) {
+
+    switch (serverResponse.data?.code) {
       // Успешная авторизация - устройство уже авторизовано
       case AuthStatusCode.authorized || AuthStatusCode.approved:
         webSocketProvider.setAuthenticated(true);
@@ -238,18 +242,18 @@ class AuthController extends GetxController {
           AuthStatusCode.missingDeviceID ||
           AuthStatusCode.timeout ||
           AuthStatusCode.requestFailed:
-        cancelAuth(authResponse.localMessage);
+        cancelAuth(serverResponse.data?.localMessage);
         break;
 
       case AuthStatusCode.unsupportedVersion:
-        cancelAuth(authResponse.localMessage);
+        cancelAuth(serverResponse.data?.localMessage);
 
       case AuthStatusCode.notAuthorized:
         break;
 
       default:
         cancelAuth(
-          'Неизвестная ошибка авторизации (код: ${authResponse.code})',
+          'Неизвестная ошибка авторизации (код: ${serverResponse.data?.code})',
         );
 
         break;
@@ -261,18 +265,17 @@ class AuthController extends GetxController {
     if (kDebugMode) {
       print("Auth pending response: $response");
     }
+    final serverResponse = ServerResponse<AuthData>.fromJson(
+      response,
+      (data) => AuthData.fromJson(data),
+    );
 
-    AuthResponse authResponse;
-    try {
-      authResponse = AuthResponse.fromJson(response);
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error parsing auth response: $e');
-      }
-      cancelAuth('Error parsing auth response: $e');
+    if (serverResponse.hasError) {
+      cancelAuth(serverResponse.error!.message);
       return;
     }
-    switch (authResponse.code) {
+
+    switch (serverResponse.data?.code) {
       case AuthStatusCode.pending:
         statusMessage.value = 'Ожидание подтверждения на устройстве хоста...';
 
@@ -283,8 +286,8 @@ class AuthController extends GetxController {
 
       default:
         statusMessage.value =
-            authResponse.message.isNotEmpty
-                ? authResponse.message
+            serverResponse.data!.message.isNotEmpty
+                ? serverResponse.data!.message
                 : 'Ожидание авторизации...';
         break;
     }

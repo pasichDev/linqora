@@ -44,7 +44,6 @@ func (b *Broadcaster) BroadcastToRoom(roomName string, message BroadcastMessage,
 	// Проверяем, существует ли комната и есть ли в ней клиенты
 	room := b.roomManager.GetRoom(roomName)
 	if room == nil || room.ClientCount() == 0 {
-		// Комната не существует или пуста
 		return
 	}
 
@@ -61,18 +60,22 @@ func (b *Broadcaster) BroadcastToRoom(roomName string, message BroadcastMessage,
 
 // BroadcastMetrics отправляет метрики всем клиентам в комнате metrics
 func (b *Broadcaster) BroadcastMetrics(metricsData []byte) {
-	message := MetricsMessage{
-		Type: "metrics",
-		Data: json.RawMessage(metricsData),
+	var payload interface{}
+	if err := json.Unmarshal(metricsData, &payload); err != nil {
+		log.Printf("Error unmarshaling metrics data: %v", err)
+		return
 	}
-	b.BroadcastToRoom("metrics", message, nil)
+
+	// Рассылаем всем клиентам в комнате
+	b.roomManager.BroadcastToRoom("metrics", payload, nil)
 }
 
 // BroadcastMedia отправляет медиаданные всем клиентам в комнате media
 func (b *Broadcaster) BroadcastMedia(mediaData []byte) {
-	message := MediaMessage{
-		Type: "media",
-		Data: json.RawMessage(mediaData),
+	var payload interface{}
+	if err := json.Unmarshal(mediaData, &payload); err != nil {
+		log.Printf("Error unmarshaling metrics data: %v", err)
+		return
 	}
-	b.BroadcastToRoom("media", message, nil)
+	b.roomManager.BroadcastToRoom("media", payload, nil)
 }

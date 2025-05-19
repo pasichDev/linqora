@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:linqoraremote/data/models/host_system_info.dart';
+import 'package:linqoraremote/data/models/host_info.dart';
 import 'package:linqoraremote/presentation/widgets/shimmer_effect.dart';
 
 import '../controllers/device_home_controller.dart';

@@ -331,6 +331,9 @@ class WebSocketProvider {
       final messageType = decodedMessage['type'] as String?;
       if (messageType != null && _messageHandlers.containsKey(messageType)) {
         _messageHandlers[messageType]!(decodedMessage);
+        if(kDebugMode) {
+          print('Оброблено повідомлення типу $messageType: $decodedMessage');
+        }
       } else {
         if (kDebugMode) {
           print('Отримано повідомлення типу $messageType: $decodedMessage');

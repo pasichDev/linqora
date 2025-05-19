@@ -172,8 +172,8 @@ func (s *WSServer) removeClient(client *Client) {
 
 	if _, exists := s.clients[client]; exists {
 		delete(s.clients, client)
-		log.Printf("Client %s removed from active clients list (remaining: %d)",
-			client.DeviceName, len(s.clients))
+		log.Printf("Client %s removed from active clients list",
+			client.DeviceName)
 	}
 }
 
@@ -233,7 +233,7 @@ func (s *WSServer) handleClientMessage(client *Client, msg *ClientMessage) {
 
 	if msg.Type != "auth_request" && msg.Type != "auth_check" && msg.Type != "ping" {
 		if !s.authManager.IsAuthorized(client.GetDeviceID()) {
-			client.SendError("Unauthorized access")
+			client.SendError(msg.Type, "Unauthorized access", 401)
 			return
 		}
 	}
@@ -256,7 +256,7 @@ func (s *WSServer) handleClientMessage(client *Client, msg *ClientMessage) {
 			s.authManager.HandleAuthRequest(client, msg)
 		} else {
 			log.Printf("ERROR: authManager is nil, cannot process auth_request")
-			client.SendError("Internal server error: auth manager not initialized")
+			client.SendError("auth_request", "Internal server error: auth manager not initialized", 500)
 		}
 	default:
 		log.Printf("Unknown message type: %s", msg.Type)
@@ -264,8 +264,6 @@ func (s *WSServer) handleClientMessage(client *Client, msg *ClientMessage) {
 	}
 }
 func (s *WSServer) handlePingMessage(client *Client, msg *ClientMessage) {
-	// Обновляем время активности
-	client.UpdateLastPingTime()
 
 	// Извлекаем timestamp из данных (если есть)
 	var timestamp interface{} = time.Now().UnixMilli()
@@ -275,15 +273,10 @@ func (s *WSServer) handlePingMessage(client *Client, msg *ClientMessage) {
 		}
 	}
 
-	// Создаем и отправляем один PONG
-	pongMessage := map[string]interface{}{
-		"type":      "pong",
+	client.SendSuccess("pong", map[string]interface{}{
 		"timestamp": timestamp,
-	}
+	})
 
-	if jsonMsg, err := json.Marshal(pongMessage); err == nil {
-		client.SendMessage(jsonMsg)
-	}
 }
 
 // Вспомогательный метод для извлечения данных
@@ -296,37 +289,25 @@ func extractPingData(data json.RawMessage) (map[string]interface{}, error) {
 // handleHostInfoMessage обробляє відомлення з інформацією про хост
 // Відправляє інформацію про систему назад клієнту
 func (s *WSServer) handleHostInfoMessage(client *Client) {
-	// Отримуємо характеристики системи
 	ramTotal, _ := metrics.GetRamTotal()
-
-	// Отримуємо характеристики системи
 	cpuModel, _ := metrics.GetCPUModel()
-
-	// Отримуємо інформацію про пристрій
 	deviceInfo := metrics.GetDeviceInfo()
-
 	freq, _ := metrics.GetCPUFrequency()
 	cores, threads, _ := metrics.GetCPUCoresAndThreads()
 
-	// Формуємо відповідь з характеристиками системи
-	host_info := HostInfo{
-		OS:                 deviceInfo.OS,
-		Hostname:           deviceInfo.Hostname,
-		CpuModel:           cpuModel,
-		VirtualMemoryTotal: ramTotal,
-		CpuPhysicalCores:   cores,
-		CpuLogicalCores:    threads,
-		CpuFrequency:       freq,
+	// Формируем ответ с использованием стандартной структуры
+	hostInfo := map[string]interface{}{
+		"os":                 deviceInfo.OS,
+		"hostname":           deviceInfo.Hostname,
+		"cpuModel":           cpuModel,
+		"virtualMemoryTotal": ramTotal,
+		"cpuPhysicalCores":   cores,
+		"cpuLogicalCores":    threads,
+		"cpuFrequency":       freq,
 	}
 
-	response := HostInfoResponse{
-		Type:     "host_info",
-		Success:  true,
-		HostInfo: host_info,
-	}
-
-	responseJSON, _ := json.Marshal(response)
-	client.SendMessage(responseJSON)
+	// Отправляем ответ
+	client.SendSuccess("host_info", hostInfo)
 
 }
 
@@ -334,11 +315,13 @@ func (s *WSServer) handleHostInfoMessage(client *Client) {
 func (s *WSServer) handleJoinRoomMessage(client *Client, msg *ClientMessage) {
 	// Добавляем клиента в комнату
 	s.roomManager.AddClientToRoom(msg.Room, client)
+
 }
 
 // handleLeaveRoomMessage обробляє повідомлення виходу з кімнати
 func (s *WSServer) handleLeaveRoomMessage(client *Client, msg *ClientMessage) {
 	s.roomManager.RemoveClientFromRoom(msg.Room, client)
+
 }
 
 // GetRoomManager повертає менеджер кімнат
@@ -357,38 +340,40 @@ func (s *WSServer) BroadcastMedia(mediaData []byte) {
 func (s *WSServer) handleMediaCommand(client *Client, msg *ClientMessage) {
 	// First check if client is in media room
 	if !s.roomManager.IsClientInRoom("media", client) {
-		log.Printf("Client %s tried to send media command without joining media room", client.DeviceName)
+		client.SendError("media", "Client not in media room", 403)
 		return
 	}
 
 	var data map[string]interface{}
 	if err := json.Unmarshal(msg.Data, &data); err != nil {
-		log.Printf("Error unmarshaling media command: %v", err)
+		client.SendError("media", "Invalid media command format", 400)
 		return
 	}
 
 	action, ok1 := data["action"].(float64)
 	value, ok2 := data["value"].(float64)
 
+	// Проверяем, что action и value корректные
+	if !ok1 || !ok2 {
+		client.SendError("media", "Invalid media command parameters", 400)
+		return
+	}
+
 	var mediaCommand = media.MediaCommand{
 		Action: int(action),
 		Value:  int(value),
 	}
 
-	// Проверяем, что action и value корректные
-	if !ok1 {
-		log.Printf("Invalid media command format from %s", client.DeviceName)
-		return
-	}
-
-	if !ok2 {
-		log.Printf("Invalid media command format from %s", client.DeviceName)
-		return
-	}
-
 	err := media.HandleMediaCommand(mediaCommand)
 	if err != nil {
-		log.Printf("Error executing media command: %v", err)
+		client.SendError("media", fmt.Sprintf("Error executing media command: %v", err), 500)
 		return
 	}
+
+	// Отправляем успешный ответ
+	client.SendSuccess("media", map[string]interface{}{
+		"action": int(action),
+		"value":  int(value),
+		"status": "success",
+	})
 }

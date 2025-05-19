@@ -27,11 +27,6 @@ class SettingsController extends GetxController {
   final RxBool enableAutoConnect = false.obs;
   final RxInt keepAliveInterval = 10.obs;
   final RxBool enableBackgroundService = false.obs;
-  final RxInt activePingInterval = 25.obs; // Интервал в активном режиме (сек)
-  final RxInt backgroundPingInterval =
-      60.obs; // Интервал в фоновом режиме (сек)
-  final RxInt pingTimeout = 10.obs; // Время ожидания ответа (сек)
-  final RxInt maxMissedPings = 2.obs; // Макс. кол-во пропущенных ответов
 
   final RxBool notificationPermissionGranted = false.obs;
 
@@ -59,10 +54,6 @@ class SettingsController extends GetxController {
     enableBackgroundService.close();
     notificationPermissionGranted.close();
     backgroundMode.close();
-    activePingInterval.close();
-    backgroundPingInterval.close();
-    pingTimeout.close();
-    maxMissedPings.close();
 
     // Clean up notifications plugin resources
     notificationsPlugin.pendingNotificationRequests().then((notifications) {
@@ -94,13 +85,6 @@ class SettingsController extends GetxController {
       keepAliveInterval.value = _storage.read<int>(_kKeepAliveInterval) ?? 10;
       enableBackgroundService.value =
           _storage.read<bool>(_kEnableBackgroundService) ?? false;
-
-      // Загружаем настройки PING/PONG
-      activePingInterval.value = _storage.read<int>(_kActivePingInterval) ?? 25;
-      backgroundPingInterval.value =
-          _storage.read<int>(_kBackgroundPingInterval) ?? 60;
-      pingTimeout.value = _storage.read<int>(_kPingTimeout) ?? 10;
-      maxMissedPings.value = _storage.read<int>(_kMaxMissedPings) ?? 2;
 
       Get.changeThemeMode(themeMode.value);
     } catch (e) {
@@ -207,79 +191,16 @@ class SettingsController extends GetxController {
     await _storage.write(_kKeepAliveInterval, value);
   }
 
-  // Добавьте методы для сохранения настроек PING/PONG
-  Future<void> saveActivePingInterval(int value) async {
-    activePingInterval.value = value;
-    await _storage.write(_kActivePingInterval, value);
-  }
 
-  Future<void> saveBackgroundPingInterval(int value) async {
-    backgroundPingInterval.value = value;
-    await _storage.write(_kBackgroundPingInterval, value);
-  }
 
-  Future<void> savePingTimeout(int value) async {
-    pingTimeout.value = value;
-    await _storage.write(_kPingTimeout, value);
-  }
 
-  Future<void> saveMaxMissedPings(int value) async {
-    maxMissedPings.value = value;
-    await _storage.write(_kMaxMissedPings, value);
-  }
-
-  // Метод для сохранения всех PING настроек одновременно
-  Future<void> savePingSettings({
-    int? activePing,
-    int? backgroundPing,
-    int? timeout,
-    int? maxMissed,
-  }) async {
-    if (activePing != null) {
-      activePingInterval.value = activePing;
-      await _storage.write(_kActivePingInterval, activePing);
-    }
-
-    if (backgroundPing != null) {
-      backgroundPingInterval.value = backgroundPing;
-      await _storage.write(_kBackgroundPingInterval, backgroundPing);
-    }
-
-    if (timeout != null) {
-      pingTimeout.value = timeout;
-      await _storage.write(_kPingTimeout, timeout);
-    }
-
-    if (maxMissed != null) {
-      maxMissedPings.value = maxMissed;
-      await _storage.write(_kMaxMissedPings, maxMissed);
-    }
-  }
-
-  // Метод для определения нужного интервала в зависимости от режима
-  Duration getCurrentPingInterval() {
-    return Duration(
-      seconds:
-          backgroundMode.value
-              ? backgroundPingInterval.value
-              : activePingInterval.value,
-    );
-  }
 
   // Метод для установки режима приложения
   void setBackgroundMode(bool isBackground) {
     backgroundMode.value = isBackground;
   }
 
-  // Метод сброса настроек PING к значениям по умолчанию
-  Future<void> resetPingSettings() async {
-    await savePingSettings(
-      activePing: 25,
-      backgroundPing: 60,
-      timeout: 10,
-      maxMissed: 2,
-    );
-  }
+
 
   ThemeMode _getThemeMode(String value) {
     switch (value) {

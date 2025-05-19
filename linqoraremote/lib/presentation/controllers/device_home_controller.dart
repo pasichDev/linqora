@@ -6,12 +6,15 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:linqoraremote/data/enums/type_messages_ws.dart';
 import 'package:linqoraremote/data/models/discovered_service.dart';
-import 'package:linqoraremote/data/models/host_system_info.dart';
+import 'package:linqoraremote/data/models/host_info.dart';
 import 'package:linqoraremote/data/models/ws_message.dart';
 import 'package:linqoraremote/presentation/controllers/settings_controller.dart';
 import 'package:linqoraremote/services/background_service.dart';
 
+import '../../core/constants/server.dart';
 import '../../core/utils/error_handler.dart';
+import '../../core/utils/ping.dart';
+import '../../data/models/server_response.dart';
 import '../../data/providers/websocket_provider.dart';
 import '../../routes/app_routes.dart';
 
@@ -33,6 +36,10 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
   Timer? _serviceStatusTimer;
 
   final Rxn<DiscoveredService> authDevice = Rxn<DiscoveredService>();
+
+  final List<bool> _recentPingResults = [];
+  final int _slidingWindowSize = 5;
+
 
   @override
   void onInit() {
@@ -87,7 +94,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
       if (kDebugMode) {
         print('Режим изменился: ${isNowBackground ? "фоновый" : "активный"}');
       }
-      _startPingMonitor(); // Перезапустить с новым интервалом
+      _startPingMonitor();
     }
 
     switch (state) {
@@ -176,7 +183,10 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
 
   // Обработчик PONG для измерения задержки
   void _handlePong(Map<String, dynamic> data) {
-    _missedPongCount = 0; // Сбрасываем счетчик при получении PONG
+    if (_recentPingResults.isNotEmpty) {
+      _recentPingResults[_recentPingResults.length - 1] = true;
+    }
+    _missedPongCount = 0;
 
     try {
       final timestamp = data['timestamp'];
@@ -188,7 +198,9 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
         latency.value = rtt;
 
         if (kDebugMode && rtt > 500) {
-          print('Высокая задержка сети: $rtt мс');
+          if (kDebugMode) {
+            print('Высокая задержка сети: $rtt мс');
+          }
         }
       }
     } catch (e) {
@@ -347,11 +359,18 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
   // Обработчик информации о системе
   void _handleSystemInfo(Map<String, dynamic> data) {
     try {
-      if (kDebugMode) {
-        print('Received system info: $data');
+      final response = ServerResponse<HostSystemInfo>.fromJson(
+        data,
+        (json) => HostSystemInfo.fromJson(json),
+      );
+      if (response.hasError) {
+        showErrorSnackbar(
+          'Ошибка получения данных',
+          'Не удалось получить информацию о системе: ${response.error?.message}',
+        );
+        return;
       }
-      final newHostInfo = HostSystemInfo.fromJson(data['host_info']);
-      hostInfo.value = newHostInfo;
+      hostInfo.value = response.data;
     } catch (e) {
       showErrorSnackbar(
         'Ошибка обработки данных',
@@ -366,8 +385,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
     _connectionCheckTimer?.cancel();
 
     _connectionCheckTimer = Timer.periodic(
-      // Интервал между PING запросами зависит от режима
-      settings.getCurrentPingInterval(),
+      getCurrentPingInterval(settings.backgroundMode.value),
       (timer) {
         if (!webSocketProvider.isConnected) {
           _handleConnectionLost('WebSocket соединение закрыто');
@@ -375,8 +393,11 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
         }
 
         // Проверка счетчика пропущенных PONG
-        if (_missedPongCount >= settings.maxMissedPings.value) {
+        if (_missedPongCount >= maxMissedPings) {
           _handleConnectionLost('Сервер не отвечает на PING');
+          if (kDebugMode) {
+            print("'Сервер не отвечает на PING'");
+          }
           return;
         }
 
@@ -391,6 +412,40 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
           if (kDebugMode) {
             print('Ошибка отправки PING: $e');
           }
+        }
+      },
+    );
+
+    _connectionCheckTimer = Timer.periodic(
+      getCurrentPingInterval(settings.backgroundMode.value),
+          (timer) {
+        if (!webSocketProvider.isConnected) {
+          _handleConnectionLost('WebSocket соединение закрыто');
+          return;
+        }
+
+        // Проверяем статистику в скользящем окне
+        if (_recentPingResults.length >= _slidingWindowSize) {
+          int failedCount = _recentPingResults.where((success) => !success).length;
+          double failRate = failedCount / _recentPingResults.length;
+
+          // Если более 70% пингов в окне не получили ответ - разрываем соединение
+          if (failRate > 0.7) {
+            _handleConnectionLost('Нестабильное соединение: ${(failRate * 100).toInt()}% потерянных пакетов');
+            return;
+          }
+        }
+
+        // Отправляем PING и добавляем ожидание в массив
+        try {
+          _recentPingResults.add(false);
+          if (_recentPingResults.length > _slidingWindowSize) {
+            _recentPingResults.removeAt(0);
+          }
+
+          final pingId = DateTime.now().millisecondsSinceEpoch.toString();
+          webSocketProvider.sendPing();
+        } catch (_) {
         }
       },
     );

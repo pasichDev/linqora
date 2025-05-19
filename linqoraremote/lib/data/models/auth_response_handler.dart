@@ -1,5 +1,3 @@
-import 'package:linqoraremote/data/enums/type_messages_ws.dart';
-
 /// Коды статусов авторизации
 class AuthStatusCode {
   static const int notAuthorized = 1; // Устройство не авторизовано
@@ -12,7 +10,6 @@ class AuthStatusCode {
   static const int timeout = 500; // Истекло время ожидания авторизации
   static const int requestFailed = 501; // Ошибка запроса авторизации
   static const int unsupportedVersion = 502; // Ошибка устаревшая версия клиента
-
 }
 
 /// Класс для обработки ответов авторизации
@@ -28,7 +25,8 @@ class AuthResponseHandler {
       AuthStatusCode.invalidFormat: 'Invalid authorization data format',
       AuthStatusCode.missingDeviceID: 'Device ID is missing',
       AuthStatusCode.requestFailed: 'Authorization request failed',
-      AuthStatusCode.unsupportedVersion: 'Client version is outdated and not supported',
+      AuthStatusCode.unsupportedVersion:
+          'Client version is outdated and not supported',
     };
 
     return messages[code] ?? 'Unknown authorization error';
@@ -45,23 +43,16 @@ class AuthResponseHandler {
   }
 }
 
-class AuthResponse {
-  final String type;
+class AuthData {
   final bool success;
   final int code;
   final String message;
 
-  AuthResponse({
-    required this.type,
-    required this.success,
-    required this.code,
-    required this.message,
-  });
+  AuthData({required this.success, required this.code, required this.message});
 
   /// Создает экземпляр из JSON
-  factory AuthResponse.fromJson(Map<String, dynamic> json) {
-    return AuthResponse(
-      type: json['type'] as String,
+  factory AuthData.fromJson(Map<String, dynamic> json) {
+    return AuthData(
       success: json['success'] as bool,
       code: json['code'] as int,
       message: json['message'] as String,
@@ -78,7 +69,5 @@ class AuthResponse {
   bool get isAuthorized => success && AuthResponseHandler.isSuccessCode(code);
 
   /// Проверяет, находится ли авторизация в ожидании
-  bool get isPending =>
-      type == TypeMessageWs.auth_pending.value ||
-      AuthResponseHandler.isPendingCode(code);
+  bool get isPending => AuthResponseHandler.isPendingCode(code);
 }

@@ -35,13 +35,13 @@ func (r *Room) RemoveClient(client *Client) {
 }
 
 // Broadcast надсилає повідомлення всім клієнтам у кімнаті
-func (r *Room) Broadcast(message []byte, excludeClient *Client) {
+func (r *Room) Broadcast(roomName string, message interface{}, excludeClient *Client) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	for client := range r.Clients {
 		if client != excludeClient {
-			client.SendMessage(message)
+			client.SendSuccess(roomName, message)
 		}
 	}
 }
@@ -107,16 +107,17 @@ func (rm *RoomManager) RemoveClientFromRoom(roomName string, client *Client) {
 			log.Printf("Room %s removed (empty)", roomName)
 		}
 	}
+
 }
 
 // BroadcastToRoom надсилає повідомлення всім клієнтам у кімнаті
-func (rm *RoomManager) BroadcastToRoom(roomName string, message []byte, excludeClient *Client) {
+func (rm *RoomManager) BroadcastToRoom(roomName string, message interface{}, excludeClient *Client) {
 	rm.mu.Lock()
 	room, exists := rm.Rooms[roomName]
 	rm.mu.Unlock()
 
 	if exists {
-		room.Broadcast(message, excludeClient)
+		room.Broadcast(roomName, message, excludeClient)
 	}
 }
 

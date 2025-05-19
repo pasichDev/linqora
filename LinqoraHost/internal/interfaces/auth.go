@@ -14,8 +14,8 @@ type PendingAuthRequest struct {
 
 // WSClient определяет интерфейс для работы с WebSocket клиентом
 type WSClient interface {
-	SendMessage(message []byte) error
-	SendError(message string) error
+	SendError(requestType string, message string, errorCode ...int) error
+	SendSuccess(responseType string, data interface{}) error
 	GetIP() string
 	GetDeviceID() string
 	GetDeviceName() string
