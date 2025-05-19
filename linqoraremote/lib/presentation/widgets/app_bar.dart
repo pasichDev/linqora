@@ -10,6 +10,7 @@ class AppBarCustom extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     return AppBar(
       title: const Text('Linqora Remote'),
+      elevation: 7,
       actions: [
         IconButton(
           onPressed: () => Get.toNamed(AppRoutes.SETTINGS),

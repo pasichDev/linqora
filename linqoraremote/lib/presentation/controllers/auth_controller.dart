@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:linqoraremote/data/enums/type_messages_ws.dart';
@@ -16,7 +17,7 @@ import '../../core/utils/error_handler.dart';
 import '../../data/models/discovered_service.dart';
 import '../../routes/app_routes.dart';
 
-enum AuthStatus { scanning, listDevices, pendingAuth, connecting }
+enum AuthStatus { noWifi, scanning, listDevices, pendingAuth, connecting }
 
 class AuthController extends GetxController {
   final WebSocketProvider webSocketProvider;
@@ -29,41 +30,70 @@ class AuthController extends GetxController {
   final RxInt authTimeoutSeconds = 30.obs;
   final Rxn<DiscoveredService> authDevice = Rxn<DiscoveredService>();
   final Rx<AuthStatus> authStatus = AuthStatus.scanning.obs;
-
-  Timer? _scanTimer;
+  final RxBool isWifiConnections = false.obs;
   Timer? _authTimer;
+
+  late final Stream<ConnectivityResult> _connectivityStream;
 
   @override
   void onInit() {
     _setupMDnsProvider();
+    _loadSettingsApp();
     super.onInit();
+  }
+
+  Future<void> _loadSettingsApp() async {
+    _connectivityStream = Connectivity().onConnectivityChanged.map(
+      (result) => result.first,
+    );
+
+    _connectivityStream.listen((result) {
+      switch (result) {
+        case ConnectivityResult.wifi:
+          _returnWifiConnection();
+          break;
+        default:
+          _cancelWifiConnection();
+          break;
+      }
+    });
+  }
+
+  _cancelWifiConnection() async {
+    isWifiConnections.value = false;
+    await _notConnectDevice(isError: false);
+    authStatus.value = AuthStatus.noWifi;
+  }
+
+  _returnWifiConnection() {
+    isWifiConnections.value = true;
+    authStatus.value = AuthStatus.scanning;
+    startDiscovery();
   }
 
   void _setupMDnsProvider() {
     mDnsProvider.onStatusChanged = (status, {String? message}) {
       switch (status) {
         case DiscoveryStatus.started:
-          statusMessage.value = 'Поиск устройств в сети...';
           authStatus.value = AuthStatus.scanning;
           break;
         case DiscoveryStatus.deviceFound:
           statusMessage.value = 'Найдено устройства!';
-          _scanTimer?.cancel();
           break;
         case DiscoveryStatus.completed:
-          statusMessage.value = 'Поиск завершен';
           authStatus.value = AuthStatus.listDevices;
           break;
         case DiscoveryStatus.empty:
-          statusMessage.value = 'Устройства не найдены';
           authStatus.value = AuthStatus.listDevices;
           break;
         case DiscoveryStatus.error:
-          statusMessage.value = message ?? 'Ошибка поиска устройств';
+          showErrorSnackbar(
+            "Ошибка поиска устройств",
+            message ?? 'Ошибка поиска устройства не определена',
+          );
           authStatus.value = AuthStatus.listDevices;
           break;
         case DiscoveryStatus.timeout:
-          statusMessage.value = 'Время поиска истекло';
           authStatus.value = AuthStatus.listDevices;
           break;
       }
@@ -72,7 +102,6 @@ class AuthController extends GetxController {
 
   @override
   void onClose() {
-    _scanTimer?.cancel();
     _authTimer?.cancel();
     super.onClose();
   }
@@ -91,9 +120,6 @@ class AuthController extends GetxController {
       } else {
         statusMessage.value = 'Устройства не найдены';
         authStatus.value = AuthStatus.listDevices;
-
-        _scanTimer?.cancel();
-        _scanTimer = Timer(const Duration(seconds: 60), startDiscovery);
       }
     } catch (e) {
       statusMessage.value = 'Ошибка при поиске устройств: $e';
@@ -295,10 +321,10 @@ class AuthController extends GetxController {
     }
   }
 
-  void _notConnectDevice({
+  Future<void> _notConnectDevice({
     String errorMessage = 'Не удалось подключиться к устройству',
     bool isError = true,
-  }) {
+  }) async {
     _cleanupResources(resetStatus: true);
 
     if (isError) {
@@ -313,9 +339,6 @@ class AuthController extends GetxController {
     bool clearHandlers = true,
     bool disconnectWebSocket = false,
   }) {
-    _authTimer?.cancel();
-    _scanTimer?.cancel();
-
     if (clearHandlers) {
       webSocketProvider.removeHandler(TypeMessageWs.auth_response.value);
       webSocketProvider.removeHandler(TypeMessageWs.auth_pending.value);

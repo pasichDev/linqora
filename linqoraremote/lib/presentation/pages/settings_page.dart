@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:linqoraremote/presentation/controllers/settings_controller.dart';
-import 'package:url_launcher/url_launcher.dart';
+
+import '../../core/constants/urls.dart';
+import '../../core/utils/lauch_url.dart';
 
 class SettingsPage extends GetView<SettingsController> {
   const SettingsPage({super.key});
@@ -270,14 +272,14 @@ class SettingsPage extends GetView<SettingsController> {
                   'Linqora Remote',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-                subtitle: const Text('Версия 1.0.0'),
+                subtitle: Text('Версия: 1.0.0'),
               ),
               // const Divider(),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Документация'),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                onTap: () => _launchURL('https://linqora.com/docs'),
+                onTap: () => launchUrlHandler(docs),
               ),
               //  const Divider(),
               ListTile(
@@ -291,7 +293,7 @@ class SettingsPage extends GetView<SettingsController> {
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Политика конфиденциальности'),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                onTap: () => _launchURL('https://linqora.com/privacy'),
+                onTap: () => launchUrlHandler(privacy),
               ),
             ],
           ),
@@ -331,8 +333,7 @@ class SettingsPage extends GetView<SettingsController> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    onPressed:
-                        () => _launchURL('https://github.com/sponsors/linqora'),
+                    onPressed: () => launchUrlHandler(supportLinqora),
                   ),
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
@@ -347,7 +348,7 @@ class SettingsPage extends GetView<SettingsController> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    onPressed: () {},
+                    onPressed: () => launchUrlHandler(sendFeedback),
                   ),
                 ],
               ),
@@ -356,11 +357,5 @@ class SettingsPage extends GetView<SettingsController> {
         ),
       ],
     );
-  }
-
-  Future<void> _launchURL(String url) async {
-    if (await canLaunch(url)) {
-      await launch(url);
-    }
   }
 }

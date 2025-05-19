@@ -4,6 +4,9 @@ import 'package:linqoraremote/presentation/controllers/auth_controller.dart';
 import 'package:linqoraremote/presentation/widgets/app_bar.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 
+import '../../core/constants/urls.dart';
+import '../../core/utils/lauch_url.dart';
+
 class DeviceAuthPage extends StatefulWidget {
   const DeviceAuthPage({super.key});
 
@@ -18,9 +21,6 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
   void initState() {
     super.initState();
     authController = Get.find<AuthController>();
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => authController.startDiscovery(),
-    );
   }
 
   @override
@@ -32,11 +32,21 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: Column(
             children: [
-              _buildStatusBar(),
+              SizedBox(height: 10),
+              Obx(() {
+                return authController.authStatus.value !=
+                            AuthStatus.pendingAuth &&
+                        authController.authStatus.value != AuthStatus.connecting
+                    ? _buildFAQ()
+                    : SizedBox.shrink();
+              }),
+
               SizedBox(height: 10),
               Expanded(
                 child: Obx(() {
                   switch (authController.authStatus.value) {
+                    case AuthStatus.noWifi:
+                      return _buildNoWifi();
                     case AuthStatus.pendingAuth:
                       return _buildAuthPendingView();
                     case AuthStatus.connecting:
@@ -51,7 +61,11 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
                   }
                 }),
               ),
-              _buildActionButton(),
+              Obx(() {
+                return authController.isWifiConnections.value
+                    ? _buildActionButton()
+                    : SizedBox.shrink();
+              }),
             ],
           ),
         ),
@@ -59,38 +73,55 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
     );
   }
 
-  Widget _buildStatusBar() {
-    return Obx(() {
-      if (authController.statusMessage.value.isNotEmpty) {
-        return Container(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 0),
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
-          child: Row(
-            children: [
-              Icon(
-                authController.authStatus.value == AuthStatus.scanning
-                    ? Icons.search
-                    : authController.authStatus.value == AuthStatus.connecting
-                    ? Icons.sync
-                    : Icons.info_outline,
-                size: 20,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  authController.statusMessage.value,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ],
+  Widget _buildNoWifi() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.wifi_off,
+            size: 60,
+            color: Theme.of(context).colorScheme.error,
           ),
-        );
-      }
-      return const SizedBox.shrink();
-    });
+          const SizedBox(height: 24),
+          const Text(
+            'Нет подключения к Wi-Fi',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Пожалуйста, подключитесь к Wi-Fi и попробуйте снова',
+            style: TextStyle(fontSize: 16),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFAQ() {
+    return Row(
+      children: [
+        ElevatedButton.icon(
+          onPressed: () {
+            launchUrlHandler(howItWorks);
+          },
+          icon: const Icon(Icons.remove_from_queue_rounded),
+          label: const Text('Як це працює?'),
+        ),
+        SizedBox(width: 10),
+        ElevatedButton.icon(
+          onPressed: () {
+            launchUrlHandler(getLinqoraHost);
+          },
+          style: ElevatedButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.errorContainer,
+          ),
+          icon: const Icon(Icons.ac_unit),
+          label: const Text('Linqora Host'),
+        ),
+      ],
+    );
   }
 
   Widget _buildScanningView() {
@@ -206,7 +237,9 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
               Icon(
                 Icons.devices_other,
                 size: 60,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.5),
               ),
               const SizedBox(height: 24),
               const Text(
@@ -248,7 +281,7 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
                 style: TextStyle(
                   color: Theme.of(
                     context,
-                  ).colorScheme.onSurface.withOpacity(0.6),
+                  ).colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               ),
               trailing: IconButton(
