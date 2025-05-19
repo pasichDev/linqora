@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:linqoraremote/presentation/controllers/settings_controller.dart';
+import 'package:linqoraremote/presentation/widgets/sponsor_card.dart';
 
 import '../../core/constants/urls.dart';
 import '../../core/utils/lauch_url.dart';
@@ -26,7 +27,7 @@ class SettingsPage extends GetView<SettingsController> {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
         children: [
-          _buildSponsorshipSection(context),
+          SponsorCard(),
           const SizedBox(height: 16),
           _buildThemeSection(context),
           const SizedBox(height: 16),
@@ -302,6 +303,7 @@ class SettingsPage extends GetView<SettingsController> {
     );
   }
 
+  /*
   Widget _buildSponsorshipSection(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -358,4 +360,6 @@ class SettingsPage extends GetView<SettingsController> {
       ],
     );
   }
+
+ */
 }

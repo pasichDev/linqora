@@ -9,26 +9,19 @@ import 'package:permission_handler/permission_handler.dart';
 
 class SettingsController extends GetxController {
   static const _kThemeMode = 'theme_mode';
-  static const _kShowMetrics = 'show_metrics';
   static const _kEnableNotifications = 'enable_notifications';
   static const _kEnableAutoConnect = 'enable_auto_connect';
-  static const _kKeepAliveInterval = 'keep_alive_interval';
   static const _kEnableBackgroundService = 'enable_background_service';
-  static const _kActivePingInterval = 'active_ping_interval';
-  static const _kBackgroundPingInterval = 'background_ping_interval';
-  static const _kPingTimeout = 'ping_timeout';
-  static const _kMaxMissedPings = 'max_missed_pings';
+  static const _kShowSponsorHome = 'show_sponsor_home';
 
   final _storage = GetStorage('settings');
 
   final Rx<ThemeMode> themeMode = ThemeMode.system.obs;
-  final RxBool showMetrics = true.obs;
   final RxBool enableNotifications = false.obs;
   final RxBool enableAutoConnect = false.obs;
-  final RxInt keepAliveInterval = 10.obs;
   final RxBool enableBackgroundService = false.obs;
-
   final RxBool notificationPermissionGranted = false.obs;
+  final RxBool showSponsorHome = true.obs;
 
   final FlutterLocalNotificationsPlugin notificationsPlugin =
       FlutterLocalNotificationsPlugin();
@@ -47,13 +40,12 @@ class SettingsController extends GetxController {
   void onClose() {
     // Dispose RxVariables
     themeMode.close();
-    showMetrics.close();
     enableNotifications.close();
     enableAutoConnect.close();
-    keepAliveInterval.close();
     enableBackgroundService.close();
     notificationPermissionGranted.close();
     backgroundMode.close();
+    showSponsorHome.close();
 
     // Clean up notifications plugin resources
     notificationsPlugin.pendingNotificationRequests().then((notifications) {
@@ -77,15 +69,13 @@ class SettingsController extends GetxController {
       final themeModeValue = _storage.read<String>(_kThemeMode) ?? 'system';
       themeMode.value = _getThemeMode(themeModeValue);
 
-      showMetrics.value = _storage.read<bool>(_kShowMetrics) ?? true;
       enableNotifications.value =
           _storage.read<bool>(_kEnableNotifications) ?? false;
       enableAutoConnect.value =
           _storage.read<bool>(_kEnableAutoConnect) ?? false;
-      keepAliveInterval.value = _storage.read<int>(_kKeepAliveInterval) ?? 10;
       enableBackgroundService.value =
           _storage.read<bool>(_kEnableBackgroundService) ?? false;
-
+      showSponsorHome.value = _storage.read<bool>(_kShowSponsorHome) ?? true;
       Get.changeThemeMode(themeMode.value);
     } catch (e) {
       printError(info: 'Ошибка загрузки настроек: $e');
@@ -165,7 +155,6 @@ class SettingsController extends GetxController {
     }
   }
 
-
   Future<void> saveThemeMode(ThemeMode mode) async {
     try {
       themeMode.value = mode;
@@ -176,31 +165,20 @@ class SettingsController extends GetxController {
     }
   }
 
-  Future<void> toggleShowMetrics(bool value) async {
-    showMetrics.value = value;
-    await _storage.write(_kShowMetrics, value);
-  }
-
   Future<void> toggleAutoConnect(bool value) async {
     enableAutoConnect.value = value;
     await _storage.write(_kEnableAutoConnect, value);
   }
 
-  Future<void> setKeepAliveInterval(int value) async {
-    keepAliveInterval.value = value;
-    await _storage.write(_kKeepAliveInterval, value);
+  Future<void> toggleShowSponsorHome(bool value) async {
+    showSponsorHome.value = value;
+    await _storage.write(_kShowSponsorHome, value);
   }
-
-
-
-
 
   // Метод для установки режима приложения
   void setBackgroundMode(bool isBackground) {
     backgroundMode.value = isBackground;
   }
-
-
 
   ThemeMode _getThemeMode(String value) {
     switch (value) {
