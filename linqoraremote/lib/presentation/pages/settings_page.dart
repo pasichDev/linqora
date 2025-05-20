@@ -42,7 +42,8 @@ class SettingsPage extends GetView<SettingsController> {
 
   Widget _buildCard(BuildContext context, Widget child) {
     return Card(
-      elevation: 2,
+      elevation: 0,
+      color: Theme.of(context).colorScheme.surfaceContainer,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: Padding(padding: const EdgeInsets.all(16.0), child: child),
@@ -164,7 +165,6 @@ class SettingsPage extends GetView<SettingsController> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
               Obx(
                 () => SwitchListTile(
                   title: Row(

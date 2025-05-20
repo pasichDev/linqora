@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
@@ -338,14 +339,15 @@ class AuthController extends GetxController {
 
       return;
     }
-
-    _cleanupResources(resetStatus: true, clearHandlers: true);
-    statusMessage.value = '';
-
     Get.toNamed(
       AppRoutes.DEVICE_HOME,
       arguments: {'device': authDevice.value!.toJson()},
     );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _cleanupResources(resetStatus: true, clearHandlers: true);
+      statusMessage.value = '';
+    });
   }
 
   void cancelAuth([String? reason]) {

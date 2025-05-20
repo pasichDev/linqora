@@ -106,7 +106,17 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
           onPressed: () {
             launchUrlHandler(howItWorks);
           },
+          style: ElevatedButton.styleFrom(
+            elevation: 0,
+            backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+            foregroundColor: Theme.of(context).colorScheme.onSurface,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
           icon: const Icon(Icons.remove_from_queue_rounded),
+
           label: const Text('Як це працює?'),
         ),
         SizedBox(width: 10),
@@ -115,7 +125,13 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
             launchUrlHandler(getLinqoraHost);
           },
           style: ElevatedButton.styleFrom(
-            foregroundColor: Theme.of(context).colorScheme.errorContainer,
+            elevation: 0,
+            backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+            foregroundColor: Theme.of(context).colorScheme.onSurface,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
           icon: const Icon(Icons.ac_unit),
           label: const Text('Linqora Host'),
@@ -129,8 +145,8 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          LoadingAnimationWidget.discreteCircle(
-            color: Theme.of(context).colorScheme.primary,
+          LoadingAnimationWidget.fourRotatingDots(
+            color: Theme.of(context).colorScheme.onSurface,
             size: 60,
           ),
           const SizedBox(height: 24),
@@ -172,7 +188,11 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
             style: OutlinedButton.styleFrom(
               foregroundColor: Theme.of(context).colorScheme.error,
               side: BorderSide(color: Theme.of(context).colorScheme.error),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                )
             ),
             child: const Text('Отменить'),
           ),
@@ -218,7 +238,11 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
             style: OutlinedButton.styleFrom(
               foregroundColor: Theme.of(context).colorScheme.error,
               side: BorderSide(color: Theme.of(context).colorScheme.error),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             child: const Text('Отменить'),
           ),
@@ -263,7 +287,9 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
           final device = authController.discoveredDevices[index];
 
           return Card(
-            margin: const EdgeInsets.symmetric(vertical: 6),
+            elevation: 0,
+            color: Get.theme.colorScheme.surfaceContainer,
+            margin: const EdgeInsets.symmetric(vertical: 0),
             child: ListTile(
               leading: Icon(
                 Icons.computer,
@@ -274,18 +300,21 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
               ),
               title: Text(
                 device.name,
-                style: TextStyle(fontWeight: FontWeight.bold),
+                style: Get.theme.textTheme.titleMedium?.copyWith(
+                  color: Get.theme.colorScheme.onPrimaryContainer,
+                ),
               ),
               subtitle: Text(
                 '${device.address}:${device.port}',
-                style: TextStyle(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.6),
+                style: Get.theme.textTheme.labelMedium?.copyWith(
+                  color: Get.theme.colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               ),
               trailing: IconButton(
-                icon: const Icon(Icons.arrow_forward),
+                icon: Icon(
+                  Icons.arrow_forward,
+                  color: Get.theme.colorScheme.onPrimaryContainer,
+                ),
                 onPressed: () => authController.connectToDevice(device),
               ),
               onTap: () => authController.connectToDevice(device),
@@ -306,10 +335,21 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
           return const SizedBox.shrink();
         }
 
-        return ElevatedButton.icon(
-          onPressed: authController.startDiscovery,
-          icon: const Icon(Icons.refresh),
-          label: const Text('Обновить'),
+        return SizedBox(
+          height: 48,
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: authController.startDiscovery,
+            style: ElevatedButton.styleFrom(
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            icon: const Icon(Icons.refresh),
+            label: Text('Обновить', style: Get.theme.textTheme.titleMedium),
+          ),
         );
       }),
     );

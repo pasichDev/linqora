@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 class MenuOptionCard extends StatelessWidget {
   final String title;
@@ -15,7 +16,8 @@ class MenuOptionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 4,
+      elevation: 0,
+      color: Theme.of(context).colorScheme.surfaceContainer,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         onTap: onTap,
@@ -23,11 +25,15 @@ class MenuOptionCard extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 48),
-            const SizedBox(height: 16),
+            Icon(icon, size: 48, color: Get.theme.colorScheme.onPrimaryContainer),
+            const SizedBox(height: 15),
             Text(
               title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Get.theme.colorScheme.onPrimaryContainer,
+              ),
             ),
           ],
         ),

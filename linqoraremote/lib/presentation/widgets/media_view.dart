@@ -84,20 +84,24 @@ class _MediaScreenViewState extends State<MediaScreenView> {
 
   Widget _volumeCard() {
     return Card(
-      elevation: 2,
+      elevation: 0,
+      color: Theme.of(context).colorScheme.surfaceContainer,
+
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Керування звуком',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: Get.theme.textTheme.titleMedium?.copyWith(
+                color: Get.theme.colorScheme.onPrimaryContainer,
+                fontSize: 18,
+              ),
             ),
             const SizedBox(height: 24),
             Row(
               children: [
-                // Кнопка выключения звука
                 Obx(
                   () => IconButton(
                     icon: Icon(
@@ -111,7 +115,6 @@ class _MediaScreenViewState extends State<MediaScreenView> {
                 ),
                 const SizedBox(width: 5),
 
-                // Кнопка уменьшения громкости
                 IconButton(
                   icon: const Icon(Icons.remove, size: 24),
                   onPressed: _mediaController.minusVolume,
@@ -164,7 +167,9 @@ class _MediaScreenViewState extends State<MediaScreenView> {
 
   Widget _mediaCard() {
     return Card(
-      elevation: 2,
+      elevation: 0,
+      color: Theme.of(context).colorScheme.surfaceContainer,
+
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Obx(() {
@@ -183,12 +188,14 @@ class _MediaScreenViewState extends State<MediaScreenView> {
             children: [
               Row(
                 children: [
-                  const Text(
+                  Text(
                     'Зараз грає',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: Get.theme.textTheme.titleMedium?.copyWith(
+                      color: Get.theme.colorScheme.onPrimaryContainer,
+                      fontSize: 18,
+                    ),
                   ),
                   const Spacer(),
-                  // Индикатор обновления в реальном времени
                   Obx(
                     () =>
                         !_mediaController.isLoadingMedia.value
@@ -207,7 +214,7 @@ class _MediaScreenViewState extends State<MediaScreenView> {
                                       : Colors.grey,
                             )
                             : LoadingAnimationWidget.fourRotatingDots(
-                              color: Theme.of(context).colorScheme.onSurface,
+                              color: Theme.of(context).colorScheme.onPrimary,
                               size: 22,
                             ),
                   ),
@@ -236,7 +243,12 @@ class _MediaScreenViewState extends State<MediaScreenView> {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         minimumSize: const Size(0, 0),
       ),
-      child: Text(label, style: const TextStyle(fontSize: 14)),
+      child: Text(
+        label,
+        style: Get.theme.textTheme.labelLarge?.copyWith(
+          color: Get.theme.colorScheme.onPrimaryContainer,
+        ),
+      ),
     );
   }
 

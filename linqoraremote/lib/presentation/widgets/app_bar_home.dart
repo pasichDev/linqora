@@ -26,7 +26,9 @@ class AppBarHomePage extends StatelessWidget implements PreferredSizeWidget {
               controller.selectedMenuIndex.value == -1
                   ? controller.hostInfo.value?.hostname ?? ""
                   : menuOptions[controller.selectedMenuIndex.value].title,
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              style: Get.textTheme.titleMedium!.copyWith(
+                color: Get.theme.colorScheme.onPrimaryContainer,
+              ),
             ),
             Row(
               mainAxisAlignment: MainAxisAlignment.start,
@@ -101,19 +103,17 @@ class AppBarHomePage extends StatelessWidget implements PreferredSizeWidget {
           size: 12,
           color:
               isTLS
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.errorContainer,
+                  ? Get.theme.colorScheme.primary
+                  : Get.theme.colorScheme.errorContainer,
         ),
         SizedBox(width: 2),
         Text(
           isTLS ? "(TSL)" : "(Non-TSL)",
-          style: TextStyle(
-            fontSize: 12,
-            color:
-                isTLS
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.errorContainer,
-          ),
+          style: Get.textTheme.labelSmall!.copyWith(color:isTLS
+              ? Get.theme.colorScheme.primary
+              : Get.theme.colorScheme.errorContainer)
+
+
         ),
         SizedBox(width: 2),
       ],

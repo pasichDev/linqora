@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 class MetricsStandartCard extends StatefulWidget {
   final String title;
@@ -28,7 +29,8 @@ class _MetricsStandartCardState extends State<MetricsStandartCard> {
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 8,
+      elevation: 0,
+      color: Get.theme.colorScheme.surfaceContainer,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -43,22 +45,13 @@ class _MetricsStandartCardState extends State<MetricsStandartCard> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    widget.title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.8),
-                    ),
-                  ),
+                  Text(widget.title, style: Get.theme.textTheme.titleMedium),
                   Row(
                     children: [
                       Text(
                         widget.value,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                        style: Get.theme.textTheme.titleMedium?.copyWith(
+                          color: Get.theme.colorScheme.onPrimaryContainer,
                         ),
                       ),
                       if (widget.widget != null) ...[

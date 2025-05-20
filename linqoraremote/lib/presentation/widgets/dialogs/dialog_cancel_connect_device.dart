@@ -24,7 +24,10 @@ class DisconnectConfirmationDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Підтвердження'),
-      content: const Text('Ви впевнені, що хочете розірвати з\'єднання?'),
+      content: Text(
+        'Ви впевнені, що хочете розірвати з\'єднання?',
+        style: Get.textTheme.bodyMedium,
+      ),
       actions: [
         TextButton(
           onPressed: () {

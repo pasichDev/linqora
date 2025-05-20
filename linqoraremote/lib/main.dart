@@ -32,9 +32,8 @@ class MyApp extends StatelessWidget {
       () => GetMaterialApp(
         title: 'Linqora Remote',
         debugShowCheckedModeBanner: false,
-        theme: MaterialTheme.lightTheme,
-        darkTheme: MaterialTheme.darkTheme,
-
+        theme: ThemeData(useMaterial3: true, colorScheme: MaterialTheme.lightScheme()),
+        darkTheme: ThemeData(useMaterial3: true, colorScheme: MaterialTheme.darkScheme()),
         themeMode: settingsController.themeMode.value,
         initialRoute: AppRoutes.DEVICE_AUTH,
 
