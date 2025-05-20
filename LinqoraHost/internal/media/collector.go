@@ -73,6 +73,8 @@ func (mc *MediaCollector) collectAndSendInfo() {
 	}
 
 	if mediaCapabilities == nil && nowPlaying == nil {
+		log.Printf("[MediaCollector:] Нет данных для отправки, выход из метода")
+
 		return
 	}
 
