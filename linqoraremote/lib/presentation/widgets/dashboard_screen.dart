@@ -97,10 +97,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 : const HostInfoCardSkeleton(),
                       ),
                     ),
-
                     Expanded(
                       child: GridView.builder(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 2,
