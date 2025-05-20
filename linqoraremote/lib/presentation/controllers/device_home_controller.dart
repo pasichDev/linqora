@@ -14,7 +14,6 @@ import '../../core/constants/settings.dart';
 import '../../core/utils/error_handler.dart';
 import '../../data/models/server_response.dart';
 import '../../data/providers/websocket_provider.dart';
-import '../../routes/app_routes.dart';
 
 class DeviceHomeController extends GetxController with WidgetsBindingObserver {
   final WebSocketProvider webSocketProvider;
@@ -36,9 +35,6 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
   Future<void> onInit() async {
     super.onInit();
 
-    // Регистрируем наблюдателя за жизненным циклом приложения
-    WidgetsBinding.instance.addObserver(this);
-
     // Получаем данные устройства из аргументов
     await _setupFromArguments();
 
@@ -57,7 +53,6 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
 
   @override
   void onClose() {
-    WidgetsBinding.instance.removeObserver(this);
     stopBackgroundService();
     _serviceStatusTimer?.cancel();
 
@@ -149,24 +144,13 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
       }
 
       isConnected.value = webSocketProvider.isConnected;
-
-      if (!isConnected.value) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          Get.back();
-          Get.offAllNamed(AppRoutes.DEVICE_AUTH);
-          showErrorSnackbar(
-            'Ошибка соединения',
-            'Соединение с устройством потеряно',
-          );
-        });
-      }
     }
   }
 
   void _setupWebSocketHandlers() {
     webSocketProvider.onDisconnected = () {
       isConnected.value = false;
-      Get.offAllNamed(AppRoutes.DEVICE_AUTH);
+      Get.back(result: true);
       showErrorSnackbar(
         'Соединение разорвано',
         'Соединение с устройством Linqora было прервано',

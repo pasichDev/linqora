@@ -72,7 +72,6 @@ class AuthController extends GetxController {
 
   _returnWifiConnection() {
     isWifiConnections.value = true;
-    //  authStatus.value = AuthStatus.scanning;
     _getLastConnect();
   }
 
