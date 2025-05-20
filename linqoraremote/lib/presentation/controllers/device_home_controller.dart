@@ -33,7 +33,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
 
   final Rxn<MdnsDevice> authDevice = Rxn<MdnsDevice>();
 
-  DateTime refreshLastTime = DateTime.now();
+  DateTime _refreshLastTime = DateTime.now();
 
   @override
   Future<void> onInit() async {
@@ -78,8 +78,8 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
       showHostFull.value =
           GetStorage(
             SettingsConst.kSettings,
-          ).read<bool>(SettingsConst.kEnableNotifications) ??
-          false;
+          ).read<bool>(SettingsConst.kShowHostInfo) ??
+          true;
     } catch (e) {
       printError(info: 'Ошибка загрузки настроек: $e');
     }
@@ -209,7 +209,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
 
   void refreshHostInfo() {
     bool difference =
-        DateTime.now().difference(refreshLastTime).inSeconds >= 30;
+        DateTime.now().difference(_refreshLastTime).inSeconds >= 30;
     if (isConnected.value && difference) {
       _requestSystemInfo();
     }
@@ -218,7 +218,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
   // Запрос информации о системе
   void _requestSystemInfo() {
     if (!isConnected.value) return;
-    refreshLastTime = DateTime.now();
+    _refreshLastTime = DateTime.now();
     try {
       webSocketProvider.sendMessage(
         WsMessage(type: TypeMessageWs.host_info.value),
@@ -268,10 +268,10 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
   }
 
   void toggleShowHostFull() {
-    showHostFull.value = !showHostFull.value;
     GetStorage(
       SettingsConst.kSettings,
     ).write(SettingsConst.kShowHostInfo, !showHostFull.value);
+    showHostFull.value = !showHostFull.value;
   }
 
   // Отключиться от устройства

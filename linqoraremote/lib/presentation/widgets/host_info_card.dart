@@ -1,40 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 import 'package:linqoraremote/presentation/widgets/shimmer_effect.dart';
 
 import '../../data/models/host_info.dart';
-import '../controllers/device_home_controller.dart';
 
-class HostInfoCard extends StatefulWidget {
+class HostInfoCard extends StatelessWidget {
   final HostSystemInfo host;
+  final bool isExpanded;
+  final VoidCallback refresh;
+  final VoidCallback toggleShowHostFull;
 
-  const HostInfoCard({required this.host, super.key});
-
-  @override
-  State<HostInfoCard> createState() => _HostInfoCardState();
-}
-
-class _HostInfoCardState extends State<HostInfoCard> {
-  late final DeviceHomeController _homeController;
-
-  @override
-  void initState() {
-    super.initState();
-    _homeController = Get.find<DeviceHomeController>();
-  }
-
-  @override
-  void dispose() {
-    if (_isControllerRegistered<DeviceHomeController>()) {
-      Get.delete<DeviceHomeController>();
-    }
-
-    super.dispose();
-  }
-
-  bool _isControllerRegistered<T>() {
-    return Get.isRegistered<T>();
-  }
+  const HostInfoCard({
+    required this.host,
+    super.key,
+    required this.refresh,
+    required this.isExpanded,
+    required this.toggleShowHostFull,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -62,7 +43,7 @@ class _HostInfoCardState extends State<HostInfoCard> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      widget.host.os,
+                      host.os,
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -73,30 +54,28 @@ class _HostInfoCardState extends State<HostInfoCard> {
                 ),
                 Row(
                   children: [
-                    Obx(
-                      () => IconButton(
-                        onPressed: _homeController.toggleShowHostFull,
-                        icon: Icon(
-                          _homeController.showHostFull.value
-                              ? Icons.keyboard_arrow_up
-                              : Icons.keyboard_arrow_down,
-                        ),
-                        style: IconButton.styleFrom(
-                          elevation: 0,
-                          backgroundColor:
-                              Theme.of(context).colorScheme.surfaceContainer,
-                          foregroundColor:
-                              Theme.of(context).colorScheme.onSurface,
-                          padding: const EdgeInsets.all(0),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(0),
-                          ),
+                    IconButton(
+                      onPressed: toggleShowHostFull,
+                      icon: Icon(
+                        isExpanded
+                            ? Icons.keyboard_arrow_up
+                            : Icons.keyboard_arrow_down,
+                      ),
+                      style: IconButton.styleFrom(
+                        elevation: 0,
+                        backgroundColor:
+                            Theme.of(context).colorScheme.surfaceContainer,
+                        foregroundColor:
+                            Theme.of(context).colorScheme.onSurface,
+                        padding: const EdgeInsets.all(0),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(0),
                         ),
                       ),
                     ),
                     SizedBox(width: 0),
                     IconButton(
-                      onPressed: _homeController.refreshHostInfo,
+                      onPressed: refresh,
                       icon: Icon(Icons.refresh),
                       style: IconButton.styleFrom(
                         elevation: 0,
@@ -115,66 +94,63 @@ class _HostInfoCardState extends State<HostInfoCard> {
               ],
             ),
 
-            Obx(() {
-              if (_homeController.showHostFull.value) {
-                return Column(
-                  children: [
-                    const SizedBox(height: 12), // Разделитель
-                    Divider(
-                      height: 1,
-                      color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+            if (isExpanded) ...[
+              Column(
+                children: [
+                  const SizedBox(height: 12),
+                  // Разделитель
+                  Divider(
+                    height: 1,
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Процессор
+                  _buildInfoRow(
+                    context,
+                    Icons.developer_board,
+                    'Процессор',
+                    host.cpu.model,
+                    "${host.cpu.frequency} MHz • ${host.cpu.physicalCores}/${host.cpu.logicalCores} ядер",
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Память
+                  _buildInfoRow(
+                    context,
+                    Icons.memory_outlined,
+                    'Память',
+                    _formatRamInfo(),
+                    _formatRamUsage(),
+                  ),
+
+                  // GPU - показываем только если есть информация
+                  if (host.gpu.model != 'Unknown')
+                    Column(
+                      children: [
+                        const SizedBox(height: 12),
+                        _buildInfoRow(
+                          context,
+                          Icons.developer_board_rounded,
+                          'Видеокарта',
+                          host.gpu.model,
+                          _formatGpuInfo(),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 12),
 
-                    // Процессор
-                    _buildInfoRow(
-                      context,
-                      Icons.developer_board,
-                      'Процессор',
-                      widget.host.cpu.model,
-                      "${widget.host.cpu.frequency} MHz • ${widget.host.cpu.physicalCores}/${widget.host.cpu.logicalCores} ядер",
+                  // Диски - показываем если есть хотя бы один диск
+                  if (host.disks.isNotEmpty)
+                    Column(
+                      children: [
+                        const SizedBox(height: 12),
+                        _buildDisksInfo(context),
+                      ],
                     ),
-
-                    const SizedBox(height: 12),
-
-                    // Память
-                    _buildInfoRow(
-                      context,
-                      Icons.memory_outlined,
-                      'Память',
-                      _formatRamInfo(),
-                      _formatRamUsage(),
-                    ),
-
-                    // GPU - показываем только если есть информация
-                    if (widget.host.gpu.model != 'Unknown')
-                      Column(
-                        children: [
-                          const SizedBox(height: 12),
-                          _buildInfoRow(
-                            context,
-                            Icons.developer_board_rounded,
-                            'Видеокарта',
-                            widget.host.gpu.model,
-                            _formatGpuInfo(),
-                          ),
-                        ],
-                      ),
-
-                    // Диски - показываем если есть хотя бы один диск
-                    if (widget.host.disks.isNotEmpty)
-                      Column(
-                        children: [
-                          const SizedBox(height: 12),
-                          _buildDisksInfo(context),
-                        ],
-                      ),
-                  ],
-                );
-              } else {
-                return const SizedBox.shrink();
-              }
-            }),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -183,22 +159,22 @@ class _HostInfoCardState extends State<HostInfoCard> {
 
   // Форматирование информации о RAM
   String _formatRamInfo() {
-    String info = "${widget.host.ram.total} GB";
-    if (widget.host.ram.type != 'Unknown') {
-      info += " • ${widget.host.ram.type}";
+    String info = "${host.ram.total} GB";
+    if (host.ram.type != 'Unknown') {
+      info += " • ${host.ram.type}";
     }
-    if (widget.host.ram.frequency > 0) {
-      info += " ${widget.host.ram.frequency} MHz";
+    if (host.ram.frequency > 0) {
+      info += " ${host.ram.frequency} MHz";
     }
     return info;
   }
 
   // Форматирование использования RAM
   String _formatRamUsage() {
-    if (widget.host.ram.used > 0 && widget.host.ram.total > 0) {
-      return "Используется: ${widget.host.ram.used} GB • Доступно: ${widget.host.ram.total} GB";
-    } else if (widget.host.ram.used > 0) {
-      return "Используется: ${widget.host.ram.used} GB";
+    if (host.ram.used > 0 && host.ram.total > 0) {
+      return "Используется: ${host.ram.used} GB • Доступно: ${host.ram.total} GB";
+    } else if (host.ram.used > 0) {
+      return "Используется: ${host.ram.used} GB";
     }
     return "";
   }
@@ -208,8 +184,8 @@ class _HostInfoCardState extends State<HostInfoCard> {
     String info = "";
 
     // Базовая информация о памяти
-    if (widget.host.gpu.memory > 0) {
-      double gpuMemoryGB = widget.host.gpu.memory / 1024.0;
+    if (host.gpu.memory > 0) {
+      double gpuMemoryGB = host.gpu.memory / 1024.0;
       info += "${gpuMemoryGB.toStringAsFixed(1)} GB";
     }
 
@@ -238,7 +214,7 @@ class _HostInfoCardState extends State<HostInfoCard> {
           ],
         ),
         const SizedBox(height: 4),
-        ...widget.host.disks.map(
+        ...host.disks.map(
           (disk) => Padding(
             padding: const EdgeInsets.only(left: 26, bottom: 4),
             child: Column(
