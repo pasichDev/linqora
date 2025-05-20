@@ -25,14 +25,14 @@ class MenuOptionCard extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 48, color: Get.theme.colorScheme.onPrimaryContainer),
+            Icon(icon, size: 48, color: Get.theme.colorScheme.secondary),
             const SizedBox(height: 15),
             Text(
               title,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: Get.theme.colorScheme.onPrimaryContainer,
+                color: Get.theme.colorScheme.secondary,
               ),
             ),
           ],

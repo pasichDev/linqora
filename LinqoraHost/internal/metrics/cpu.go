@@ -18,6 +18,46 @@ type CPUMetrics struct {
 	Threads     float64 `json:"threads"`
 }
 
+type CPUInfo struct {
+	Model         string
+	LogicalCores  int
+	PhysicalCores int
+	Frequency     float64
+}
+
+func GetCPUInfo() (CPUInfo, error) {
+	info := CPUInfo{
+		Model:         "Unknown",
+		LogicalCores:  0,
+		PhysicalCores: 0,
+		Frequency:     0.0,
+	}
+
+	// Отримуємо кількість логічних ядер (потоків)
+	logicalCores, logErr := cpu.Counts(true)
+
+	// Отримуємо кількість фізичних ядер
+	physicalCores, psyhErr := cpu.Counts(false)
+
+	if logErr == nil && psyhErr == nil {
+		info.LogicalCores = logicalCores
+		info.PhysicalCores = physicalCores
+	}
+
+	// Отримуємо інформацію про процесор
+	cpuArray, cpuError := cpu.Info()
+	if cpuError == nil {
+		// Якщо є хоча б один процесор, заповнюємо модель, кількість ядер і потоків
+		if len(cpuArray) > 0 {
+			c := cpuArray[0]
+			info.Model = c.ModelName
+			info.Frequency = math.Round(c.Mhz*100) / 100
+		}
+	}
+
+	return info, nil
+}
+
 func GetCPUMetrics() (CPUMetrics, error) {
 	cpu := CPUMetrics{}
 
@@ -107,53 +147,4 @@ func GetProcessesAndThreads() (int, int, error) {
 	}
 
 	return numProcesses, totalThreads, nil
-}
-
-func GetCPUModel() (string, error) {
-
-	// Отримуємо інформацію про процесор
-	cpuArray, cpuError := cpu.Info()
-	if cpuError != nil {
-		return "Unkown", cpuError
-	}
-
-	// Якщо є хоча б один процесор, заповнюємо модель, кількість ядер і потоків
-	if len(cpuArray) > 0 {
-		c := cpuArray[0]
-		return c.ModelName, nil
-	}
-
-	return "Unkown", nil
-}
-
-// GetCPUFrequency повертає частоту процесора в МГц
-func GetCPUFrequency() (float64, error) {
-	cpuInfo, err := cpu.Info()
-	if err != nil {
-		return 0, err
-	}
-
-	if len(cpuInfo) == 0 {
-		return 0, fmt.Errorf("не вдалося отримати інформацію про процесор")
-	}
-
-	// Округляємо до 2 знаків після коми
-	return math.Round(cpuInfo[0].Mhz*100) / 100, nil
-}
-
-// GetCPUCoresAndThreads повертає кількість фізичних ядер та логічних потоків
-func GetCPUCoresAndThreads() (int, int, error) {
-	// Отримуємо кількість логічних ядер (потоків)
-	logicalCores, err := cpu.Counts(true)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	// Отримуємо кількість фізичних ядер
-	physicalCores, err := cpu.Counts(false)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	return physicalCores, logicalCores, nil
 }

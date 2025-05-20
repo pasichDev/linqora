@@ -12,6 +12,7 @@ import (
 	"LinqoraHost/internal/config"
 	"LinqoraHost/internal/media"
 	"LinqoraHost/internal/metrics"
+	"LinqoraHost/internal/privileges"
 
 	"LinqoraHost/internal/interfaces"
 
@@ -297,28 +298,36 @@ func extractPingData(data json.RawMessage) (map[string]interface{}, error) {
 }
 
 // handleHostInfoMessage обробляє відомлення з інформацією про хост
-// Відправляє інформацію про систему назад клієнту
 func (s *WSServer) handleHostInfoMessage(client *Client) {
-	ramTotal, _ := metrics.GetRamTotal()
-	cpuModel, _ := metrics.GetCPUModel()
+	// Базовая информация о системе
+	cpuInfo, _ := metrics.GetCPUInfo()
 	deviceInfo := metrics.GetDeviceInfo()
-	freq, _ := metrics.GetCPUFrequency()
-	cores, threads, _ := metrics.GetCPUCoresAndThreads()
 
-	// Формируем ответ с использованием стандартной структуры
+	// Новая информация
+	ramInfo, _ := metrics.GetRAMInfo()
+	gpuInfo, _ := metrics.GetGPUInfo()
+	diskInfo, _ := metrics.GetDiskInfo()
+
+	// Формируем расширенный ответ
 	hostInfo := map[string]interface{}{
-		"os":                 deviceInfo.OS,
-		"hostname":           deviceInfo.Hostname,
-		"cpuModel":           cpuModel,
-		"virtualMemoryTotal": ramTotal,
-		"cpuPhysicalCores":   cores,
-		"cpuLogicalCores":    threads,
-		"cpuFrequency":       freq,
+		// Базовая информация
+		"os":       deviceInfo.OS,
+		"hostname": deviceInfo.Hostname,
+		"su":       privileges.CheckAdminPrivileges(),
+		"cpu":      cpuInfo,
+
+		// RAM информация
+		"ram": ramInfo,
+
+		// Информация о GPU
+		"gpu": gpuInfo,
+
+		// Информация о дисках
+		"disks": diskInfo,
 	}
 
 	// Отправляем ответ
 	client.SendSuccess("host_info", hostInfo)
-
 }
 
 // handleJoinRoomMessage обробляє повідомлення приєднання до кімнати

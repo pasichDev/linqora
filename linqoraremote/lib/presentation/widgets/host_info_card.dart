@@ -22,6 +22,7 @@ class HostInfoCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Заголовок - ОС
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Row(
@@ -49,17 +50,17 @@ class HostInfoCard extends StatelessWidget {
             // Разделитель
             Divider(
               height: 1,
-              color: colorScheme.outlineVariant.withOpacity(0.5),
+              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 12),
 
             // Процессор
             _buildInfoRow(
               context,
-              Icons.memory_rounded,
+              Icons.developer_board,
               'Процессор',
-              host.cpuModel,
-              "${host.cpuFrequency} MHz • ${host.cpuPhysicalCores}/${host.cpuLogicalCores} ядер",
+              host.cpu.model,
+              "${host.cpu.frequency} MHz • ${host.cpu.physicalCores}/${host.cpu.logicalCores} ядер",
             ),
 
             const SizedBox(height: 12),
@@ -67,14 +68,124 @@ class HostInfoCard extends StatelessWidget {
             // Память
             _buildInfoRow(
               context,
-              Icons.developer_board,
-              'RAM',
-              "${host.virtualMemoryTotal} GB",
-              "",
+              Icons.memory_outlined,
+              'Память',
+              _formatRamInfo(),
+              _formatRamUsage(),
             ),
+
+            // GPU - показываем только если есть информация
+            if (host.gpu.model != 'Unknown')
+              Column(
+                children: [
+                  const SizedBox(height: 12),
+                  _buildInfoRow(
+                    context,
+                    Icons.developer_board_rounded,
+                    'Видеокарта',
+                    host.gpu.model,
+                    _formatGpuInfo(),
+                  ),
+                ],
+              ),
+
+            // Диски - показываем если есть хотя бы один диск
+            if (host.disks.isNotEmpty)
+              Column(
+                children: [
+                  const SizedBox(height: 12),
+                  _buildDisksInfo(context),
+                ],
+              ),
           ],
         ),
       ),
+    );
+  }
+
+  // Форматирование информации о RAM
+  String _formatRamInfo() {
+    String info = "${host.ram.total} GB";
+    if (host.ram.type != 'Unknown') {
+      info += " • ${host.ram.type}";
+    }
+    if (host.ram.frequency > 0) {
+      info += " ${host.ram.frequency} MHz";
+    }
+    return info;
+  }
+
+  // Форматирование использования RAM
+  String _formatRamUsage() {
+    if (host.ram.used > 0 && host.ram.total > 0) {
+      return "Используется: ${host.ram.used} GB • Доступно: ${host.ram.total} GB";
+    } else if (host.ram.used > 0) {
+      return "Используется: ${host.ram.used} GB";
+    }
+    return "";
+  }
+
+  // Форматирование информации о GPU
+  String _formatGpuInfo() {
+    String info = "";
+
+    // Базовая информация о памяти
+    if (host.gpu.memory > 0) {
+      double gpuMemoryGB = host.gpu.memory / 1024.0;
+      info += "${gpuMemoryGB.toStringAsFixed(1)} GB";
+    }
+
+    return info;
+  }
+
+  // Виджет для информации о дисках
+  Widget _buildDisksInfo(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.storage_rounded, color: colorScheme.secondary, size: 18),
+            const SizedBox(width: 8),
+            Text(
+              'Диски',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: colorScheme.secondary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        ...host.disks.map(
+          (disk) => Padding(
+            padding: const EdgeInsets.only(left: 26, bottom: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "${disk.name} (${disk.mountPath})",
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                Text(
+                  "${disk.total} GB • Свободно: ${disk.free} GB • ${disk.fileSystem}",
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -112,18 +223,19 @@ class HostInfoCard extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                   color: colorScheme.onSurface,
                 ),
-                maxLines: 1,
+                maxLines: 3,
                 overflow: TextOverflow.ellipsis,
               ),
-              Text(
-                secondaryInfo,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: colorScheme.onSurfaceVariant,
+              if (secondaryInfo.isNotEmpty)
+                Text(
+                  secondaryInfo,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
             ],
           ),
         ),
@@ -155,7 +267,7 @@ class HostInfoCardSkeleton extends StatelessWidget {
                 ShimmerEffect(
                   height: 20,
                   width: 20,
-                  borderRadius: BorderRadius.all(Radius.circular(4)),
+                  borderRadius: BorderRadius.circular(4),
                 ),
                 const SizedBox(width: 8),
                 ShimmerEffect(height: 18, width: 160),
@@ -165,7 +277,7 @@ class HostInfoCardSkeleton extends StatelessWidget {
             const SizedBox(height: 12),
             Divider(
               height: 1,
-              color: colorScheme.outlineVariant.withOpacity(0.5),
+              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 12),
 
@@ -176,6 +288,18 @@ class HostInfoCardSkeleton extends StatelessWidget {
 
             // Память
             _buildSkeletonRow(context),
+
+            const SizedBox(height: 12),
+
+            // GPU
+            _buildSkeletonRow(context),
+
+            const SizedBox(height: 12),
+
+            // Диски
+            _buildSkeletonRow(context),
+            _buildSkeletonDisk(context),
+            _buildSkeletonDisk(context),
           ],
         ),
       ),
@@ -189,7 +313,7 @@ class HostInfoCardSkeleton extends StatelessWidget {
         ShimmerEffect(
           height: 18,
           width: 18,
-          borderRadius: BorderRadius.all(Radius.circular(4)),
+          borderRadius: BorderRadius.circular(4),
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -205,6 +329,20 @@ class HostInfoCardSkeleton extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildSkeletonDisk(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 26, top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          ShimmerEffect(height: 14, width: 160),
+          SizedBox(height: 2),
+          ShimmerEffect(height: 12, width: 200),
+        ],
+      ),
     );
   }
 }
