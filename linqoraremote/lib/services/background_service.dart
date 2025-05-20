@@ -214,6 +214,7 @@ void onStart(ServiceInstance service) async {
   String deviceName = 'Неизвестное устройство';
   String deviceAddress = '';
   bool isConnected = true;
+  bool notificationsEnabled = false;
 
   // Отслеживание последнего времени PONG
   int lastPongTimestamp = DateTime.now().millisecondsSinceEpoch;
@@ -224,7 +225,7 @@ void onStart(ServiceInstance service) async {
   );
 
   // Устанавливаем начальное уведомление
-  if (service is AndroidServiceInstance) {
+  if (service is AndroidServiceInstance && notificationsEnabled) {
     service.setForegroundNotificationInfo(
       title: 'Linqora Remote',
       content: 'Инициализация...',
@@ -233,7 +234,7 @@ void onStart(ServiceInstance service) async {
 
   // Удобная функция для обновления уведомлений
   void updateNotification() {
-    if (service is AndroidServiceInstance) {
+    if (service is AndroidServiceInstance && notificationsEnabled) {
       service.setForegroundNotificationInfo(
         title: 'Linqora Remote ${isConnected ? 'подключен' : 'отключен'}',
         content:
@@ -250,6 +251,7 @@ void onStart(ServiceInstance service) async {
       deviceName = event['deviceName'] ?? deviceName;
       deviceAddress = event['deviceAddress'] ?? deviceAddress;
       isConnected = event['isConnected'] ?? isConnected;
+      notificationsEnabled = event['notificationsEnabled'] ?? isConnected;
 
       // Обновляем уведомление
       updateNotification();
