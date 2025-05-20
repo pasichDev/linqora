@@ -3,3 +3,5 @@
 /// for development or testing environments.
 /// Note: This should be set to `false` in production for security reasons.
 const bool allowSelfSigned = true;
+
+const bool showErrorSu = false;

@@ -93,13 +93,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             _homeController.hostInfo.value != null
                                 ? HostInfoCard(
                                   host: _homeController.hostInfo.value!,
+                                  refresh: _homeController.refreshHostInfo,
                                 )
                                 : const HostInfoCardSkeleton(),
                       ),
                     ),
                     Expanded(
                       child: GridView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 5,
+                        ),
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 2,

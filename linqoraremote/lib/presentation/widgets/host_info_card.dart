@@ -5,8 +5,8 @@ import '../../data/models/host_info.dart';
 
 class HostInfoCard extends StatelessWidget {
   final HostSystemInfo host;
-
-  const HostInfoCard({required this.host, super.key});
+  final VoidCallback? refresh;
+  const HostInfoCard({super.key, required this.host, this.refresh});
 
   @override
   Widget build(BuildContext context) {
@@ -22,27 +22,38 @@ class HostInfoCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Заголовок - ОС
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Icon(
-                    Icons.computer_rounded,
-                    color: colorScheme.primary,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      host.os,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onSurface,
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.computer_rounded,
+                        color: colorScheme.primary,
+                        size: 20,
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      Text(
+                        host.os,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
                   ),
+                  if (refresh != null)
+                    Row(
+                      children: [
+                        InkWell(
+                          onTap: refresh,
+                          child: Icon(Icons.refresh, size: 24),
+                        ),
+                      ],
+                    ),
                 ],
               ),
             ),
@@ -197,7 +208,6 @@ class HostInfoCard extends StatelessWidget {
     String secondaryInfo,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
-
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -233,7 +243,7 @@ class HostInfoCard extends StatelessWidget {
                     fontSize: 12,
                     color: colorScheme.onSurfaceVariant,
                   ),
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
             ],

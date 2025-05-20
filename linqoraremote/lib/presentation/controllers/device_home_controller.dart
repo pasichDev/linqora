@@ -10,6 +10,7 @@ import 'package:linqoraremote/data/models/host_info.dart';
 import 'package:linqoraremote/data/models/ws_message.dart';
 import 'package:linqoraremote/services/background_service.dart';
 
+import '../../core/constants/constants.dart';
 import '../../core/constants/settings.dart';
 import '../../core/utils/error_handler.dart';
 import '../../data/models/server_response.dart';
@@ -30,6 +31,8 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
   Timer? _serviceStatusTimer;
 
   final Rxn<MdnsDevice> authDevice = Rxn<MdnsDevice>();
+
+  DateTime refreshLastTime = DateTime.now();
 
   @override
   Future<void> onInit() async {
@@ -188,10 +191,18 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
     }
   }
 
+  void refreshHostInfo() {
+    bool difference =
+        DateTime.now().difference(refreshLastTime).inSeconds >= 30;
+    if (isConnected.value && difference) {
+      _requestSystemInfo();
+    }
+  }
+
   // Запрос информации о системе
   void _requestSystemInfo() {
     if (!isConnected.value) return;
-
+    refreshLastTime = DateTime.now();
     try {
       webSocketProvider.sendMessage(
         WsMessage(type: TypeMessageWs.host_info.value),
@@ -210,6 +221,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
         data,
         (json) => HostSystemInfo.fromJson(json),
       );
+
       if (response.hasError) {
         showErrorSnackbar(
           'Ошибка получения данных',
@@ -218,6 +230,14 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
         return;
       }
       hostInfo.value = response.data;
+
+      if (!response.data!.baseInfo.su && showErrorSu) {
+        showErrorSnackbar(
+          'Отсутствуют права доступа к системной информации',
+          'Пожалуйста, запустите Linqora с правами администратора, чтобы получить доступ к полному функционалу.',
+        );
+        return;
+      }
     } catch (e) {
       showErrorSnackbar(
         'Ошибка обработки данных',
