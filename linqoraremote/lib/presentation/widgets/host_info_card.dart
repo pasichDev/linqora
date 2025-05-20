@@ -1,12 +1,40 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:linqoraremote/presentation/widgets/shimmer_effect.dart';
 
 import '../../data/models/host_info.dart';
+import '../controllers/device_home_controller.dart';
 
-class HostInfoCard extends StatelessWidget {
+class HostInfoCard extends StatefulWidget {
   final HostSystemInfo host;
-  final VoidCallback? refresh;
-  const HostInfoCard({super.key, required this.host, this.refresh});
+
+  const HostInfoCard({required this.host, super.key});
+
+  @override
+  State<HostInfoCard> createState() => _HostInfoCardState();
+}
+
+class _HostInfoCardState extends State<HostInfoCard> {
+  late final DeviceHomeController _homeController;
+
+  @override
+  void initState() {
+    super.initState();
+    _homeController = Get.find<DeviceHomeController>();
+  }
+
+  @override
+  void dispose() {
+    if (_isControllerRegistered<DeviceHomeController>()) {
+      Get.delete<DeviceHomeController>();
+    }
+
+    super.dispose();
+  }
+
+  bool _isControllerRegistered<T>() {
+    return Get.isRegistered<T>();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,92 +50,131 @@ class HostInfoCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.computer_rounded,
-                        color: colorScheme.primary,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        host.os,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (refresh != null)
-                    Row(
-                      children: [
-                        InkWell(
-                          onTap: refresh,
-                          child: Icon(Icons.refresh, size: 24),
-                        ),
-                      ],
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.computer_rounded,
+                      color: colorScheme.primary,
+                      size: 20,
                     ),
-                ],
-              ),
+                    const SizedBox(width: 8),
+                    Text(
+                      widget.host.os,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    Obx(
+                      () => IconButton(
+                        onPressed: _homeController.toggleShowHostFull,
+                        icon: Icon(
+                          _homeController.showHostFull.value
+                              ? Icons.keyboard_arrow_up
+                              : Icons.keyboard_arrow_down,
+                        ),
+                        style: IconButton.styleFrom(
+                          elevation: 0,
+                          backgroundColor:
+                              Theme.of(context).colorScheme.surfaceContainer,
+                          foregroundColor:
+                              Theme.of(context).colorScheme.onSurface,
+                          padding: const EdgeInsets.all(0),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(0),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 0),
+                    IconButton(
+                      onPressed: _homeController.refreshHostInfo,
+                      icon: Icon(Icons.refresh),
+                      style: IconButton.styleFrom(
+                        elevation: 0,
+                        backgroundColor:
+                            Theme.of(context).colorScheme.surfaceContainer,
+                        foregroundColor:
+                            Theme.of(context).colorScheme.onSurface,
+                        padding: const EdgeInsets.all(0),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(0),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
 
-            // Разделитель
-            Divider(
-              height: 1,
-              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-            ),
-            const SizedBox(height: 12),
+            Obx(() {
+              if (_homeController.showHostFull.value) {
+                return Column(
+                  children: [
+                    const SizedBox(height: 12), // Разделитель
+                    Divider(
+                      height: 1,
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                    ),
+                    const SizedBox(height: 12),
 
-            // Процессор
-            _buildInfoRow(
-              context,
-              Icons.developer_board,
-              'Процессор',
-              host.cpu.model,
-              "${host.cpu.frequency} MHz • ${host.cpu.physicalCores}/${host.cpu.logicalCores} ядер",
-            ),
+                    // Процессор
+                    _buildInfoRow(
+                      context,
+                      Icons.developer_board,
+                      'Процессор',
+                      widget.host.cpu.model,
+                      "${widget.host.cpu.frequency} MHz • ${widget.host.cpu.physicalCores}/${widget.host.cpu.logicalCores} ядер",
+                    ),
 
-            const SizedBox(height: 12),
+                    const SizedBox(height: 12),
 
-            // Память
-            _buildInfoRow(
-              context,
-              Icons.memory_outlined,
-              'Память',
-              _formatRamInfo(),
-              _formatRamUsage(),
-            ),
+                    // Память
+                    _buildInfoRow(
+                      context,
+                      Icons.memory_outlined,
+                      'Память',
+                      _formatRamInfo(),
+                      _formatRamUsage(),
+                    ),
 
-            // GPU - показываем только если есть информация
-            if (host.gpu.model != 'Unknown')
-              Column(
-                children: [
-                  const SizedBox(height: 12),
-                  _buildInfoRow(
-                    context,
-                    Icons.developer_board_rounded,
-                    'Видеокарта',
-                    host.gpu.model,
-                    _formatGpuInfo(),
-                  ),
-                ],
-              ),
+                    // GPU - показываем только если есть информация
+                    if (widget.host.gpu.model != 'Unknown')
+                      Column(
+                        children: [
+                          const SizedBox(height: 12),
+                          _buildInfoRow(
+                            context,
+                            Icons.developer_board_rounded,
+                            'Видеокарта',
+                            widget.host.gpu.model,
+                            _formatGpuInfo(),
+                          ),
+                        ],
+                      ),
 
-            // Диски - показываем если есть хотя бы один диск
-            if (host.disks.isNotEmpty)
-              Column(
-                children: [
-                  const SizedBox(height: 12),
-                  _buildDisksInfo(context),
-                ],
-              ),
+                    // Диски - показываем если есть хотя бы один диск
+                    if (widget.host.disks.isNotEmpty)
+                      Column(
+                        children: [
+                          const SizedBox(height: 12),
+                          _buildDisksInfo(context),
+                        ],
+                      ),
+                  ],
+                );
+              } else {
+                return const SizedBox.shrink();
+              }
+            }),
           ],
         ),
       ),
@@ -116,22 +183,22 @@ class HostInfoCard extends StatelessWidget {
 
   // Форматирование информации о RAM
   String _formatRamInfo() {
-    String info = "${host.ram.total} GB";
-    if (host.ram.type != 'Unknown') {
-      info += " • ${host.ram.type}";
+    String info = "${widget.host.ram.total} GB";
+    if (widget.host.ram.type != 'Unknown') {
+      info += " • ${widget.host.ram.type}";
     }
-    if (host.ram.frequency > 0) {
-      info += " ${host.ram.frequency} MHz";
+    if (widget.host.ram.frequency > 0) {
+      info += " ${widget.host.ram.frequency} MHz";
     }
     return info;
   }
 
   // Форматирование использования RAM
   String _formatRamUsage() {
-    if (host.ram.used > 0 && host.ram.total > 0) {
-      return "Используется: ${host.ram.used} GB • Доступно: ${host.ram.total} GB";
-    } else if (host.ram.used > 0) {
-      return "Используется: ${host.ram.used} GB";
+    if (widget.host.ram.used > 0 && widget.host.ram.total > 0) {
+      return "Используется: ${widget.host.ram.used} GB • Доступно: ${widget.host.ram.total} GB";
+    } else if (widget.host.ram.used > 0) {
+      return "Используется: ${widget.host.ram.used} GB";
     }
     return "";
   }
@@ -141,8 +208,8 @@ class HostInfoCard extends StatelessWidget {
     String info = "";
 
     // Базовая информация о памяти
-    if (host.gpu.memory > 0) {
-      double gpuMemoryGB = host.gpu.memory / 1024.0;
+    if (widget.host.gpu.memory > 0) {
+      double gpuMemoryGB = widget.host.gpu.memory / 1024.0;
       info += "${gpuMemoryGB.toStringAsFixed(1)} GB";
     }
 
@@ -171,7 +238,7 @@ class HostInfoCard extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 4),
-        ...host.disks.map(
+        ...widget.host.disks.map(
           (disk) => Padding(
             padding: const EdgeInsets.only(left: 26, bottom: 4),
             child: Column(

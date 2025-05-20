@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:linqoraremote/presentation/controllers/settings_controller.dart';
-import 'package:linqoraremote/presentation/widgets/settings/sponsor_card.dart';
 
 import '../controllers/device_home_controller.dart';
 import '../dashboard_items.dart';
@@ -17,13 +15,11 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   late final DeviceHomeController _homeController;
-  late final SettingsController _settingsController;
 
   @override
   void initState() {
     super.initState();
     _homeController = Get.find<DeviceHomeController>();
-    _settingsController = Get.find<SettingsController>();
   }
 
   @override
@@ -71,21 +67,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 : Column(
                   key: const ValueKey('grid_view'),
                   children: [
-                    Obx(
-                      () =>
-                          _settingsController.showSponsorHome.value
-                              ? Padding(
-                                padding: EdgeInsets.all(16),
-                                child: SponsorCard(
-                                  onClose: () {
-                                    _settingsController.toggleShowSponsorHome(
-                                      false,
-                                    );
-                                  },
-                                ),
-                              )
-                              : SizedBox.shrink(),
-                    ),
                     SizedBox(
                       width: double.infinity,
                       child: Obx(
@@ -93,7 +74,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             _homeController.hostInfo.value != null
                                 ? HostInfoCard(
                                   host: _homeController.hostInfo.value!,
-                                  refresh: _homeController.refreshHostInfo,
                                 )
                                 : const HostInfoCardSkeleton(),
                       ),

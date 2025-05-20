@@ -25,6 +25,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
   final RxInt selectedMenuIndex = (-1).obs;
   final RxBool isBackgroundServiceRunning = false.obs;
   final RxBool isReconnecting = false.obs;
+  final RxBool showHostFull = false.obs;
 
   final RxMap deviceInfo = {}.obs;
   final Rxn<HostSystemInfo> hostInfo = Rxn<HostSystemInfo>();
@@ -40,6 +41,9 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
 
     // Получаем данные устройства из аргументов
     await _setupFromArguments();
+
+    // Загружаем настройки
+    _loadingSettings();
 
     // Настраиваем обработчики WebSocket
     _setupWebSocketHandlers();
@@ -67,6 +71,18 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
     );
 
     super.onClose();
+  }
+
+  _loadingSettings() {
+    try {
+      showHostFull.value =
+          GetStorage(
+            SettingsConst.kSettings,
+          ).read<bool>(SettingsConst.kEnableNotifications) ??
+          false;
+    } catch (e) {
+      printError(info: 'Ошибка загрузки настроек: $e');
+    }
   }
 
   // Метод для запуска фонового сервиса
@@ -249,6 +265,13 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
   // Метод для выбора пункта меню
   void selectMenuItem(int index) {
     selectedMenuIndex.value = index;
+  }
+
+  void toggleShowHostFull() {
+    showHostFull.value = !showHostFull.value;
+    GetStorage(
+      SettingsConst.kSettings,
+    ).write(SettingsConst.kShowHostInfo, !showHostFull.value);
   }
 
   // Отключиться от устройства

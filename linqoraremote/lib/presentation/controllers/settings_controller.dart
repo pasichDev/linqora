@@ -3,7 +3,6 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:linqoraremote/core/constants/settings.dart';
-import 'package:linqoraremote/data/models/discovered_service.dart';
 import 'package:linqoraremote/services/permissions_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -14,7 +13,6 @@ class SettingsController extends GetxController {
   final RxBool enableNotifications = false.obs;
   final RxBool enableAutoConnect = false.obs;
   final RxBool notificationPermissionGranted = false.obs;
-  final RxBool showSponsorHome = true.obs;
 
   final FlutterLocalNotificationsPlugin notificationsPlugin =
       FlutterLocalNotificationsPlugin();
@@ -33,7 +31,6 @@ class SettingsController extends GetxController {
     enableNotifications.close();
     enableAutoConnect.close();
     notificationPermissionGranted.close();
-    showSponsorHome.close();
 
     // Clean up notifications plugin resources
     notificationsPlugin.pendingNotificationRequests().then((notifications) {
@@ -57,8 +54,6 @@ class SettingsController extends GetxController {
       enableAutoConnect.value =
           _storage.read<bool>(SettingsConst.kEnableAutoConnect) ?? false;
 
-      showSponsorHome.value =
-          _storage.read<bool>(SettingsConst.kShowSponsorHome) ?? true;
       Get.changeThemeMode(themeMode.value);
     } catch (e) {
       printError(info: 'Ошибка загрузки настроек: $e');
@@ -139,15 +134,6 @@ class SettingsController extends GetxController {
   Future<void> toggleAutoConnect(bool value) async {
     enableAutoConnect.value = value;
     await _storage.write(SettingsConst.kEnableAutoConnect, value);
-  }
-
-  Future<void> toggleShowSponsorHome(bool value) async {
-    showSponsorHome.value = value;
-    await _storage.write(SettingsConst.kShowSponsorHome, value);
-  }
-
-  Future<void> saveLastConnect(MdnsDevice value) async {
-    await _storage.write(SettingsConst.kLastConnect, value.toJson());
   }
 
   ThemeMode _getThemeMode(String value) {
