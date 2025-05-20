@@ -37,7 +37,7 @@ class WebSocketProvider {
   Set<String> get joinedRooms => Set.from(_joinedRooms);
 
   Future<bool> connect(
-    DiscoveredService device, {
+      MdnsDevice device, {
     bool allowSelfSigned = true,
     Duration timeout = const Duration(seconds: 10),
     Duration pingInterval = const Duration(seconds: 30),

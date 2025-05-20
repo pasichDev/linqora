@@ -1,18 +1,14 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:linqoraremote/core/constants/settings.dart';
+import 'package:linqoraremote/data/models/discovered_service.dart';
 import 'package:linqoraremote/services/permissions_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class SettingsController extends GetxController {
-  static const _kThemeMode = 'theme_mode';
-  static const _kEnableNotifications = 'enable_notifications';
-  static const _kEnableAutoConnect = 'enable_auto_connect';
-  static const _kShowSponsorHome = 'show_sponsor_home';
-
-  final _storage = GetStorage('settings');
+  final _storage = GetStorage(SettingsConst.kSettings);
 
   final Rx<ThemeMode> themeMode = ThemeMode.system.obs;
   final RxBool enableNotifications = false.obs;
@@ -46,27 +42,23 @@ class SettingsController extends GetxController {
       }
     });
 
-    // Close storage if needed
     _storage.save();
-
     super.onClose();
-
-    if (kDebugMode) {
-      print('SettingsController resources released successfully');
-    }
   }
 
   void loadSettings() {
     try {
-      final themeModeValue = _storage.read<String>(_kThemeMode) ?? 'system';
+      final themeModeValue =
+          _storage.read<String>(SettingsConst.kThemeMode) ?? 'system';
       themeMode.value = _getThemeMode(themeModeValue);
 
       enableNotifications.value =
-          _storage.read<bool>(_kEnableNotifications) ?? false;
+          _storage.read<bool>(SettingsConst.kEnableNotifications) ?? false;
       enableAutoConnect.value =
-          _storage.read<bool>(_kEnableAutoConnect) ?? false;
+          _storage.read<bool>(SettingsConst.kEnableAutoConnect) ?? false;
 
-      showSponsorHome.value = _storage.read<bool>(_kShowSponsorHome) ?? true;
+      showSponsorHome.value =
+          _storage.read<bool>(SettingsConst.kShowSponsorHome) ?? true;
       Get.changeThemeMode(themeMode.value);
     } catch (e) {
       printError(info: 'Ошибка загрузки настроек: $e');
@@ -82,7 +74,7 @@ class SettingsController extends GetxController {
       // Если разрешение не выдано, но настройка включена - отключаем настройку
       if (!status && enableNotifications.value) {
         enableNotifications.value = false;
-        await _storage.write(_kEnableNotifications, false);
+        await _storage.write(SettingsConst.kEnableNotifications, false);
       }
     } catch (e) {
       // Обрабатываем ошибку - не блокируем функционал
@@ -125,19 +117,19 @@ class SettingsController extends GetxController {
       // Установка значения только если разрешения получены или отключаем уведомления
       if (!value || notificationPermissionGranted.value) {
         enableNotifications.value = value;
-        await _storage.write(_kEnableNotifications, value);
+        await _storage.write(SettingsConst.kEnableNotifications, value);
       }
     } catch (e) {
       printError(info: 'Ошибка при переключении уведомлений: $e');
       enableNotifications.value = value;
-      await _storage.write(_kEnableNotifications, value);
+      await _storage.write(SettingsConst.kEnableNotifications, value);
     }
   }
 
   Future<void> saveThemeMode(ThemeMode mode) async {
     try {
       themeMode.value = mode;
-      await _storage.write(_kThemeMode, _getThemeModeString(mode));
+      await _storage.write(SettingsConst.kThemeMode, _getThemeModeString(mode));
       Get.changeThemeMode(mode);
     } catch (e) {
       printError(info: 'Ошибка сохранения темы: $e');
@@ -146,12 +138,16 @@ class SettingsController extends GetxController {
 
   Future<void> toggleAutoConnect(bool value) async {
     enableAutoConnect.value = value;
-    await _storage.write(_kEnableAutoConnect, value);
+    await _storage.write(SettingsConst.kEnableAutoConnect, value);
   }
 
   Future<void> toggleShowSponsorHome(bool value) async {
     showSponsorHome.value = value;
-    await _storage.write(_kShowSponsorHome, value);
+    await _storage.write(SettingsConst.kShowSponsorHome, value);
+  }
+
+  Future<void> saveLastConnect(MdnsDevice value) async {
+    await _storage.write(SettingsConst.kLastConnect, value.toJson());
   }
 
   ThemeMode _getThemeMode(String value) {

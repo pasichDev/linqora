@@ -1,10 +1,10 @@
-class DiscoveredService {
+class MdnsDevice {
   final String name;
   final String address;
   final String port;
   final bool supportsTLS;
 
-  DiscoveredService({
+  MdnsDevice({
     required this.name,
     required this.address,
     required this.port,
@@ -20,8 +20,8 @@ class DiscoveredService {
     };
   }
 
-  factory DiscoveredService.fromJson(Map<String, dynamic> json) {
-    return DiscoveredService(
+  factory MdnsDevice.fromJson(Map<String, dynamic> json) {
+    return MdnsDevice(
       name: json['name'] ?? '',
       address: json['address'] ?? '',
       port: json['port'] ?? '',

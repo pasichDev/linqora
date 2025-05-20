@@ -10,6 +10,7 @@ import 'package:linqoraremote/data/models/host_info.dart';
 import 'package:linqoraremote/data/models/ws_message.dart';
 import 'package:linqoraremote/services/background_service.dart';
 
+import '../../core/constants/settings.dart';
 import '../../core/utils/error_handler.dart';
 import '../../data/models/server_response.dart';
 import '../../data/providers/websocket_provider.dart';
@@ -29,7 +30,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
   final Rxn<HostSystemInfo> hostInfo = Rxn<HostSystemInfo>();
   Timer? _serviceStatusTimer;
 
-  final Rxn<DiscoveredService> authDevice = Rxn<DiscoveredService>();
+  final Rxn<MdnsDevice> authDevice = Rxn<MdnsDevice>();
 
   @override
   Future<void> onInit() async {
@@ -76,9 +77,11 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
       final deviceName = authDevice.value!.name;
       final deviceAddress =
           "${authDevice.value!.address}:${authDevice.value!.port}";
-      final storage = GetStorage('settings');
       final notificationsEnabled =
-          storage.read<bool>('enable_notifications') ?? false;
+          GetStorage(
+            SettingsConst.kSettings,
+          ).read<bool>(SettingsConst.kEnableNotifications) ??
+          false;
 
       // Запускаем фоновый сервис с текущим состоянием соединения
       await BackgroundConnectionService.startService(
@@ -133,7 +136,11 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
     if (args != null && args['device'] != null) {
       if (args['device'] != null) {
         try {
-          authDevice.value = DiscoveredService.fromJson(args['device']);
+          authDevice.value = MdnsDevice.fromJson(args['device']);
+          // Save device data to storage lsat connect
+          GetStorage(
+            SettingsConst.kSettings,
+          ).write(SettingsConst.kLastConnect, authDevice.value!.toJson());
         } catch (e) {
           if (kDebugMode) {
             print("Error parse device data: ${args['device']}");

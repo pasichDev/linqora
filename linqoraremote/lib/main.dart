@@ -5,6 +5,7 @@ import 'package:linqoraremote/core/themes/theme.dart';
 import 'package:linqoraremote/presentation/controllers/settings_controller.dart';
 import 'package:linqoraremote/routes/app_routes.dart';
 
+import 'core/constants/settings.dart';
 import 'services/background_service.dart';
 
 void main() async {
@@ -15,7 +16,7 @@ void main() async {
     debugPrint("Error initializing background service: $e");
   }
 
-  await GetStorage.init('settings');
+  await GetStorage.init(SettingsConst.kSettings);
 
   runApp(MyApp());
 }

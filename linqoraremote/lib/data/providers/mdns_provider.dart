@@ -82,12 +82,12 @@ class MDnsProvider {
     cancelDiscovery();
   }
 
-  Future<List<DiscoveredService>> discoverLinqoraDevices({
+  Future<List<MdnsDevice>> discoverLinqoraDevices({
     bool useDirectSearch = true,
     bool useDnsSdSearch = false,
     bool avoidDuplicates = true,
   }) async {
-    final devices = <DiscoveredService>[];
+    final devices = <MdnsDevice>[];
     final startTime = DateTime.now();
 
     try {
@@ -153,7 +153,7 @@ class MDnsProvider {
   }
 
   // Прямой поиск по типу сервиса
-  Future<void> _performDirectSearch(List<DiscoveredService> devices) async {
+  Future<void> _performDirectSearch(List<MdnsDevice> devices) async {
     try {
       _log('Ищем Linqora сервисы с типом "_linqora.local"');
 
@@ -169,7 +169,7 @@ class MDnsProvider {
   }
 
   // Поиск через DNS-SD
-  Future<void> _performDnsSdSearch(List<DiscoveredService> devices) async {
+  Future<void> _performDnsSdSearch(List<MdnsDevice> devices) async {
     try {
       _log('Пробуем поиск через DNS-SD...');
 
@@ -178,7 +178,6 @@ class MDnsProvider {
       )) {
         _log('Найден тип сервиса через DNS-SD: ${serviceType.domainName}');
 
-        print(serviceType.domainName);
         if (_isLinqoraServiceType(serviceType.domainName)) {
           await for (final instance in _client!.lookup<PtrResourceRecord>(
             ResourceRecordQuery.serverPointer(serviceType.domainName),
@@ -196,7 +195,7 @@ class MDnsProvider {
   }
 
   // Завершение поиска и обработка результатов
-  List<DiscoveredService> _finalizeDiscovery(List<DiscoveredService> devices) {
+  List<MdnsDevice> _finalizeDiscovery(List<MdnsDevice> devices) {
     _cancelDiscoveryTimer();
     _stopDiscovery();
 
@@ -248,7 +247,7 @@ class MDnsProvider {
 
   Future<void> _processLinqoraInstance(
     String serviceName,
-    List<DiscoveredService> devices,
+    List<MdnsDevice> devices,
   ) async {
     try {
       _log('Обработка сервиса: $serviceName');
@@ -293,7 +292,7 @@ class MDnsProvider {
       _log('Выбран основной IP: ${bestIp.address.address}');
 
       // Создаем устройство с лучшим IP
-      final device = DiscoveredService(
+      final device = MdnsDevice(
         name:
             txtData['hostname']?.isNotEmpty == true
                 ? txtData['hostname']!
@@ -402,8 +401,8 @@ class MDnsProvider {
 
   // Проверяет, существует ли устройство в списке
   bool _deviceExists(
-    List<DiscoveredService> devices,
-    DiscoveredService device,
+    List<MdnsDevice> devices,
+      MdnsDevice device,
   ) {
     return devices.any(
       (d) => d.address == device.address && d.port == device.port,

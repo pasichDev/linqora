@@ -104,8 +104,6 @@ class BackgroundConnectionService {
         autoStart: false,
         isForegroundMode: true,
         notificationChannelId: _notificationChannelId,
-        initialNotificationTitle: 'Linqora Remote',
-        initialNotificationContent: 'Поддержание соединения...',
         foregroundServiceNotificationId: _notificationId,
         autoStartOnBoot: false,
       ),
@@ -223,14 +221,6 @@ void onStart(ServiceInstance service) async {
   final sendPort = IsolateNameServer.lookupPortByName(
     'linqora_background_port',
   );
-
-  // Устанавливаем начальное уведомление
-  if (service is AndroidServiceInstance && notificationsEnabled) {
-    service.setForegroundNotificationInfo(
-      title: 'Linqora Remote',
-      content: 'Инициализация...',
-    );
-  }
 
   // Удобная функция для обновления уведомлений
   void updateNotification() {

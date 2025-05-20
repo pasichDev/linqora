@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:linqoraremote/data/enums/type_messages_ws.dart';
 import 'package:linqoraremote/data/models/auth_response_handler.dart';
 import 'package:linqoraremote/data/models/ws_message.dart';
@@ -12,6 +13,7 @@ import 'package:linqoraremote/data/providers/mdns_provider.dart';
 import 'package:linqoraremote/data/providers/websocket_provider.dart';
 
 import '../../core/constants/constants.dart';
+import '../../core/constants/settings.dart';
 import '../../core/utils/device_info.dart';
 import '../../core/utils/error_handler.dart';
 import '../../data/models/discovered_service.dart';
@@ -26,12 +28,13 @@ class AuthController extends GetxController {
 
   AuthController({required this.webSocketProvider, required this.mDnsProvider});
 
-  final RxList<DiscoveredService> discoveredDevices = <DiscoveredService>[].obs;
+  final RxList<MdnsDevice> discoveredDevices = <MdnsDevice>[].obs;
   final RxString statusMessage = ''.obs;
   final RxInt authTimeoutSeconds = 30.obs;
-  final Rxn<DiscoveredService> authDevice = Rxn<DiscoveredService>();
-  final Rx<AuthStatus> authStatus = AuthStatus.scanning.obs;
+  final Rxn<MdnsDevice> authDevice = Rxn<MdnsDevice>();
+  final Rx<AuthStatus> authStatus = AuthStatus.listDevices.obs;
   final RxBool isWifiConnections = false.obs;
+  final RxBool isAutoConnectEnable = false.obs;
   Timer? _authTimer;
 
   late final Stream<ConnectivityResult> _connectivityStream;
@@ -68,8 +71,8 @@ class AuthController extends GetxController {
 
   _returnWifiConnection() {
     isWifiConnections.value = true;
-    authStatus.value = AuthStatus.scanning;
-    startDiscovery();
+    //  authStatus.value = AuthStatus.scanning;
+    _getLastConnect();
   }
 
   void _setupMDnsProvider() {
@@ -101,6 +104,37 @@ class AuthController extends GetxController {
     };
   }
 
+  void _getLastConnect() {
+    try {
+      final mIsAutoConnectEnable =
+          GetStorage(
+            SettingsConst.kSettings,
+          ).read<bool>(SettingsConst.kEnableAutoConnect) ??
+          false;
+      isAutoConnectEnable.value = mIsAutoConnectEnable;
+      if (kDebugMode) {
+        print("Autoconnect is $mIsAutoConnectEnable");
+      }
+      if (mIsAutoConnectEnable) {
+        final MdnsDevice lastDevice = MdnsDevice.fromJson(
+          (GetStorage(
+                    SettingsConst.kSettings,
+                  ).read<Map<String, dynamic>>(SettingsConst.kLastConnect) ??
+                  "")
+              as Map<String, dynamic>,
+        );
+
+        discoveredDevices.add(lastDevice);
+        connectToDevice(lastDevice);
+      } else {
+        authStatus.value = AuthStatus.scanning;
+        startDiscovery();
+      }
+    } catch (e) {
+      isAutoConnectEnable.value = false;
+    }
+  }
+
   @override
   void onClose() {
     _authTimer?.cancel();
@@ -128,7 +162,7 @@ class AuthController extends GetxController {
     }
   }
 
-  Future<void> connectToDevice(DiscoveredService device) async {
+  Future<void> connectToDevice(MdnsDevice device) async {
     if (authStatus.value == AuthStatus.connecting) return;
     authDevice.value = device;
     authStatus.value = AuthStatus.connecting;
@@ -154,6 +188,8 @@ class AuthController extends GetxController {
       if (kDebugMode) print("onError: $error");
       _notConnectDevice(errorMessage: error.toString().split('\n').first);
     };
+    // Добавляем небольшую задержку перед подключением для стабильности
+    await Future.delayed(const Duration(seconds: 2));
 
     try {
       await webSocketProvider.connect(
