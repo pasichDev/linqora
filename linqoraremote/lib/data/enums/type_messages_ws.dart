@@ -8,7 +8,8 @@ enum TypeMessageWs {
   media,
   metrics,
   host_info,
-  auth_check
+  auth_check,
+  power
 }
 
 extension TypeMessageWsExtension on TypeMessageWs {

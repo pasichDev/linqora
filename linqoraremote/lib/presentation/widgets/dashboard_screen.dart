@@ -99,29 +99,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ),
                     Expanded(
-                      child: GridView.builder(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 5,
-                        ),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              crossAxisSpacing: 16,
-                              mainAxisSpacing: 16,
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: GridView.builder(
+                              padding: const EdgeInsets.only(
+                                left: 16,
+                                right: 16,
+                                top: 5,
+                                bottom: 16,
+                              ),
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    crossAxisSpacing: 16,
+                                    mainAxisSpacing: 16,
+                                  ),
+                              itemCount: menuOptions.length,
+                              itemBuilder: (context, index) {
+                                return Hero(
+                                  tag: 'menu_item_$index',
+                                  child: MenuOptionCard(
+                                    title: menuOptions[index].title,
+                                    icon: menuOptions[index].icon,
+                                    onTap:
+                                        () => _homeController.selectMenuItem(
+                                          index,
+                                        ),
+                                  ),
+                                );
+                              },
                             ),
-                        itemCount: menuOptions.length,
-                        itemBuilder: (context, index) {
-                          return Hero(
-                            tag: 'menu_item_$index',
-                            child: MenuOptionCard(
-                              title: menuOptions[index].title,
-                              icon: menuOptions[index].icon,
-                              onTap:
-                                  () => _homeController.selectMenuItem(index),
-                            ),
-                          );
-                        },
+                          ),
+                        ],
                       ),
                     ),
                   ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:linqoraremote/presentation/widgets/monitoring_view.dart';
+import 'package:linqoraremote/presentation/widgets/powermanagment_view.dart';
 
 import 'widgets/media_view.dart';
 
@@ -22,4 +23,9 @@ final menuOptions = [
     view: MonitoringView(),
   ),
   MenuOption(title: 'Медіа', icon: Icons.volume_up, view: MediaScreenView()),
+  MenuOption(
+    title: 'Живлення',
+    icon: Icons.energy_savings_leaf_outlined,
+    view: PowerManagementView(),
+  ),
 ];
