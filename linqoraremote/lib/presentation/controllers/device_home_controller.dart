@@ -15,6 +15,7 @@ import '../../core/constants/settings.dart';
 import '../../core/utils/error_handler.dart';
 import '../../data/models/server_response.dart';
 import '../../data/providers/websocket_provider.dart';
+import '../../services/permissions_service.dart';
 
 class DeviceHomeController extends GetxController with WidgetsBindingObserver {
   final WebSocketProvider webSocketProvider;
@@ -63,8 +64,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
     stopBackgroundService();
     _serviceStatusTimer?.cancel();
 
-    webSocketProvider.removeHandler('media');
-    webSocketProvider.removeHandler('host_info');
+    webSocketProvider.removeHandler(TypeMessageWs.host_info.value);
 
     BackgroundConnectionService.removeMessageHandler(
       _handleBackgroundServiceMessage,
@@ -73,7 +73,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
     super.onClose();
   }
 
-  _loadingSettings() {
+  void _loadingSettings() {
     try {
       showHostFull.value =
           GetStorage(
@@ -91,11 +91,14 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
       final deviceName = authDevice.value!.name;
       final deviceAddress =
           "${authDevice.value!.address}:${authDevice.value!.port}";
-      final notificationsEnabled =
+      final notificationsSettings =
           GetStorage(
             SettingsConst.kSettings,
           ).read<bool>(SettingsConst.kEnableNotifications) ??
           false;
+
+      final statusDevicePermission =
+          await PermissionsService.checkNotificationPermission();
 
       // Запускаем фоновый сервис с текущим состоянием соединения
       await BackgroundConnectionService.startService(
@@ -110,7 +113,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
           deviceName,
           deviceAddress,
           isConnected.value,
-          notificationsEnabled,
+          notificationsSettings && statusDevicePermission,
         );
       });
     }
