@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../controllers/power_controller.dart';
+import '../default_card.dart';
 
 class PowerControlCard extends StatelessWidget {
   final void Function(int) fetchAction;
@@ -10,10 +11,7 @@ class PowerControlCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      color: Get.theme.colorScheme.surfaceContainer,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    return DefaultCard(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 15.0),
         child: Row(
@@ -22,21 +20,21 @@ class PowerControlCard extends StatelessWidget {
             _buildControlButton(
               context,
               Icons.power_settings_new,
-              'Вимкнути',
+              'shut_down'.tr,
               () => fetchAction(PowerActions.shutDown),
               Colors.red.shade300,
             ),
             _buildControlButton(
               context,
               Icons.restart_alt,
-              'Перезавантажити',
+              'restart'.tr,
               () => fetchAction(PowerActions.restart),
               Get.theme.colorScheme.secondary,
             ),
             _buildControlButton(
               context,
               Icons.lock_outline,
-              'Заблокувати',
+              'lock'.tr,
               () => fetchAction(PowerActions.lock),
               Get.theme.colorScheme.secondary,
             ),
@@ -65,9 +63,7 @@ class PowerControlCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               label,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
+              style: Get.textTheme.titleMedium!.copyWith(
                 color: Get.theme.colorScheme.onSurface,
               ),
             ),

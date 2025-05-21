@@ -81,13 +81,10 @@ class _MonitoringViewState extends State<MonitoringView>
                       children: [
                         const SizedBox(height: 16),
                         !_monitoringController.hasEnoughMetricsData
-                            ? MessageBanner(
-                              message:
-                                  'Зачекайте, відбувається калібрація даних',
-                            )
+                            ? MessageBanner(message: 'calibrate_data'.tr)
                             : SizedBox.shrink(),
 
-                        _buildStandartMode(ramMetrics, cpuMetrics),
+                        _buildMode(ramMetrics, cpuMetrics),
                       ],
                     ),
                   ),
@@ -100,20 +97,20 @@ class _MonitoringViewState extends State<MonitoringView>
     );
   }
 
-  _buildStandartMode(RAMMetrics ramMetrics, CPUMetrics cpuMetrics) {
+  _buildMode(RAMMetrics ramMetrics, CPUMetrics cpuMetrics) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        MetricsStandartCard(
-          title: 'Температура CPU',
+        MetricsCard(
+          title: '${'temperature'.tr} CPU',
           value: '${cpuMetrics.temperature}°C',
           widget: MetricChart(
             metricsData: _monitoringController.getTemperatures(),
           ),
         ),
         const SizedBox(height: 16),
-        MetricsStandartCard(
-          title: 'Навантаження CPU',
+        MetricsCard(
+          title: '${'load'.tr} CPU',
           value: '${cpuMetrics.loadPercent}%',
           widget: Column(
             children: [
@@ -124,7 +121,7 @@ class _MonitoringViewState extends State<MonitoringView>
                 child: Column(
                   children: [
                     MetricDetailRow(
-                      label: "Процеси",
+                      label: 'processes'.tr,
                       value:
                           _monitoringController
                               .currentCPUMetrics
@@ -134,7 +131,7 @@ class _MonitoringViewState extends State<MonitoringView>
                           "",
                     ),
                     MetricDetailRow(
-                      label: "Нитки",
+                      label: 'threads'.tr,
                       value:
                           _monitoringController.currentCPUMetrics.value?.threads
                               .toString() ??
@@ -148,8 +145,8 @@ class _MonitoringViewState extends State<MonitoringView>
         ),
         const SizedBox(height: 16),
 
-        MetricsStandartCard(
-          title: 'Використання RAM',
+        MetricsCard(
+          title: '${'usage'.tr} RAM',
           value: '${ramMetrics.loadPercent}% (${ramMetrics.usage} ГБ)',
           widget: MetricChart(
             metricsData: _monitoringController.getRAMUsagesPercent(),

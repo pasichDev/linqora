@@ -41,7 +41,7 @@ class AppBarHomePage extends StatelessWidget implements PreferredSizeWidget {
                   return Text(
                     device != null
                         ? "${device.address}:${device.port}"
-                        : "Подключение...",
+                        : 'connecting'.tr,
                     style: TextStyle(
                       fontSize: 12,
                       color: Theme.of(
@@ -109,11 +109,12 @@ class AppBarHomePage extends StatelessWidget implements PreferredSizeWidget {
         SizedBox(width: 2),
         Text(
           isTLS ? "(TSL)" : "(Non-TSL)",
-          style: Get.textTheme.labelSmall!.copyWith(color:isTLS
-              ? Get.theme.colorScheme.primary
-              : Get.theme.colorScheme.errorContainer)
-
-
+          style: Get.textTheme.labelSmall!.copyWith(
+            color:
+                isTLS
+                    ? Get.theme.colorScheme.primary
+                    : Get.theme.colorScheme.errorContainer,
+          ),
         ),
         SizedBox(width: 2),
       ],

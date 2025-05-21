@@ -154,7 +154,6 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
       if (args['device'] != null) {
         try {
           authDevice.value = MdnsDevice.fromJson(args['device']);
-          // Save device data to storage lsat connect
           GetStorage(
             SettingsConst.kSettings,
           ).write(SettingsConst.kLastConnect, authDevice.value!.toJson());

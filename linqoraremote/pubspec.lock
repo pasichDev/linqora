@@ -360,6 +360,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.1"
+  getx_multilanguage_helper:
+    dependency: "direct main"
+    description:
+      name: getx_multilanguage_helper
+      sha256: "2548ce792d35fbdab8077b2b82546055796212795b979932382fbfa1a8822c81"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.0.2"
   glob:
     dependency: transitive
     description:

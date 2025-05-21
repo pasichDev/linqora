@@ -23,9 +23,9 @@ class DisconnectConfirmationDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Підтвердження'),
+      title: Text('confirmation'.tr),
       content: Text(
-        'Ви впевнені, що хочете розірвати з\'єднання?',
+        'cancel_connection_confirmation'.tr,
         style: Get.textTheme.bodyMedium,
       ),
       actions: [
@@ -34,14 +34,14 @@ class DisconnectConfirmationDialog extends StatelessWidget {
             Get.back(result: false);
             if (onCancel != null) onCancel!();
           },
-          child: const Text('Скасувати'),
+          child: Text('cancel'.tr),
         ),
         TextButton(
           onPressed: () {
             Get.back(result: true);
             onConfirm();
           },
-          child: const Text('Так'),
+          child: Text('disconnect'.tr),
         ),
       ],
     );

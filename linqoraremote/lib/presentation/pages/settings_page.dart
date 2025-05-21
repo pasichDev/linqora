@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:linqoraremote/core/constants/names.dart';
 import 'package:linqoraremote/presentation/controllers/settings_controller.dart';
 import 'package:linqoraremote/presentation/widgets/settings/sponsor_card.dart';
 
@@ -14,8 +15,8 @@ class SettingsPage extends GetView<SettingsController> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          "Настройки",
+        title: Text(
+          "settings".tr,
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         elevation: 8,
@@ -54,16 +55,13 @@ class SettingsPage extends GetView<SettingsController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader(title: "Оформление", icon: Icons.palette_outlined),
+        SectionHeader(title: 'design'.tr, icon: Icons.palette_outlined),
         _buildCard(
           context,
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Тема приложения',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-              ),
+              Text('app_theme'.tr, style: Get.textTheme.titleMedium),
               const SizedBox(height: 16),
               Obx(() => _buildThemeSelector(context)),
             ],
@@ -79,21 +77,21 @@ class SettingsPage extends GetView<SettingsController> {
       children: [
         _buildThemeOption(
           context,
-          'Системная',
+          'theme_set_system'.tr,
           Icons.settings_suggest_outlined,
           controller.themeMode.value == ThemeMode.system,
           () => controller.saveThemeMode(ThemeMode.system),
         ),
         _buildThemeOption(
           context,
-          'Светлая',
+          'theme_set_light'.tr,
           Icons.light_mode_outlined,
           controller.themeMode.value == ThemeMode.light,
           () => controller.saveThemeMode(ThemeMode.light),
         ),
         _buildThemeOption(
           context,
-          'Тёмная',
+          'theme_set_dark'.tr,
           Icons.dark_mode_outlined,
           controller.themeMode.value == ThemeMode.dark,
           () => controller.saveThemeMode(ThemeMode.dark),
@@ -159,7 +157,7 @@ class SettingsPage extends GetView<SettingsController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader(title: "Подключение", icon: Icons.link_outlined),
+        SectionHeader(title: 'connecting'.tr, icon: Icons.link_outlined),
         _buildCard(
           context,
           Column(
@@ -169,9 +167,8 @@ class SettingsPage extends GetView<SettingsController> {
                 () => SwitchListTile(
                   title: Row(
                     children: [
-                      const Text('Уведомления'),
+                      Text('notification'.tr, style: Get.textTheme.titleMedium),
                       const SizedBox(width: 8),
-                      // Показываем индикатор статуса разрешения
                       if (!controller.notificationPermissionGranted.value &&
                           controller.enableNotifications.value)
                         Container(
@@ -183,16 +180,14 @@ class SettingsPage extends GetView<SettingsController> {
                             color: Colors.orange,
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: const Text(
-                            'Требуется разрешение',
+                          child: Text(
+                            'required_permission'.tr,
                             style: TextStyle(fontSize: 10, color: Colors.white),
                           ),
                         ),
                     ],
                   ),
-                  subtitle: const Text(
-                    'Показывать уведомления о состоянии подключения',
-                  ),
+                  subtitle: Text('notification_description'.tr),
                   value: controller.enableNotifications.value,
                   onChanged: (value) => controller.toggleNotifications(value),
                   contentPadding: EdgeInsets.zero,
@@ -200,10 +195,11 @@ class SettingsPage extends GetView<SettingsController> {
               ),
               Obx(
                 () => SwitchListTile(
-                  title: const Text('Автоподключение'),
-                  subtitle: const Text(
-                    'Автоматически подключаться к последнему устройству',
+                  title: Text(
+                    'auto_connect'.tr,
+                    style: Get.textTheme.titleMedium,
                   ),
+                  subtitle: Text('auto_connect_description'.tr),
                   value: controller.enableAutoConnect.value,
                   onChanged: (value) => controller.toggleAutoConnect(value),
                   contentPadding: EdgeInsets.zero,
@@ -220,7 +216,7 @@ class SettingsPage extends GetView<SettingsController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader(title: "О приложении", icon: Icons.info_outline),
+        SectionHeader(title: 'about_app'.tr, icon: Icons.info_outline),
         _buildCard(
           context,
           Column(
@@ -242,29 +238,36 @@ class SettingsPage extends GetView<SettingsController> {
                   ),
                 ),
                 title: const Text(
-                  'Linqora Remote',
+                  appName,
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-                subtitle: Text('Версия: 1.0.0'),
+                subtitle: Text(
+                  'app_version_text'.trParams({
+                    'version': controller.appVersion.value,
+                  }),
+                ),
               ),
-              // const Divider(),
+
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Документация'),
+                title: Text('docs'.tr, style: Get.textTheme.titleMedium),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                 onTap: () => launchUrlHandler(docs),
               ),
-              //  const Divider(),
+
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Лицензии'),
+                title: Text('license'.tr, style: Get.textTheme.titleMedium),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                onTap: () => Get.toNamed('/licenses'),
+                onTap: () => {},
               ),
-              //     const Divider(),
+
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Политика конфиденциальности'),
+                title: Text(
+                  'privacy_police'.tr,
+                  style: Get.textTheme.titleMedium,
+                ),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                 onTap: () => launchUrlHandler(privacy),
               ),

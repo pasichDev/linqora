@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:linqoraremote/presentation/widgets/default_card.dart';
 
-class MetricsStandartCard extends StatefulWidget {
+class MetricsCard extends StatefulWidget {
   final String title;
   final String value;
   final Widget? widget;
 
-  const MetricsStandartCard({
+  const MetricsCard({
     required this.title,
     required this.value,
     this.widget,
@@ -14,10 +15,10 @@ class MetricsStandartCard extends StatefulWidget {
   });
 
   @override
-  State<MetricsStandartCard> createState() => _MetricsStandartCardState();
+  State<MetricsCard> createState() => _MetricsCardState();
 }
 
-class _MetricsStandartCardState extends State<MetricsStandartCard> {
+class _MetricsCardState extends State<MetricsCard> {
   bool _isExpanded = true;
 
   _expanded() {
@@ -28,10 +29,7 @@ class _MetricsStandartCardState extends State<MetricsStandartCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      color: Get.theme.colorScheme.surfaceContainer,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return DefaultCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: InkWell(

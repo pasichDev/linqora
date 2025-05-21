@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:linqoraremote/presentation/controllers/auth_controller.dart';
 import 'package:linqoraremote/presentation/widgets/app_bar.dart';
+import 'package:linqoraremote/presentation/widgets/default_card.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 
+import '../../core/constants/names.dart';
 import '../../core/constants/urls.dart';
+import '../../core/themes/styles.dart';
 import '../../core/utils/lauch_url.dart';
 
 class DeviceAuthPage extends StatefulWidget {
@@ -84,14 +87,11 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
             color: Theme.of(context).colorScheme.error,
           ),
           const SizedBox(height: 24),
-          const Text(
-            'Нет подключения к Wi-Fi',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
+          Text('wifi_no_connection'.tr, style: Get.textTheme.titleMedium),
           const SizedBox(height: 8),
-          const Text(
-            'Пожалуйста, подключитесь к Wi-Fi и попробуйте снова',
-            style: TextStyle(fontSize: 16),
+          Text(
+            'reconnect_to_wifi_please'.tr,
+            style: Get.textTheme.bodyMedium,
             textAlign: TextAlign.center,
           ),
         ],
@@ -106,35 +106,18 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
           onPressed: () {
             launchUrlHandler(howItWorks);
           },
-          style: ElevatedButton.styleFrom(
-            elevation: 0,
-            backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-            foregroundColor: Theme.of(context).colorScheme.onSurface,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
+          style: AppButtonStyle.elevatedButtonStyle(context),
           icon: const Icon(Icons.remove_from_queue_rounded),
-
-          label: const Text('Як це працює?'),
+          label: Text('how_does_work'.tr),
         ),
         SizedBox(width: 10),
         ElevatedButton.icon(
           onPressed: () {
             launchUrlHandler(getLinqoraHost);
           },
-          style: ElevatedButton.styleFrom(
-            elevation: 0,
-            backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-            foregroundColor: Theme.of(context).colorScheme.onSurface,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
+          style: AppButtonStyle.elevatedButtonStyle(context),
           icon: const Icon(Icons.ac_unit),
-          label: const Text('Linqora Host'),
+          label: Text(appNameHost),
         ),
       ],
     );
@@ -150,11 +133,7 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
             size: 60,
           ),
           const SizedBox(height: 24),
-          const Text(
-            'Поиск устройств Linqora в сети...',
-            style: TextStyle(fontSize: 16),
-            textAlign: TextAlign.center,
-          ),
+          Text('search_devices_mdns'.tr, style: Get.textTheme.titleMedium),
         ],
       ),
     );
@@ -173,28 +152,19 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
           Obx(
             () => Text(
               authController.statusMessage.value,
-              style: const TextStyle(fontSize: 16),
-              textAlign: TextAlign.center,
+              style: Get.textTheme.titleMedium,
             ),
           ),
           const SizedBox(height: 32),
           OutlinedButton(
             onPressed: () {
-              authController.cancelAuth('Авторизация отклонена пользователем');
+              authController.cancelAuth('cancel_aut_for_user'.tr);
               setState(() {
                 authController.authStatus.value = AuthStatus.scanning;
               });
             },
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-              side: BorderSide(color: Theme.of(context).colorScheme.error),
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                )
-            ),
-            child: const Text('Отменить'),
+            style: AppButtonStyle.errorButtonStyle(context),
+            child: Text('cancel'.tr),
           ),
         ],
       ),
@@ -212,39 +182,24 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
             color: Theme.of(context).colorScheme.primary,
           ),
           const SizedBox(height: 24),
-          const Text(
-            'Запрос авторизации отправлен',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
+          Text('auth_request_sending'.tr, style: Get.textTheme.titleMedium),
           const SizedBox(height: 8),
-          const Text(
-            'Пожалуйста, подтвердите подключение на устройстве-хосте',
-            style: TextStyle(fontSize: 16),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
+          Text('auth_request_description'.tr, style: Get.textTheme.bodyMedium),
+          const SizedBox(height: 25),
           Obx(
             () => Text(
-              'Осталось времени: ${authController.authTimeoutSeconds.value} сек',
-              style: const TextStyle(fontSize: 14),
+              'auth_request_time_pending'.trParams({
+                's': authController.authTimeoutSeconds.value.toString(),
+              }),
+              style: Get.textTheme.bodyMedium,
             ),
           ),
           const SizedBox(height: 32),
           OutlinedButton(
             onPressed:
-                () => authController.cancelAuth(
-                  'Авторизация отменена пользователем',
-                ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-              side: BorderSide(color: Theme.of(context).colorScheme.error),
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text('Отменить'),
+                () => authController.cancelAuth('cancel_aut_for_user'.tr),
+            style: AppButtonStyle.errorButtonStyle(context),
+            child: Text('cancel'.tr),
           ),
         ],
       ),
@@ -266,14 +221,14 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
                 ).colorScheme.onSurface.withValues(alpha: 0.5),
               ),
               const SizedBox(height: 24),
-              const Text(
-                'Устройства LinqoraHost не найдены',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              Text(
+                'empty_devices_linqora'.tr,
+                style: Get.textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Убедитесь, что устройство находится в той же сети и приложение LinqoraHost запущено',
-                style: TextStyle(fontSize: 16),
+              Text(
+                'empty_devices_linqora_descriptions'.tr,
+                style: Get.textTheme.bodyMedium,
                 textAlign: TextAlign.center,
               ),
             ],
@@ -285,11 +240,7 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
         itemCount: authController.discoveredDevices.length,
         itemBuilder: (context, index) {
           final device = authController.discoveredDevices[index];
-
-          return Card(
-            elevation: 0,
-            color: Get.theme.colorScheme.surfaceContainer,
-            margin: const EdgeInsets.symmetric(vertical: 0),
+          return DefaultCard(
             child: ListTile(
               leading: Icon(
                 Icons.computer,
@@ -348,7 +299,10 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
               ),
             ),
             icon: const Icon(Icons.refresh),
-            label: Text('Обновить', style: Get.theme.textTheme.titleMedium),
+            label: Text(
+              'update'.tr,
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
           ),
         );
       }),

@@ -15,9 +15,7 @@ class SectionHeader extends StatelessWidget {
         const SizedBox(width: 8),
         Text(
           title,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
+          style: Get.textTheme.titleMedium!.copyWith(
             color: Get.theme.colorScheme.primary,
           ),
         ),

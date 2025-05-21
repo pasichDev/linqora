@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:linqoraremote/core/constants/names.dart';
 
 import '../../routes/app_routes.dart';
 
@@ -9,7 +10,7 @@ class AppBarCustom extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      title: const Text('Linqora Remote'),
+      title:  Text(appName),
       elevation: 7,
       actions: [
         IconButton(

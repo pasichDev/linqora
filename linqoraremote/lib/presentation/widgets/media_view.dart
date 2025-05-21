@@ -60,8 +60,8 @@ class _MediaScreenViewState extends State<MediaScreenView> {
                       MessageBanner(
                         message:
                             _mediaController.nowPlaying.value == null
-                                ? "На віддаленому пристрої зараз нічого не відтворюється"
-                                : "Керування медіа на віддаленому пристрої недоступно",
+                                ? 'info_no_playing_remote'.tr
+                                : "error_control_remote".tr,
                         isLoading: false,
                       ),
                     _volumeCard(),
@@ -93,7 +93,7 @@ class _MediaScreenViewState extends State<MediaScreenView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Керування звуком',
+              'control_sound'.tr,
               style: Get.theme.textTheme.titleMedium?.copyWith(
                 color: Get.theme.colorScheme.onPrimaryContainer,
                 fontSize: 18,
@@ -120,7 +120,6 @@ class _MediaScreenViewState extends State<MediaScreenView> {
                   onPressed: _mediaController.minusVolume,
                 ),
 
-                // Слайдер громкости
                 Expanded(
                   child: Obx(
                     () => Slider(
@@ -139,7 +138,6 @@ class _MediaScreenViewState extends State<MediaScreenView> {
                   ),
                 ),
 
-                // Кнопка увеличения громкости
                 IconButton(
                   icon: const Icon(Icons.add, size: 24),
                   onPressed: _mediaController.plusVolume,
@@ -148,7 +146,6 @@ class _MediaScreenViewState extends State<MediaScreenView> {
             ),
             const SizedBox(height: 16),
 
-            // Предустановленные уровни громкости
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
@@ -174,9 +171,9 @@ class _MediaScreenViewState extends State<MediaScreenView> {
         padding: const EdgeInsets.all(16),
         child: Obx(() {
           if (!_mediaController.capabilities.value!.canControlMedia) {
-            return const Center(
+            return Center(
               child: Text(
-                'Управление мультимедиа недоступно на устройстве',
+                'error_control_remote'.tr,
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 16),
               ),
@@ -189,7 +186,7 @@ class _MediaScreenViewState extends State<MediaScreenView> {
               Row(
                 children: [
                   Text(
-                    'Зараз грає',
+                    'now_playing'.tr,
                     style: Get.theme.textTheme.titleMedium?.copyWith(
                       color: Get.theme.colorScheme.onPrimaryContainer,
                       fontSize: 18,
@@ -252,7 +249,6 @@ class _MediaScreenViewState extends State<MediaScreenView> {
     );
   }
 
-  // Секция с информацией о текущем треке
   Widget _buildMediaInfoSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -282,7 +278,7 @@ class _MediaScreenViewState extends State<MediaScreenView> {
           final app = _mediaController.nowPlaying.value!.application;
           if (!_mediaController.isLoadingMedia.value) {
             return Text(
-              app.isEmpty ? 'Неизвестное приложение' : app,
+              app.isEmpty ? 'unknown_app'.tr : app,
               style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
             );
           } else {
@@ -290,7 +286,6 @@ class _MediaScreenViewState extends State<MediaScreenView> {
           }
         }),
 
-        // Прогресс воспроизведения
         const SizedBox(height: 20),
         Obx(() {
           if (_mediaController.nowPlaying.value!.duration > 0 &&
@@ -339,7 +334,6 @@ class _MediaScreenViewState extends State<MediaScreenView> {
     );
   }
 
-  // Кнопки управления воспроизведением
   Widget _buildPlaybackControls(bool isEnabled) {
     var color =
         isEnabled
@@ -349,7 +343,6 @@ class _MediaScreenViewState extends State<MediaScreenView> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Предыдущий трек
         IconButton(
           icon: Icon(Icons.skip_previous, size: 36, color: color),
           onPressed: () {
@@ -361,7 +354,6 @@ class _MediaScreenViewState extends State<MediaScreenView> {
 
         const SizedBox(width: 16),
 
-        // Воспроизведение/Пауза
         Obx(
           () => IconButton(
             icon: Icon(
@@ -381,7 +373,6 @@ class _MediaScreenViewState extends State<MediaScreenView> {
 
         const SizedBox(width: 16),
 
-        // Следующий трек
         IconButton(
           icon: Icon(Icons.skip_next, size: 36, color: color),
           onPressed: () {

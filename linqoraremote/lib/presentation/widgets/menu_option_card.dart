@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:linqoraremote/presentation/widgets/default_card.dart';
 
 class MenuOptionCard extends StatelessWidget {
   final String title;
@@ -15,10 +16,7 @@ class MenuOptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceContainer,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    return DefaultCard(
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),

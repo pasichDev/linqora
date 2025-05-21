@@ -6,6 +6,8 @@ import 'package:linqoraremote/core/constants/settings.dart';
 import 'package:linqoraremote/services/permissions_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../core/utils/device_info.dart';
+
 class SettingsController extends GetxController {
   final _storage = GetStorage(SettingsConst.kSettings);
 
@@ -13,6 +15,7 @@ class SettingsController extends GetxController {
   final RxBool enableNotifications = false.obs;
   final RxBool enableAutoConnect = false.obs;
   final RxBool notificationPermissionGranted = false.obs;
+  final RxString appVersion = ''.obs;
 
   final FlutterLocalNotificationsPlugin notificationsPlugin =
       FlutterLocalNotificationsPlugin();
@@ -22,6 +25,9 @@ class SettingsController extends GetxController {
     super.onInit();
     loadSettings();
     checkNotificationPermission();
+
+    // Load app version
+    _loadAppVersion();
   }
 
   @override
@@ -31,6 +37,7 @@ class SettingsController extends GetxController {
     enableNotifications.close();
     enableAutoConnect.close();
     notificationPermissionGranted.close();
+    appVersion.close();
 
     // Clean up notifications plugin resources
     notificationsPlugin.pendingNotificationRequests().then((notifications) {
@@ -41,6 +48,11 @@ class SettingsController extends GetxController {
 
     _storage.save();
     super.onClose();
+  }
+
+  Future<void> _loadAppVersion() async {
+    final mAppVersion = await getAppVersion();
+    appVersion.value = mAppVersion;
   }
 
   void loadSettings() {

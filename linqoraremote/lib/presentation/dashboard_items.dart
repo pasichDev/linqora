@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:linqoraremote/presentation/widgets/monitoring_view.dart';
 import 'package:linqoraremote/presentation/widgets/powermanagment_view.dart';
 
@@ -18,13 +19,13 @@ class MenuOption {
 
 final menuOptions = [
   MenuOption(
-    title: 'Моніторинг',
+    title: 'monitoring'.tr,
     icon: Icons.monitor_heart_outlined,
     view: MonitoringView(),
   ),
-  MenuOption(title: 'Медіа', icon: Icons.volume_up, view: MediaScreenView()),
+  MenuOption(title: 'media'.tr, icon: Icons.volume_up, view: MediaScreenView()),
   MenuOption(
-    title: 'Живлення',
+    title: 'power'.tr,
     icon: Icons.energy_savings_leaf_outlined,
     view: PowerManagementView(),
   ),

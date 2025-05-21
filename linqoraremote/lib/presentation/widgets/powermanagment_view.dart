@@ -72,7 +72,7 @@ class _PowerManagementViewState extends State<PowerManagementView>
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Тут ви можете керувати живленням вашого пристрою: вимкнути, перезавантажити або заблокувати екран',
+                      'info_power_management'.tr,
                       style: TextStyle(
                         fontSize: 14,
                         fontStyle: FontStyle.italic,
