@@ -48,6 +48,7 @@ class MediaController extends GetxController {
     await webSocketProvider.joinRoom(TypeMessageWs.media.value);
   }
 
+  /// Handle incoming media data
   void _handleMediaData(dynamic data) {
     final mediaData = data['data'];
     if (mediaData != null && mediaData is Map<String, dynamic>) {
@@ -60,6 +61,7 @@ class MediaController extends GetxController {
     }
   }
 
+  /// Handle now playing data
   void _handleNowPlayingData(Map<String, dynamic> mediaData) {
     final nowPlayingData = mediaData['nowPlaying'] as Map<String, dynamic>?;
     if (nowPlayingData != null) {
@@ -70,6 +72,7 @@ class MediaController extends GetxController {
     }
   }
 
+  /// Handle media capabilities data
   void _handleCapabilitiesData(Map<String, dynamic> mediaData) {
     final capabilitiesData =
         mediaData['mediaCapabilities'] as Map<String, dynamic>?;
@@ -95,6 +98,7 @@ class MediaController extends GetxController {
     }
   }
 
+  /// Minus volume by 5%
   Future<void> minusVolume() async {
     if (volume.value > 0) {
       volume.value = (volume.value - 5).clamp(0, 100);
@@ -107,6 +111,7 @@ class MediaController extends GetxController {
     }
   }
 
+  /// Increase volume by 5%
   Future<void> plusVolume() async {
     if (volume.value < 100) {
       volume.value = (volume.value + 5).clamp(0, 100);
@@ -123,6 +128,7 @@ class MediaController extends GetxController {
     }
   }
 
+  /// Slide volume to a specific value
   Future<void> slideVolume(double newValue) async {
     volume.value = newValue.clamp(0, 100);
     await sendMediaCommand(AudioActions.setVolume, value: volume.value.toInt());
@@ -132,6 +138,7 @@ class MediaController extends GetxController {
     }
   }
 
+  /// Set volume to a specific value
   Future<void> setVolume(int newValue) async {
     volume.value = newValue.toDouble().clamp(0, 100);
     await sendMediaCommand(AudioActions.setVolume, value: newValue);
@@ -141,19 +148,17 @@ class MediaController extends GetxController {
     }
   }
 
+  /// Mute or unmute the media
   Future<void> setMuted() async {
     isMuted.value = !isMuted.value;
     await sendMediaCommand(AudioActions.mute, value: isMuted.value ? 1 : 0);
   }
 
-  // Отправить команду управления мультимедиа
+  /// Send media command to the server
   Future<bool> _sendMediaCommand(int action, int value) async {
     if (!webSocketProvider.isReadyForCommand() ||
         !await webSocketProvider.isJoinedRoom(TypeMessageWs.media.value)) {
-      showErrorSnackbar(
-        'Помилка відправки медіа команди:',
-        'Операція не може бути виконана: клієнт не підключений або не авторизований',
-      );
+      showErrorSnackbar('error_media_action'.tr, 'error_auth_connect'.tr);
       return false;
     }
 
@@ -167,7 +172,7 @@ class MediaController extends GetxController {
       webSocketProvider.sendMessage(message);
       return true;
     } catch (e) {
-      showErrorSnackbar('Помилка відправки медіа команди:', e.toString());
+      showErrorSnackbar('${'error_media_action'.tr}:', e.toString());
       return false;
     }
   }

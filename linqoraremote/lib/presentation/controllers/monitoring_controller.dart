@@ -48,6 +48,7 @@ class MonitoringController extends GetxController {
     super.onClose();
   }
 
+  /// Handles the metrics update message from the WebSocket.
   void _handleMetricsUpdate(Map<String, dynamic> data) {
     final metricsData = data['data'] as Map<String, dynamic>;
 
@@ -61,6 +62,7 @@ class MonitoringController extends GetxController {
     );
   }
 
+  /// Resets the metrics data.
   void _resetMetrics() {
     currentCPUMetrics.value = null;
     currentRAMMetrics.value = null;
@@ -69,6 +71,7 @@ class MonitoringController extends GetxController {
     ramUsagesPercent.clear();
   }
 
+  /// Sends a request to the WebSocket server to get the metrics data.
   void _updateMetricsArrays(int temperature, int cpuLoad, int ramUsage) {
     if (temperatures.length >= maxMetricsCount) temperatures.removeAt(0);
     temperatures.add(temperature);

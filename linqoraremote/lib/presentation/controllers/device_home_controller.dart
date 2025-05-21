@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
@@ -12,6 +11,7 @@ import 'package:linqoraremote/services/background_service.dart';
 
 import '../../core/constants/constants.dart';
 import '../../core/constants/settings.dart';
+import '../../core/utils/app_logger.dart';
 import '../../core/utils/error_handler.dart';
 import '../../data/models/server_response.dart';
 import '../../data/providers/websocket_provider.dart';
@@ -27,35 +27,33 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
   final RxBool isBackgroundServiceRunning = false.obs;
   final RxBool isReconnecting = false.obs;
   final RxBool showHostFull = false.obs;
-
   final RxMap deviceInfo = {}.obs;
   final Rxn<HostSystemInfo> hostInfo = Rxn<HostSystemInfo>();
-  Timer? _serviceStatusTimer;
-
   final Rxn<MdnsDevice> authDevice = Rxn<MdnsDevice>();
 
   DateTime _refreshLastTime = DateTime.now();
+  Timer? _serviceStatusTimer;
 
   @override
   Future<void> onInit() async {
     super.onInit();
 
-    // Получаем данные устройства из аргументов
+    /// Get the device information from the arguments
     await _setupFromArguments();
 
-    // Загружаем настройки
+    /// Load the settings
     _loadingSettings();
 
-    // Настраиваем обработчики WebSocket
+    /// Set up the WebSocket handlers
     _setupWebSocketHandlers();
 
-    // Запускаем таймер для проверки статуса сервиса
+    /// Set up the background service handlers
     _startServiceStatusCheck();
 
-    // Настраиваем обработчики
+    /// Set up the background service handlers
     setupBackgroundServiceHandlers();
 
-    // Запускаем фоновый сервис
+    /// Start the background service if needed
     _startBackgroundServiceIfNeeded();
   }
 
@@ -63,9 +61,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
   void onClose() {
     stopBackgroundService();
     _serviceStatusTimer?.cancel();
-
     webSocketProvider.removeHandler(TypeMessageWs.host_info.value);
-
     BackgroundConnectionService.removeMessageHandler(
       _handleBackgroundServiceMessage,
     );
@@ -73,6 +69,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
     super.onClose();
   }
 
+  /// Get settings from storage
   void _loadingSettings() {
     try {
       showHostFull.value =
@@ -81,11 +78,14 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
           ).read<bool>(SettingsConst.kShowHostInfo) ??
           true;
     } catch (e) {
-      printError(info: 'Ошибка загрузки настроек: $e');
+      AppLogger.release(
+        'Error loading settings: $e',
+        module: "DeviceHomeController",
+      );
     }
   }
 
-  // Метод для запуска фонового сервиса
+  /// Start the background service if needed
   void _startBackgroundServiceIfNeeded() async {
     if (authDevice.value != null && isConnected.value) {
       final deviceName = authDevice.value!.name;
@@ -100,14 +100,14 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
       final statusDevicePermission =
           await PermissionsService.checkNotificationPermission();
 
-      // Запускаем фоновый сервис с текущим состоянием соединения
+      /// Start the background service
       await BackgroundConnectionService.startService(
         deviceName,
         deviceAddress,
         isConnected.value,
       );
 
-      // Дополнительное обновление информации через небольшой интервал
+      /// Force update device info
       Future.delayed(const Duration(seconds: 3), () {
         BackgroundConnectionService.forceUpdateDeviceInfo(
           deviceName,
@@ -119,14 +119,14 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
     }
   }
 
-  // Метод для подключения обработчиков сообщений от фонового сервиса
+  /// Method to start background handlers
   void setupBackgroundServiceHandlers() {
     BackgroundConnectionService.addMessageHandler(
       _handleBackgroundServiceMessage,
     );
   }
 
-  // Обработчик сообщений от фонового сервиса
+  /// Method to handle messages from the background service
   void _handleBackgroundServiceMessage(String message) {
     if (message == BackgroundConnectionService.MESSAGE_CHECK_CONNECTION) {
       _checkConnection();
@@ -137,7 +137,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
     }
   }
 
-  // Метод для проверки соединения
+  /// Check the connection status
   void _checkConnection({bool forcePing = false}) {
     if (!webSocketProvider.isConnected && !forcePing) {
       BackgroundConnectionService.reportConnectionState(false);
@@ -147,6 +147,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
     webSocketProvider.sendPing();
   }
 
+  /// Method to handle the background service message
   Future<void> _setupFromArguments() async {
     final args = Get.arguments;
 
@@ -158,9 +159,10 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
             SettingsConst.kSettings,
           ).write(SettingsConst.kLastConnect, authDevice.value!.toJson());
         } catch (e) {
-          if (kDebugMode) {
-            print("Error parse device data: ${args['device']}");
-          }
+          AppLogger.release(
+            'Error parse device data: ${args['device']}',
+            module: "DeviceHomeController",
+          );
         }
       }
 
@@ -168,14 +170,14 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
     }
   }
 
+  /// Method to set up WebSocket handlers
   void _setupWebSocketHandlers() {
     webSocketProvider.onDisconnected = () {
-      isConnected.value = false;
-      Get.back(result: true);
       showErrorSnackbar(
-        'Соединение разорвано',
-        'Соединение с устройством Linqora было прервано',
+        'connection_broken'.tr,
+        'connection_broken_description'.tr,
       );
+      disconnectFromDevice();
     };
 
     webSocketProvider.registerHandler(
@@ -186,7 +188,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
     _requestSystemInfo();
   }
 
-  // Запускаем таймер проверки статуса фонового сервиса
+  /// Method to start the background service
   void _startServiceStatusCheck() {
     _serviceStatusTimer = Timer.periodic(Duration(seconds: 5), (timer) async {
       isBackgroundServiceRunning.value =
@@ -194,21 +196,24 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
     });
   }
 
-  // Остановка фонового сервиса
+  /// Stop the background service
   Future<void> stopBackgroundService() async {
     try {
       await BackgroundConnectionService.stopService();
       isBackgroundServiceRunning.value = false;
-      if (kDebugMode) {
-        print('Background service stopped');
-      }
+      AppLogger.release(
+        'Background service stopped',
+        module: "DeviceHomeController",
+      );
     } catch (e) {
-      if (kDebugMode) {
-        print('Error stopping background service: $e');
-      }
+      AppLogger.release(
+        'Error stopping background service: $e',
+        module: "DeviceHomeController",
+      );
     }
   }
 
+  /// Method to refresh the host information
   void refreshHostInfo() {
     bool difference =
         DateTime.now().difference(_refreshLastTime).inSeconds >= 30;
@@ -217,7 +222,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
     }
   }
 
-  // Запрос информации о системе
+  /// Request system information
   void _requestSystemInfo() {
     if (!isConnected.value) return;
     _refreshLastTime = DateTime.now();
@@ -226,13 +231,14 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
         WsMessage(type: TypeMessageWs.host_info.value),
       );
     } catch (e) {
-      if (kDebugMode) {
-        print('Error requesting system info: $e');
-      }
+      AppLogger.release(
+        'Error stopping system info: $e',
+        module: "DeviceHomeController",
+      );
     }
   }
 
-  // Обработчик информации о системе
+  /// Method to handle the system information response
   void _handleSystemInfo(Map<String, dynamic> data) {
     try {
       final response = ServerResponse<HostSystemInfo>.fromJson(
@@ -242,8 +248,8 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
 
       if (response.hasError) {
         showErrorSnackbar(
-          'Ошибка получения данных',
-          'Не удалось получить информацию о системе: ${response.error?.message}',
+          'error_fetch_data'.tr,
+          '${'error_fetch_data_description'.tr} ${response.error?.message}',
         );
         return;
       }
@@ -251,24 +257,25 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
 
       if (!response.data!.baseInfo.su && showErrorSu) {
         showErrorSnackbar(
-          'Отсутствуют права доступа к системной информации',
-          'Пожалуйста, запустите Linqora с правами администратора, чтобы получить доступ к полному функционалу.',
+          'access_denied_system_info'.tr,
+          'access_denied_system_info_description'.tr,
         );
         return;
       }
     } catch (e) {
       showErrorSnackbar(
-        'Ошибка обработки данных',
-        'Не удалось обработать информацию о системе',
+        'error_processing_data'.tr,
+        'error_processing_data_description'.tr,
       );
     }
   }
 
-  // Метод для выбора пункта меню
+  /// Method to handle the menu item selection
   void selectMenuItem(int index) {
     selectedMenuIndex.value = index;
   }
 
+  /// Method to handle the menu item selection
   void toggleShowHostFull() {
     GetStorage(
       SettingsConst.kSettings,
@@ -276,7 +283,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
     showHostFull.value = !showHostFull.value;
   }
 
-  // Отключиться от устройства
+  /// Disconnect from the device
   Future<void> disconnectFromDevice() async {
     await BackgroundConnectionService.stopService();
     stopBackgroundService();

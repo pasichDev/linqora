@@ -1,10 +1,12 @@
 import 'package:get/get.dart';
 import 'package:linqoraremote/core/utils/error_handler.dart';
 
+import '../../core/utils/app_logger.dart';
 import '../../data/enums/type_request_host.dart';
 import '../../data/models/ws_message.dart';
 import '../../data/providers/websocket_provider.dart';
 
+/// This class is responsible for handling power-related actions
 class PowerActions {
   static const int shutDown = 0;
   static const int restart = 1;
@@ -31,20 +33,19 @@ class PowerController extends GetxController {
     super.onClose();
   }
 
+  /// Handles the power update message from the WebSocket.
   void _handlePowerUpdate(Map<String, dynamic> data) {
     final String indicator = data['data']['status'];
 
     if (indicator.contains("locked")) {
-      showErrorSnackbar(
-        "Пристрій заблоковано",
-        "Команди керування живленням не доступні",
-      );
+      showErrorSnackbar('device_locked'.tr, 'ban_commands.tr');
     } else {
       final int action = data['data']['action'];
       _messageSnack(action);
     }
   }
 
+  /// Sends a command to the WebSocket server.
   void fetchCommand(int action) {
     try {
       final message = WsMessage(type: TypeMessageWs.power.value)
@@ -53,27 +54,32 @@ class PowerController extends GetxController {
       webSocketProvider.sendMessage(message.toJson());
     } catch (e) {
       showErrorSnackbar(
-        "Помилка",
-        "Не вдалося надіслати команду: ${e.toString()}",
+        'error'.tr,
+        "${'error_sending_command'.tr}: ${e.toString()}",
+      );
+      AppLogger.release(
+        '${'error_sending_command'.tr}: $e',
+        module: "PowerController",
       );
     }
   }
 
+  /// Displays a snackbar message based on the action performed.
   void _messageSnack(int action) {
-    String textMessage = "Невідома дія";
+    String textMessage = 'unknown_action'.tr;
 
     switch (action) {
       case PowerActions.shutDown:
-        textMessage = "Вимкнення пристрою...";
+        textMessage = 'shutdown_device'.tr;
         break;
       case PowerActions.restart:
-        textMessage = "Перезавантаження пристрою...";
+        textMessage = 'restart_device'.tr;
         break;
       case PowerActions.lock:
-        textMessage = "Блокування пристрою...";
+        textMessage = 'lock_device'.tr;
         break;
     }
 
-    showErrorSnackbar('Виконується', textMessage);
+    showErrorSnackbar('running'.tr, textMessage);
   }
 }

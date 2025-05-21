@@ -3,9 +3,11 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:linqoraremote/core/constants/settings.dart';
+import 'package:linqoraremote/core/utils/error_handler.dart';
 import 'package:linqoraremote/services/permissions_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../core/utils/app_logger.dart';
 import '../../core/utils/device_info.dart';
 
 class SettingsController extends GetxController {
@@ -23,23 +25,24 @@ class SettingsController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+
+    /// Load the settings from storage
     loadSettings();
+
+    /// Initialize the notifications plugin
     checkNotificationPermission();
 
-    // Load app version
+    /// Get app version
     _loadAppVersion();
   }
 
   @override
   void onClose() {
-    // Dispose RxVariables
     themeMode.close();
     enableNotifications.close();
     enableAutoConnect.close();
     notificationPermissionGranted.close();
     appVersion.close();
-
-    // Clean up notifications plugin resources
     notificationsPlugin.pendingNotificationRequests().then((notifications) {
       for (final notification in notifications) {
         notificationsPlugin.cancel(notification.id);
@@ -68,86 +71,89 @@ class SettingsController extends GetxController {
 
       Get.changeThemeMode(themeMode.value);
     } catch (e) {
-      printError(info: 'Ошибка загрузки настроек: $e');
+      AppLogger.release(
+        'Error loading settings: $e',
+        module: "SettingsController",
+      );
     }
   }
 
-  // Проверка разрешения уведомлений при запуске
+  /// Check notification permission status
   Future<void> checkNotificationPermission() async {
     try {
       final status = await PermissionsService.checkNotificationPermission();
       notificationPermissionGranted.value = status;
 
-      // Если разрешение не выдано, но настройка включена - отключаем настройку
+      /// Else if the permission is not granted and notifications are enabled,
       if (!status && enableNotifications.value) {
         enableNotifications.value = false;
         await _storage.write(SettingsConst.kEnableNotifications, false);
       }
     } catch (e) {
-      // Обрабатываем ошибку - не блокируем функционал
-      notificationPermissionGranted.value = true;
-      printError(info: 'Ошибка проверки разрешений: $e');
+      showErrorSnackbar('Error check permission', e.toString());
+      AppLogger.release(
+        'Error check permission: $e',
+        module: "SettingsController",
+      );
     }
   }
 
-  // Запрос разрешения на уведомления
+  /// Request notification permission
   Future<bool> requestNotificationPermission() async {
     final status = await Permission.notification.request();
     notificationPermissionGranted.value = status.isGranted;
     return status.isGranted;
   }
 
-  // Обновленный метод переключения уведомлений с запросом разрешений
+  /// Request notification permission and check if it is granted
   Future<void> toggleNotifications(bool value) async {
     try {
       if (value && !notificationPermissionGranted.value) {
         final granted =
             await PermissionsService.requestNotificationPermission();
         if (!granted) {
-          Get.snackbar(
-            'Отсутствует разрешение',
-            'Чтобы получать уведомления, предоставьте разрешение в настройках устройства',
-            snackPosition: SnackPosition.BOTTOM,
-            duration: Duration(seconds: 5),
-            mainButton: TextButton(
-              child: Text('Настройки', style: TextStyle(color: Colors.white)),
-              onPressed: () => PermissionsService.openAppSettings(),
-            ),
-            backgroundColor: Colors.orange.shade800,
-            colorText: Colors.white,
+          showErrorSnackbar(
+            'empty_permission'.tr,
+            'empty_permission_description'.tr,
           );
           return;
         }
         notificationPermissionGranted.value = granted;
       }
 
-      // Установка значения только если разрешения получены или отключаем уведомления
+      /// If the permission is not granted and notifications are enabled,
       if (!value || notificationPermissionGranted.value) {
         enableNotifications.value = value;
         await _storage.write(SettingsConst.kEnableNotifications, value);
       }
     } catch (e) {
-      printError(info: 'Ошибка при переключении уведомлений: $e');
+      AppLogger.release(
+        'Error when switching notifications: $e',
+        module: "SettingsController",
+      );
       enableNotifications.value = value;
       await _storage.write(SettingsConst.kEnableNotifications, value);
     }
   }
 
+  /// Save the theme mode to storage and change the app theme
   Future<void> saveThemeMode(ThemeMode mode) async {
     try {
       themeMode.value = mode;
       await _storage.write(SettingsConst.kThemeMode, _getThemeModeString(mode));
       Get.changeThemeMode(mode);
     } catch (e) {
-      printError(info: 'Ошибка сохранения темы: $e');
+      AppLogger.release('Error save theme: $e', module: "SettingsController");
     }
   }
 
+  /// Save the auto connect setting to storage
   Future<void> toggleAutoConnect(bool value) async {
     enableAutoConnect.value = value;
     await _storage.write(SettingsConst.kEnableAutoConnect, value);
   }
 
+  /// Get the theme mode from string
   ThemeMode _getThemeMode(String value) {
     switch (value) {
       case 'light':
@@ -159,6 +165,7 @@ class SettingsController extends GetxController {
     }
   }
 
+  /// Get the theme mode as string
   String _getThemeModeString(ThemeMode mode) {
     switch (mode) {
       case ThemeMode.light:
