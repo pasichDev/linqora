@@ -6,4 +6,4 @@ import 'package:flutter/foundation.dart';
 /// Note: This should be set to `false` in production for security reasons.
 const bool allowSelfSigned = true;
 
-const bool showErrorSu = kDebugMode;
+const bool showErrorSu = !kDebugMode;

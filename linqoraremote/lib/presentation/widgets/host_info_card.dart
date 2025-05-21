@@ -73,22 +73,23 @@ class HostInfoCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    SizedBox(width: 0),
-                    IconButton(
-                      onPressed: refresh,
-                      icon: Icon(Icons.refresh),
-                      style: IconButton.styleFrom(
-                        elevation: 0,
-                        backgroundColor:
-                            Theme.of(context).colorScheme.surfaceContainer,
-                        foregroundColor:
-                            Theme.of(context).colorScheme.onSurface,
-                        padding: const EdgeInsets.all(0),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(0),
+                    if (isExpanded) ...[
+                      IconButton(
+                        onPressed: refresh,
+                        icon: Icon(Icons.refresh),
+                        style: IconButton.styleFrom(
+                          elevation: 0,
+                          backgroundColor:
+                              Theme.of(context).colorScheme.surfaceContainer,
+                          foregroundColor:
+                              Theme.of(context).colorScheme.onSurface,
+                          padding: const EdgeInsets.all(0),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(0),
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ],
