@@ -1,4 +1,3 @@
-// Базовая информация о системе
 class BaseSystemInfo {
   final String os;
   final String hostname;
@@ -25,7 +24,6 @@ class BaseSystemInfo {
   }
 }
 
-// Информация о процессоре
 class CPUInfo {
   final String model;
   final int physicalCores;
@@ -49,7 +47,6 @@ class CPUInfo {
   }
 }
 
-// Информация об оперативной памяти
 class RAMInfo {
   final String type;
   final int frequency;
@@ -79,7 +76,6 @@ class RAMInfo {
   }
 }
 
-// Информация о видеокарте
 class GPUInfo {
   final String model;
   final int memory;
@@ -94,7 +90,6 @@ class GPUInfo {
   }
 }
 
-// Информация о диске
 class DiskInfo {
   final String name;
   final double total;
@@ -126,7 +121,6 @@ class DiskInfo {
   }
 }
 
-// Главный класс, объединяющий всю информацию о системе
 class HostSystemInfo {
   final BaseSystemInfo baseInfo;
   final CPUInfo cpu;
@@ -160,7 +154,6 @@ class HostSystemInfo {
     );
   }
 
-  // Для упрощения доступа к часто используемым полям
   String get os => baseInfo.os;
   String get hostname => baseInfo.hostname;
 }

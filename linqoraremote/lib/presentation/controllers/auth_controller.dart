@@ -7,7 +7,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
-import 'package:linqoraremote/data/enums/type_messages_ws.dart';
+import 'package:linqoraremote/data/enums/type_request_host.dart';
 import 'package:linqoraremote/data/models/auth_response_handler.dart';
 import 'package:linqoraremote/data/models/ws_message.dart';
 import 'package:linqoraremote/data/providers/mdns_provider.dart';
@@ -15,6 +15,7 @@ import 'package:linqoraremote/data/providers/websocket_provider.dart';
 
 import '../../core/constants/constants.dart';
 import '../../core/constants/settings.dart';
+import '../../core/utils/auth_response_handler.dart';
 import '../../core/utils/device_info.dart';
 import '../../core/utils/error_handler.dart';
 import '../../data/models/discovered_service.dart';
@@ -30,7 +31,7 @@ class AuthController extends GetxController {
   AuthController({required this.webSocketProvider, required this.mDnsProvider});
 
   final RxList<MdnsDevice> discoveredDevices = <MdnsDevice>[].obs;
-  final RxString statusMessage = ''.obs;
+ // final RxString statusMessage = ''.obs;
   final RxInt authTimeoutSeconds = 30.obs;
   final Rxn<MdnsDevice> authDevice = Rxn<MdnsDevice>();
   final Rx<AuthStatus> authStatus = AuthStatus.listDevices.obs;
@@ -79,10 +80,9 @@ class AuthController extends GetxController {
     mDnsProvider.onStatusChanged = (status, {String? message}) {
       switch (status) {
         case DiscoveryStatus.started:
-          authStatus.value = AuthStatus.scanning;
+         authStatus.value = AuthStatus.scanning;
           break;
         case DiscoveryStatus.deviceFound:
-          statusMessage.value = 'Найдено устройства!';
           break;
         case DiscoveryStatus.completed:
           authStatus.value = AuthStatus.listDevices;
@@ -95,9 +95,6 @@ class AuthController extends GetxController {
             "Ошибка поиска устройств",
             message ?? 'Ошибка поиска устройства не определена',
           );
-          authStatus.value = AuthStatus.listDevices;
-          break;
-        case DiscoveryStatus.timeout:
           authStatus.value = AuthStatus.listDevices;
           break;
       }
@@ -150,14 +147,14 @@ class AuthController extends GetxController {
 
       if (devices.isNotEmpty) {
         discoveredDevices.addAll(devices);
-        statusMessage.value = 'Найдено ${devices.length} устройств';
+    //    statusMessage.value = 'Найдено ${devices.length} устройств';
         authStatus.value = AuthStatus.listDevices;
       } else {
-        statusMessage.value = 'Устройства не найдены';
+    //    statusMessage.value = 'Устройства не найдены';
         authStatus.value = AuthStatus.listDevices;
       }
     } catch (e) {
-      statusMessage.value = 'Ошибка при поиске устройств: $e';
+   //   statusMessage.value = 'Ошибка при поиске устройств: $e';
       authStatus.value = AuthStatus.listDevices;
     }
   }
@@ -166,15 +163,15 @@ class AuthController extends GetxController {
     if (authStatus.value == AuthStatus.connecting) return;
     authDevice.value = device;
     authStatus.value = AuthStatus.connecting;
-    statusMessage.value = 'Подключение к ${device.name}...';
+  //  statusMessage.value = 'Подключение к ${device.name}...';
 
     // Устанавливаем обработчики до попытки подключения
     webSocketProvider.onConnected = () {
       if (authStatus.value != AuthStatus.connecting) {
         return;
       }
-      statusMessage.value =
-          'Соединение установлено, выполняется авторизация...';
+  //    statusMessage.value =
+  //        'Соединение установлено, выполняется авторизация...';
       startAuthProcess();
       if (kDebugMode) print("onConnected");
     };
@@ -313,7 +310,7 @@ class AuthController extends GetxController {
 
     switch (serverResponse.data?.code) {
       case AuthStatusCode.pending:
-        statusMessage.value = 'Ожидание подтверждения на устройстве хоста...';
+      //  statusMessage.value = 'Ожидание подтверждения на устройстве хоста...';
 
         if (authStatus.value != AuthStatus.pendingAuth) {
           authStatus.value = AuthStatus.pendingAuth;
@@ -321,10 +318,12 @@ class AuthController extends GetxController {
         break;
 
       default:
-        statusMessage.value =
+      /*  statusMessage.value =
             serverResponse.data!.message.isNotEmpty
                 ? serverResponse.data!.message
                 : 'Ожидание авторизации...';
+
+       */
         break;
     }
   }
@@ -345,7 +344,7 @@ class AuthController extends GetxController {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _cleanupResources(resetStatus: true, clearHandlers: true);
-      statusMessage.value = '';
+    //  statusMessage.value = '';
     });
   }
 
@@ -370,7 +369,7 @@ class AuthController extends GetxController {
     if (isError) {
       showErrorSnackbar('Ошибка подключения', errorMessage);
     } else {
-      statusMessage.value = 'Соединение прервано';
+    //  statusMessage.value = 'Соединение прервано';
     }
   }
 

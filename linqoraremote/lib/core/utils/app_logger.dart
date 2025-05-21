@@ -1,49 +1,50 @@
+/// A utility class for logging messages in the application.
+///
+/// This logger provides methods for logging messages in both debug and release modes.
+/// It also allows initialization with a debug mode flag to control logging behavior.
 class AppLogger {
-  // Прапорець для визначення, чи виводити логи
-  static bool _isDebug = false;
+  /// A private flag indicating whether the logger is in debug mode.
+  static bool _isDebug = true;
 
-  // Ініціалізація логера
-  static void init({bool isDebug = false}) {
+  /// Initializes the logger with the specified debug mode.
+  ///
+  /// - **Parameters**:
+  ///   - `isDebug` (`bool`): A flag to enable or disable debug mode. Defaults to `true`.
+  static void init({bool isDebug = true}) {
     _isDebug = isDebug;
-    log('Logger initialized, debug mode: $_isDebug');
+    _logInternal('Logger initialized, debug mode: $_isDebug', level: 'INIT');
   }
 
-  // Головний метод логування
-  static void log(
+  /// Logs a debug message if the logger is in debug mode.
+  ///
+  /// - **Parameters**:
+  ///   - `message` (`String`): The message to log.
+  ///   - `module` (`String`): The module name associated with the log. Defaults to `'App'`.
+  static void debug(String message, {String module = 'App'}) {
+    if (_isDebug) {
+      _logInternal(message, module: module, level: 'DEBUG');
+    }
+  }
+
+  /// Logs a release message regardless of the debug mode.
+  ///
+  /// - **Parameters**:
+  ///   - `message` (`String`): The message to log.
+  ///   - `module` (`String`): The module name associated with the log. Defaults to `'App'`.
+  static void release(String message, {String module = 'App'}) {
+    _logInternal(message, module: module, level: 'RELEASE');
+  }
+
+  /// A private method for logging messages with a specific level and module.
+  ///
+  /// - **Parameters**:
+  ///   - `message` (`String`): The message to log.
+  ///   - `module` (`String`): The module name associated with the log. Defaults to `'App'`.
+  static void _logInternal(
     String message, {
     String module = 'App',
-    LogLevel level = LogLevel.info,
+    String level = 'LOG',
   }) {
-    if (!_isDebug && level != LogLevel.error) {
-      return;
-    }
-
-    final DateTime now = DateTime.now();
-    final String formattedTime =
-        '${now.hour}:${now.minute}:${now.second}.${now.millisecond}';
-    final String levelStr = level.toString().split('.').last.toUpperCase();
-
-    print('[$formattedTime][$levelStr][$module] $message');
-  }
-
-  // Скорочені методи для різних рівнів логування
-  static void debug(String message, {String module = 'App'}) {
-    log(message, module: module, level: LogLevel.debug);
-  }
-
-  static void info(String message, {String module = 'App'}) {
-    log(message, module: module, level: LogLevel.info);
-  }
-
-  static void warning(String message, {String module = 'App'}) {
-    log(message, module: module, level: LogLevel.warning);
-  }
-
-  static void error(String message, {String module = 'App', Object? error}) {
-    final errorMsg = error != null ? '$message | Error: $error' : message;
-    log(errorMsg, module: module, level: LogLevel.error);
+    print('[$module] $message');
   }
 }
-
-// Рівні логування
-enum LogLevel { debug, info, warning, error }

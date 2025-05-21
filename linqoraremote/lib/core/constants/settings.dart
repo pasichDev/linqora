@@ -1,4 +1,3 @@
-
 class SettingsConst{
   static const kSettings = 'settings';
   static const kThemeMode = 'theme_mode';

@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import '../core/utils/ping.dart';
+
 /// Служба для підтримки з'єднання з хостом у фоновому режимі, коли додаток згорнутий.
 /// Забезпечує постійний зв'язок з сервером та відображення сповіщень про статус з'єднання.
 class BackgroundConnectionService {
@@ -297,7 +299,7 @@ void onStart(ServiceInstance service) async {
         consecutivePingFails++;
 
         // После 2 неудачных пингов считаем соединение потерянным
-        if (consecutivePingFails >= 2) {
+        if (consecutivePingFails >= maxMissedPings) {
           isConnected = false;
           sendPort.send(BackgroundConnectionService.MESSAGE_CONNECTION_LOST);
           updateNotification();

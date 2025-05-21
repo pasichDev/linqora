@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
-import 'package:linqoraremote/data/enums/type_messages_ws.dart';
+import 'package:linqoraremote/data/enums/type_request_host.dart';
 import 'package:linqoraremote/data/models/discovered_service.dart';
 import 'package:linqoraremote/data/models/host_info.dart';
 import 'package:linqoraremote/data/models/ws_message.dart';

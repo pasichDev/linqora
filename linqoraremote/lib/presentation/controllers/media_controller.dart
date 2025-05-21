@@ -6,7 +6,7 @@ import 'package:linqoraremote/data/providers/websocket_provider.dart';
 
 import '../../core/utils/error_handler.dart';
 import '../../core/utils/formatter.dart';
-import '../../data/enums/type_messages_ws.dart';
+import '../../data/enums/type_request_host.dart';
 import '../../data/models/media_capabilities.dart';
 import '../../data/models/now_playing.dart';
 

@@ -8,7 +8,7 @@ import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/status.dart' as status;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import '../enums/type_messages_ws.dart';
+import '../enums/type_request_host.dart';
 import '../models/discovered_service.dart';
 import '../models/ws_message.dart';
 

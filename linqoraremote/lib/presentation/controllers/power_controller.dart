@@ -1,7 +1,7 @@
 import 'package:get/get.dart';
 import 'package:linqoraremote/core/utils/error_handler.dart';
 
-import '../../data/enums/type_messages_ws.dart';
+import '../../data/enums/type_request_host.dart';
 import '../../data/models/ws_message.dart';
 import '../../data/providers/websocket_provider.dart';
 

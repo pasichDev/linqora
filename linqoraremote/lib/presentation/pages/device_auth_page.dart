@@ -151,7 +151,7 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
           const SizedBox(height: 24),
           Obx(
             () => Text(
-              authController.statusMessage.value,
+              "${'connecting_for'.tr} ${authController.authDevice.value!.name}...",
               style: Get.textTheme.titleMedium,
             ),
           ),

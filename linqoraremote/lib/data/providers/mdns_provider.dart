@@ -1,14 +1,14 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:multicast_dns/multicast_dns.dart';
 
+import '../../core/utils/app_logger.dart';
 import '../models/discovered_service.dart';
 
 /// Status of mDNS discovery process
-enum DiscoveryStatus { started, deviceFound, completed, empty, error, timeout }
+enum DiscoveryStatus { started, deviceFound, completed, empty, error }
 
 class MDnsProvider {
   /// Callback for discovery status changes
@@ -28,7 +28,6 @@ class MDnsProvider {
   /// Enables multicast capability on Android devices
   /// Returns true if successful, false otherwise
   Future<bool> _enableMulticast() async {
-    // Only applicable to Android
     if (!Platform.isAndroid) return true;
 
     const wifiMulticastChannel = MethodChannel('android.net.wifi.WifiManager');
@@ -37,14 +36,17 @@ class MDnsProvider {
         'acquireMulticastLock',
       );
 
-      if (kDebugMode) {
-        print('Multicast lock acquired: $result');
-      }
+      AppLogger.debug(
+        'Multicast lock acquired: $result',
+        module: "MDnsProvider",
+      );
+
       return true;
     } catch (e) {
-      if (kDebugMode) {
-        print("Failed to activate multicast: $e");
-      }
+      AppLogger.release(
+        'Failed to activate multicast: $e',
+        module: "MDnsProvider",
+      );
       onStatusChanged?.call(
         DiscoveryStatus.error,
         message: "Failed to activate multicast: $e",
@@ -59,9 +61,7 @@ class MDnsProvider {
       _client?.stop();
       _client = null;
     } catch (e) {
-      if (kDebugMode) {
-        print('Error stopping mDNS client: $e');
-      }
+      AppLogger.debug('Error stopping mDNS client: $e', module: "MDnsProvider");
     }
   }
 
@@ -72,9 +72,7 @@ class MDnsProvider {
     }
     _stopDiscovery();
 
-    if (kDebugMode) {
-      print('mDNS discovery canceled');
-    }
+    AppLogger.debug('mDNS discovery canceled', module: "MDnsProvider");
   }
 
   /// Dispose resources
@@ -94,23 +92,23 @@ class MDnsProvider {
       if (!await _initializeDiscovery()) {
         return [];
       }
-
-      // Устанавливаем таймаут
-      _log('Начинаем поиск с таймаутом $discoveryTimeout секунд');
+      AppLogger.debug(
+        "Start the search with a timeout of $discoveryTimeout seconds",
+        module: "MDnsProvider",
+      );
       _cancelDiscoveryTimer();
       _discoveryTimer = Timer(Duration(seconds: discoveryTimeout), () {
-        _log('Таймаут поиска ($discoveryTimeout сек)');
         _stopDiscovery();
       });
 
-      // Запускаем поиск
+      /// Start search
       if (useDirectSearch && useDnsSdSearch && !avoidDuplicates) {
         await Future.wait([
           _performDirectSearch(devices),
           _performDnsSdSearch(devices),
         ]);
       } else {
-        // Иначе запускаем последовательно, чтобы избежать дублирования
+        /// Start direct search
         if (useDirectSearch) {
           await _performDirectSearch(devices);
         }
@@ -121,20 +119,22 @@ class MDnsProvider {
       }
 
       final duration = DateTime.now().difference(startTime).inMilliseconds;
-      _log(
-        'Поиск устройств завершен за $duration мс, найдено: ${devices.length}',
+      AppLogger.release(
+        'Device search completed in $duration ms, found: ${devices.length}',
+        module: "MDnsProvider",
       );
-
       return _finalizeDiscovery(devices);
     } catch (e) {
-      final duration = DateTime.now().difference(startTime).inMilliseconds;
-      _logError('Ошибка при поиске устройств ($duration мс)', e);
+      AppLogger.release(
+        'Error when searching for devices: ${devices.length}',
+        module: "MDnsProvider",
+      );
       _stopDiscovery();
       return [];
     }
   }
 
-  // Инициализация поиска
+  /// Initializes mDNS discovery process
   Future<bool> _initializeDiscovery() async {
     onStatusChanged?.call(DiscoveryStatus.started);
 
@@ -144,71 +144,69 @@ class MDnsProvider {
 
     _client = MDnsClient();
     await _client!.start();
-    _log('Начинаем mDNS-обнаружение для Linqora-устройств');
-
-    // Запускаем таймер для ограничения времени поиска
+    AppLogger.release(
+      'Starting mDNS discovery for Linqora devices',
+      module: "MDnsProvider",
+    );
     _startDiscoveryTimer();
-
     return true;
   }
 
-  // Прямой поиск по типу сервиса
+  /// Performs direct search for Linqora services
   Future<void> _performDirectSearch(List<MdnsDevice> devices) async {
     try {
-      _log('Ищем Linqora сервисы с типом "_linqora.local"');
-
       await for (final ptr in _client!.lookup<PtrResourceRecord>(
         ResourceRecordQuery.serverPointer('_linqora.local'),
       )) {
-        _log('Найден Linqora сервис: ${ptr.domainName}');
+        AppLogger.debug(
+          'Found Linqora service: ${ptr.domainName}',
+          module: "MDnsProvider",
+        );
         await _processLinqoraInstance(ptr.domainName, devices);
       }
     } catch (e) {
-      _logError('Ошибка при прямом поиске', e);
+      AppLogger.release(
+        'Error in direct search: ${e.toString()}',
+        module: "MDnsProvider",
+      );
     }
   }
 
-  // Поиск через DNS-SD
+  /// Performs DNS-SD search for Linqora services
   Future<void> _performDnsSdSearch(List<MdnsDevice> devices) async {
     try {
-      _log('Пробуем поиск через DNS-SD...');
-
       await for (final serviceType in _client!.lookup<PtrResourceRecord>(
         ResourceRecordQuery.serverPointer('_services._dns-sd._udp.local'),
       )) {
-        _log('Найден тип сервиса через DNS-SD: ${serviceType.domainName}');
-
+        AppLogger.release(
+          'Found service type via DNS-SD: ${serviceType.domainName}',
+          module: "MDnsProvider",
+        );
         if (_isLinqoraServiceType(serviceType.domainName)) {
           await for (final instance in _client!.lookup<PtrResourceRecord>(
             ResourceRecordQuery.serverPointer(serviceType.domainName),
           )) {
-            _log(
-              'Найден экземпляр ${serviceType.domainName}: ${instance.domainName}',
-            );
             await _processLinqoraInstance(instance.domainName, devices);
           }
         }
       }
     } catch (e) {
-      _logError('Ошибка при поиске через DNS-SD', e);
+      AppLogger.release(
+        'Error when searching via DNS-SD: ${e.toString()}',
+        module: "MDnsProvider",
+      );
     }
   }
 
-  // Завершение поиска и обработка результатов
+  /// Finalizes the discovery process
   List<MdnsDevice> _finalizeDiscovery(List<MdnsDevice> devices) {
     _cancelDiscoveryTimer();
     _stopDiscovery();
 
     if (devices.isEmpty) {
-      onStatusChanged?.call(
-        DiscoveryStatus.empty,
-        message: 'Устройства не найдены',
-      );
+      onStatusChanged?.call(DiscoveryStatus.empty);
     } else {
-      onStatusChanged?.call(
-        DiscoveryStatus.completed,
-        message: 'Найдено ${devices.length} устройств',
-      );
+      onStatusChanged?.call(DiscoveryStatus.completed);
     }
 
     return devices;
@@ -217,25 +215,9 @@ class MDnsProvider {
   void _startDiscoveryTimer() {
     _cancelDiscoveryTimer();
     _discoveryTimer = Timer(Duration(seconds: discoveryTimeout), () {
-      _log('Timeout: завершаем поиск');
       _stopDiscovery();
-      onStatusChanged?.call(
-        DiscoveryStatus.timeout,
-        message: 'Поиск завершен по таймауту',
-      );
+      onStatusChanged?.call(DiscoveryStatus.empty);
     });
-  }
-
-  void _log(String message) {
-    if (kDebugMode) {
-      print('[MDnsProvider] $message');
-    }
-  }
-
-  void _logError(String context, dynamic error) {
-    if (kDebugMode) {
-      print('[MDnsProvider] $context: $error');
-    }
   }
 
   void _cancelDiscoveryTimer() {
@@ -250,9 +232,6 @@ class MDnsProvider {
     List<MdnsDevice> devices,
   ) async {
     try {
-      _log('Обработка сервиса: $serviceName');
-
-      // Получаем все SRV записи сразу
       final srvRecords =
           await _client!
               .lookup<SrvResourceRecord>(
@@ -261,14 +240,11 @@ class MDnsProvider {
               .toList();
 
       if (srvRecords.isEmpty) {
-        _log('Сервис $serviceName не имеет SRV записей');
         return;
       }
+
       final srv = srvRecords.first;
-      _log('SRV запись: ${srv.target}:${srv.port}');
-
       final txtData = await _parseTxtRecords(serviceName);
-
       final ipAddresses =
           await _client!
               .lookup<IPAddressResourceRecord>(
@@ -277,21 +253,21 @@ class MDnsProvider {
               .toList();
 
       if (ipAddresses.isEmpty) {
-        _log('Не найдено IP адресов для ${srv.target}');
+        AppLogger.debug(
+          'No IP addresses found for ${srv.target}',
+          module: "MDnsProvider",
+        );
         return;
       }
 
-      // Создаем понятное имя сервиса
+      /// Create a device with the best IP address
       String serviceParts = serviceName.split('._')[0];
       if (serviceParts.startsWith('_')) {
         serviceParts = serviceParts.substring(1);
       }
 
-      // Выбираем основной IP (предпочитаем не локальные и не Docker)
+      /// Select the best IP address
       final bestIp = _selectBestIpAddress(ipAddresses);
-      _log('Выбран основной IP: ${bestIp.address.address}');
-
-      // Создаем устройство с лучшим IP
       final device = MdnsDevice(
         name:
             txtData['hostname']?.isNotEmpty == true
@@ -305,28 +281,35 @@ class MDnsProvider {
       if (!_deviceExists(devices, device)) {
         devices.add(device);
         onStatusChanged?.call(DiscoveryStatus.deviceFound);
-        _log(
-          'Добавлено устройство: ${device.name} (${device.address}:${device.port})',
+        AppLogger.debug(
+          'Device added: ${device.name} (${device.address}:${device.port})',
+          module: "MDnsProvider",
         );
       } else {
-        _log('Устройство ${device.name} уже существует в списке');
+        AppLogger.debug(
+          'Device already exists: ${device.name} (${device.address}:${device.port})',
+          module: "MDnsProvider",
+        );
       }
     } catch (e) {
-      _logError('Ошибка при обработке сервиса $serviceName', e);
+      AppLogger.release(
+        'Error processing service $serviceName: ${e.toString()}',
+        module: "MDnsProvider",
+      );
     }
   }
 
-  // Метод для выбора лучшего IP адреса
+  /// Selects the best IP address from a list of addresses
   IPAddressResourceRecord _selectBestIpAddress(
     List<IPAddressResourceRecord> addresses,
   ) {
-    // Фильтруем Docker и локальные адреса
+    /// Filter out unwanted addresses
     final filteredAddresses =
         addresses.where((record) {
           final ip = record.address.address;
-          return !ip.startsWith('172.17.') && // Docker сеть
+          return !ip.startsWith('172.17.') && // Docker
               !ip.startsWith('127.') && // Localhost
-              !ip.startsWith('10.') && // Частные адреса
+              !ip.startsWith('10.') && // Private
               !ip.startsWith('169.254.'); // Link-local
         }).toList();
 
@@ -335,7 +318,7 @@ class MDnsProvider {
         : addresses.first;
   }
 
-  // Метод обработки TXT записей
+  /// Parses TXT records for a given service name
   Future<Map<String, String>> _parseTxtRecords(String serviceName) async {
     final Map<String, String> result = {'supportsTLS': 'false', 'hostname': ''};
 
@@ -353,7 +336,6 @@ class MDnsProvider {
           result['supportsTLS'] = 'true';
         }
 
-        // Копируем важные поля
         final fieldsToMap = ['hostname'];
         for (final field in fieldsToMap) {
           if (entries.containsKey(field) && entries[field]!.isNotEmpty) {
@@ -362,24 +344,24 @@ class MDnsProvider {
         }
       }
     } catch (e) {
-      _logError('Ошибка при обработке TXT записей', e);
+      AppLogger.release(
+        'Error when processing TXT records ${e.toString()}',
+        module: "MDnsProvider",
+      );
     }
 
     return result;
   }
 
-  // Вспомогательный метод для разбора TXT строки
+  /// Parses a TXT string into a map of key-value pairs
   Map<String, String> _parseTxtString(String txtString) {
     final result = <String, String>{};
 
-    // Обработка разных форматов TXT записей
     final entries = txtString.split(RegExp(r'[;\s]'));
 
     for (final entry in entries) {
       final trimmed = entry.trim();
       if (trimmed.isEmpty) continue;
-
-      // Проверка на формат key=value и key:value
       final keyValueMatch = RegExp(r'^([^=:]+)[=:](.*)$').firstMatch(trimmed);
       if (keyValueMatch != null) {
         final key = keyValueMatch.group(1)?.toLowerCase();
@@ -394,16 +376,13 @@ class MDnsProvider {
     return result;
   }
 
-  // Проверяет, что тип сервиса может быть Linqora сервисом
+  /// Checks if the service type is Linqora
   bool _isLinqoraServiceType(String serviceType) {
     return serviceType.contains('_linqora');
   }
 
-  // Проверяет, существует ли устройство в списке
-  bool _deviceExists(
-    List<MdnsDevice> devices,
-      MdnsDevice device,
-  ) {
+  /// Checks if a device already exists in the list
+  bool _deviceExists(List<MdnsDevice> devices, MdnsDevice device) {
     return devices.any(
       (d) => d.address == device.address && d.port == device.port,
     );
