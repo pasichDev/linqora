@@ -51,16 +51,19 @@ func init() {
 	rootCmd.Flags().String("cert", "./certificates/dev_cert.pem", "Path to the TLS certificate file")
 	rootCmd.Flags().String("key", "./certificates/dev_key.pem", "Path to the TLS key file")
 }
-
 func startCommandProcessor() {
 	scanner := bufio.NewScanner(os.Stdin)
 	authRequests := make(map[string]interfaces.PendingAuthRequest)
 
-	// Запускаем горутину для обработки запросов авторизации
+	authTimers := make(map[string]*time.Timer)
+
+	var requestsMutex sync.Mutex
+
 	go func() {
 		for {
 			select {
 			case req := <-authChan:
+				requestsMutex.Lock()
 				consoleMutex.Lock()
 				fmt.Printf("\n\n===> AUTHORIZATION REQUEST <===\n")
 				fmt.Printf("Device:  %s\n", req.DeviceName)
@@ -71,9 +74,45 @@ func startCommandProcessor() {
 
 				// Сохраняем запрос для последующей обработки
 				authRequests[req.DeviceID] = req
+
+				timer := time.AfterFunc(30*time.Second, func() {
+					// Эта функция будет вызвана через 30 секунд
+					requestsMutex.Lock()
+					defer requestsMutex.Unlock()
+
+					// Проверяем, существует ли еще запрос
+					if expiredReq, exists := authRequests[req.DeviceID]; exists {
+
+						consoleMutex.Lock()
+						fmt.Printf("\n\nAuthorization request for device %s (%s) has expired\n",
+							expiredReq.DeviceName, expiredReq.DeviceID)
+						fmt.Print("> ")
+						consoleMutex.Unlock()
+
+						// Отклоняем запрос автоматически
+						authManager.RespondToAuthRequest(req.DeviceID, false)
+
+						// Удаляем запрос и таймер из карт
+						delete(authRequests, req.DeviceID)
+						delete(authTimers, req.DeviceID)
+					}
+				})
+
+				// Сохраняем таймер для возможности отмены
+				authTimers[req.DeviceID] = timer
+
 				consoleMutex.Unlock()
+				requestsMutex.Unlock()
 
 			case <-stopCh:
+				// Остановка всех таймеров при завершении
+				requestsMutex.Lock()
+				for _, timer := range authTimers {
+					if timer != nil {
+						timer.Stop()
+					}
+				}
+				requestsMutex.Unlock()
 				return
 			}
 		}
@@ -84,6 +123,8 @@ func startCommandProcessor() {
 
 		// Проверка на ответы на запросы авторизации
 		if len(authRequests) > 0 && (strings.ToLower(command) == "y" || strings.ToLower(command) == "n") {
+			requestsMutex.Lock()
+
 			// Находим последний запрос авторизации
 			var latestReq interfaces.PendingAuthRequest
 			var latestDeviceID string
@@ -99,6 +140,12 @@ func startCommandProcessor() {
 
 			approved := strings.ToLower(command) == "y"
 
+			// Останавливаем таймер для этого запроса
+			if timer, exists := authTimers[latestDeviceID]; exists && timer != nil {
+				timer.Stop()
+				delete(authTimers, latestDeviceID)
+			}
+
 			// Отвечаем на запрос
 			authManager.RespondToAuthRequest(latestDeviceID, approved)
 
@@ -110,6 +157,7 @@ func startCommandProcessor() {
 
 			// Удаляем обработанный запрос
 			delete(authRequests, latestDeviceID)
+			requestsMutex.Unlock()
 
 			continue
 		}
