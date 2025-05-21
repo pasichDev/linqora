@@ -2,42 +2,67 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:linqoraremote/services/background_service.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/status.dart' as status;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import '../../core/utils/app_logger.dart';
 import '../enums/type_request_host.dart';
 import '../models/discovered_service.dart';
 import '../models/ws_message.dart';
 
 class WebSocketProvider {
+  /// The WebSocket channel used for communication.
+  /// This is initialized when a connection is established and set to `null` when disconnected.
   WebSocketChannel? _channel;
 
+  /// Callback function triggered when the WebSocket connection is successfully established.
   Function()? onConnected;
+
+  /// Callback function triggered when the WebSocket connection is closed or disconnected.
   Function()? onDisconnected;
+
+  /// Callback function triggered when an error occurs during WebSocket communication.
+  /// - **Parameters**:
+  ///   - `error` (`Object`): The error object describing the issue.
   Function(Object error)? onError;
 
+  /// A map of message handlers for processing incoming WebSocket messages.
+  /// - **Key**: The message type as a `String`.
+  /// - **Value**: A function that processes the message, taking a `Map<String, dynamic>` as input.
   final Map<String, Function(Map<String, dynamic>)> _messageHandlers = {};
+
+  /// A set of room names that the client has joined.
+  /// Used to track the current WebSocket rooms.
   final Set<String> _joinedRooms = {};
+
+  /// Indicates whether the WebSocket connection is currently active.
+  /// - **Default**: `false`.
   bool _isConnected = false;
+
+  /// Indicates whether the client is authenticated with the WebSocket server.
+  /// - **Default**: `false`.
   bool _isAuthenticated = false;
+
+  /// The subscription to the WebSocket stream for receiving messages.
+  /// This is used to manage the lifecycle of the stream.
   StreamSubscription? _subscription;
+
+  /// The interval for sending periodic ping messages to the WebSocket server.
+  /// - **Default**: `50 seconds`.
   Duration _pingInterval = const Duration(seconds: 50);
+
+  /// A timer for managing periodic ping messages.
+  /// This is started when the connection is established and stopped when disconnected.
   Timer? _pingTimer;
 
-  // Перевірка стану підключення
+  /// A getter to check if the WebSocket connection is active.
+  /// - **Returns**: `true` if the connection is active, otherwise `false`.
   bool get isConnected => _isConnected;
 
-  // Перевірка стану авторизації
-  bool get isAuthenticated => _isAuthenticated;
-
-  // Отримання списку кімнат, до яких приєднаний клієнт
-  Set<String> get joinedRooms => Set.from(_joinedRooms);
-
   Future<bool> connect(
-      MdnsDevice device, {
+    MdnsDevice device, {
     bool allowSelfSigned = true,
     Duration timeout = const Duration(seconds: 10),
     Duration pingInterval = const Duration(seconds: 30),
@@ -46,13 +71,10 @@ class WebSocketProvider {
     await _cleanupExistingConnection();
     _pingInterval = pingInterval;
 
-    final protocol = device.supportsTLS ? 'wss' : 'ws';
-    final wsUrl = '$protocol://${device.address}:${device.port}/ws';
+    final wsUrl =
+        '${device.supportsTLS ? 'wss' : 'ws'}://${device.address}:${device.port}/ws';
 
-    if (kDebugMode) {
-      print('Підключення до $wsUrl');
-    }
-
+    AppLogger.release('Connecting to $wsUrl', module: "WebSocketProvider");
     try {
       await _establishConnection(
         wsUrl,
@@ -62,7 +84,7 @@ class WebSocketProvider {
         timeout,
         onTimeout: () {
           throw TimeoutException(
-            'Підключення перевищило час очікування $timeout',
+            'The connection has exceeded the waiting time $timeout',
           );
         },
       );
@@ -85,26 +107,24 @@ class WebSocketProvider {
       _isConnected = true;
       onConnected?.call();
 
-      if (kDebugMode) {
-        print('WebSocket підключено');
-      }
+      AppLogger.release('Connected to $wsUrl', module: "WebSocketProvider");
       registerHandler('pong', _handlePongMessage);
 
-      // Запускаем таймер PING
+      /// Send ping message immediately after connection
       startPingTimer(customInterval: pingInterval);
       return true;
     } catch (e) {
       await _cleanupExistingConnection();
-
-      if (kDebugMode) {
-        print('Помилка підключення до WebSocket: $e');
-      }
+      AppLogger.release(
+        'Error connecting to WebSocket: $e',
+        module: "WebSocketProvider",
+      );
       onError?.call(e);
       return false;
     }
   }
 
-  //Метод для запуска периодических ping сообщений
+  /// Starts a timer to send periodic ping messages to the WebSocket server.
   void startPingTimer({Duration? customInterval}) {
     _pingTimer?.cancel();
     _pingInterval = customInterval ?? _pingInterval;
@@ -115,21 +135,13 @@ class WebSocketProvider {
       }
       sendPing();
     });
-
-    if (kDebugMode) {
-      print('PING таймер запущен с интервалом ${_pingInterval.inSeconds} сек');
-    }
+    AppLogger.release(
+      'PING timer is running at ${_pingInterval.inSeconds} sec intervals',
+      module: "WebSocketProvider",
+    );
   }
 
-  void stopPingTimer() {
-    _pingTimer?.cancel();
-    _pingTimer = null;
-    if (kDebugMode) {
-      print('PING таймер остановлен');
-    }
-  }
-
-  // Обновляем метод cleanup для отмены ping таймера
+  /// Cleans up the existing WebSocket connection and its resources.
   Future<void> _cleanupExistingConnection() async {
     _pingTimer?.cancel();
     _pingTimer = null;
@@ -145,6 +157,7 @@ class WebSocketProvider {
     }
   }
 
+  /// Establishes a WebSocket connection to the specified URL.
   Future<void> _establishConnection(
     String wsUrl,
     bool supportsTLS,
@@ -154,11 +167,11 @@ class WebSocketProvider {
       try {
         await _establishTLSConnection(wsUrl, allowSelfSigned);
       } catch (e) {
-        if (kDebugMode) {
-          print(
-            'Помилка TLS підключення: $e. Спроба звичайного підключення...',
-          );
-        }
+        AppLogger.release(
+          'TLS connection error: $e. Attempting a normal connection...',
+          module: "WebSocketProvider",
+        );
+
         await _establishStandardConnection(wsUrl);
       }
     } else {
@@ -166,6 +179,7 @@ class WebSocketProvider {
     }
   }
 
+  /// Establishes a TLS WebSocket connection.
   Future<void> _establishTLSConnection(
     String wsUrl,
     bool allowSelfSigned,
@@ -178,33 +192,35 @@ class WebSocketProvider {
       customClient: client,
     ).timeout(
       const Duration(seconds: 5),
-      onTimeout: () => throw TimeoutException('Таймаут TLS підключення'),
+      onTimeout: () => throw TimeoutException('TLS connection timeout'),
     );
 
     _channel = IOWebSocketChannel(webSocket);
 
-    if (kDebugMode) {
-      print('Підключено через TLS');
-    }
+    AppLogger.release('TLS Connect', module: "WebSocketProvider");
   }
 
+  /// Establishes a standard WebSocket connection.
   Future<void> _establishStandardConnection(String wsUrl) async {
     final channel = WebSocketChannel.connect(Uri.parse(wsUrl));
     await channel.ready.timeout(
       const Duration(seconds: 5),
-      onTimeout: () => throw TimeoutException('Таймаут підключення'),
+      onTimeout: () => throw TimeoutException('Connection timeout'),
     );
     _channel = channel;
 
-    if (kDebugMode) {
-      print('Підключено через звичайне з\'єднання');
-    }
+    AppLogger.debug(
+      'Connected via a standard connection',
+      module: "WebSocketProvider",
+    );
   }
 
+  /// Sends a message to the WebSocket server.
   void sendMessage(dynamic message) {
     _channel!.sink.add(jsonEncode(message));
   }
 
+  /// Sends a message to the WebSocket server with a specific type.
   Future<bool> joinRoom(String roomName) async {
     if (!isReadyForCommand()) return false;
 
@@ -215,19 +231,22 @@ class WebSocketProvider {
 
       sendMessage(joinRoomMessage.toJson());
       _joinedRooms.add(roomName);
-      if (kDebugMode) {
-        print('Приєднано до кімнати: $roomName');
-      }
+      AppLogger.release(
+        'Attached to room: $roomName',
+        module: "WebSocketProvider",
+      );
+
       return true;
     } catch (e) {
-      if (kDebugMode) {
-        print('Помилка приєднання до кімнати $roomName: $e');
-      }
+      AppLogger.release(
+        'Error joining room $roomName',
+        module: "WebSocketProvider",
+      );
       return false;
     }
   }
 
-  // Вийти з кімнати
+  /// Leaves a room in the WebSocket server.
   Future<bool> leaveRoom(String roomName) async {
     if (!isReadyForCommand()) return false;
 
@@ -238,18 +257,18 @@ class WebSocketProvider {
 
       sendMessage(leaveRoomMessage.toJson());
       _joinedRooms.remove(roomName);
-      if (kDebugMode) {
-        print('Залишено кімнату: $roomName');
-      }
+      AppLogger.release('Room left $roomName', module: "WebSocketProvider");
       return true;
     } catch (e) {
-      if (kDebugMode) {
-        print('Помилка виходу з кімнати $roomName: $e');
-      }
+      AppLogger.release(
+        'Error room left $roomName',
+        module: "WebSocketProvider",
+      );
       return false;
     }
   }
 
+  /// Checks if the client is joined to a specific room.
   Future<bool> isJoinedRoom(String nameRoom) async {
     return _joinedRooms.contains(nameRoom);
   }
@@ -266,9 +285,10 @@ class WebSocketProvider {
           )..setField('room', room);
           sendMessage(leaveRoomMessage.toJson());
         } catch (e) {
-          if (kDebugMode) {
-            print('Помилка при виході з кімнати $room: $e');
-          }
+          AppLogger.release(
+            'Error when leaving room $room',
+            module: "WebSocketProvider",
+          );
         }
       }
     }
@@ -281,9 +301,10 @@ class WebSocketProvider {
       try {
         await _channel!.sink.close(status.normalClosure);
       } catch (e) {
-        if (kDebugMode) {
-          print('Помилка при закритті WebSocket: $e');
-        }
+        AppLogger.release(
+          'Error closing WebSocket: $e',
+          module: "WebSocketProvider",
+        );
       }
       _channel = null;
     }
@@ -296,55 +317,57 @@ class WebSocketProvider {
       _messageHandlers.clear();
     }
 
-    if (kDebugMode) {
-      print('WebSocket відключено');
-    }
+    AppLogger.release('Web Socket closed', module: "WebSocketProvider");
   }
 
-  // Обробка вхідних повідомлень
+  /// Handles incoming WebSocket messages.
   void _handleMessage(dynamic message) {
     try {
       if (message == null) return;
 
       final dynamic decodedMessage = jsonDecode(message.toString());
       if (decodedMessage is! Map<String, dynamic>) {
-        if (kDebugMode) {
-          print('Отримано некоректне повідомлення: $message');
-        }
+        AppLogger.release(
+          'Invalid message received: $message',
+          module: "WebSocketProvider",
+        );
         return;
       }
 
       final messageType = decodedMessage['type'] as String?;
       if (messageType != null && _messageHandlers.containsKey(messageType)) {
         _messageHandlers[messageType]!(decodedMessage);
-        if (kDebugMode) {
-          print('Оброблено повідомлення типу $messageType: $decodedMessage');
-        }
+        AppLogger.debug(
+          'Messages of the type: $messageType: $decodedMessage',
+          module: "WebSocketProvider",
+        );
       } else {
-        if (kDebugMode) {
-          print('Отримано повідомлення типу $messageType: $decodedMessage');
-        }
+        AppLogger.debug(
+          'A message of the type: $messageType: $decodedMessage',
+          module: "WebSocketProvider",
+        );
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Помилка обробки повідомлення: $e\nПовідомлення: $message');
-      }
+      AppLogger.release(
+        'Invalid message received: $message',
+        module: "WebSocketProvider",
+      );
     }
   }
 
+  /// Checks if the client is ready to send commands.
   bool isReadyForCommand() {
     if (!_isConnected || !_isAuthenticated || _channel == null) {
-      if (kDebugMode) {
-        print(
-          'Операція не може бути виконана: клієнт не підключений або не авторизований',
-        );
-      }
+      AppLogger.release(
+        'Operation cannot be performed: the client is not connected or logged in',
+        module: "WebSocketProvider",
+      );
       return false;
     }
     return true;
   }
 
-  // Реєстрація обробника повідомлень певного типу
+  /// Registers a message handler for a specific message type.
   void registerHandler(
     String messageType,
     Function(Map<String, dynamic>) handler,
@@ -352,24 +375,23 @@ class WebSocketProvider {
     _messageHandlers[messageType] = handler;
   }
 
+  /// Sets the authentication status of the client.
   void setAuthenticated(bool isAuthenticated) {
     _isAuthenticated = isAuthenticated;
   }
 
-  // Видалення обробника повідомлень
+  /// Removes a message handler for a specific message type.
   void removeHandler(String messageType) {
     _messageHandlers.remove(messageType);
   }
 
-  // Обробка помилок WebSocket
+  /// Handles errors that occur during WebSocket communication.
   void _handleError(error) {
     onError?.call(error);
-    if (kDebugMode) {
-      print('Помилка WebSocket: $error');
-    }
+    AppLogger.release('WebSocket error', module: "WebSocketProvider");
   }
 
-  // Обновите метод для отправки ping
+  /// Sends a ping message to the WebSocket server.
   Future<void> sendPing() async {
     if (!isConnected) return;
 
@@ -379,23 +401,21 @@ class WebSocketProvider {
         ..setField('data', {'timestamp': timestamp});
 
       sendMessage(message.toJson());
-
-      if (kDebugMode) {
-        print('Sending ping with timestamp: $timestamp');
-      }
+      AppLogger.debug(
+        'Sending ping with timestamp: $timestamp',
+        module: "WebSocketProvider",
+      );
     } catch (e) {
-      if (kDebugMode) {
-        print('Error sending ping: $e');
-      }
+      AppLogger.release('Error sending ping: $e', module: "WebSocketProvider");
 
-      // Сообщаем фоновому сервису о проблеме с соединением
+      /// If an error occurs while sending the ping, report the connection state as false
       BackgroundConnectionService.reportConnectionState(false);
     }
   }
 
-  // Обновите обработку сообщений типа pong
+  /// Handles the pong message received from the WebSocket server.
   void _handlePongMessage(Map<String, dynamic> data) {
-    // Добавьте отправку отчета о успешном pong в фоновый сервис
+    /// Check if the data contains a timestamp
     int? latency;
     if (data['data'] != null && data['data']['timestamp'] != null) {
       final timestamp = data['data']['timestamp'] as int;
@@ -403,22 +423,26 @@ class WebSocketProvider {
       latency = now - timestamp;
     }
 
-    // Сообщаем об успешном соединении фоновому сервису
+    /// Report the connection state to the background service
     BackgroundConnectionService.reportConnectionState(true, latency: latency);
   }
 
-  // Обробка закриття WebSocket
+  /// Stops the ping timer to prevent sending further ping messages.
+  void stopPingTimer() {
+    _pingTimer?.cancel();
+    _pingTimer = null;
+    AppLogger.debug('Stop PING timer', module: "WebSocketProvider");
+  }
+
+  /// Handles the completion of the WebSocket connection.
   void _handleDone() {
-    if (kDebugMode) {
-      print('WebSocket з\'єднання закрито');
-    }
+    AppLogger.release(
+      'WebSocket connection closed',
+      module: "WebSocketProvider",
+    );
     _isConnected = false;
     _isAuthenticated = false;
     _joinedRooms.clear();
     onDisconnected?.call();
-  }
-
-  void close() {
-    disconnect(clearHandlers: true);
   }
 }
