@@ -1,7 +1,7 @@
 # Linqora Host
 
 <div align="center">
-<img src="../docs/logo_linqora.png" alt="Linqora Logo" width="200"/>
+<img src="../docs/assets/logo_linqora.png" alt="Linqora Logo" width="200"/>
 
 **Server component of Linqora — smart interaction with your computer.**
 

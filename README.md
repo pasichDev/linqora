@@ -7,7 +7,7 @@
 [![GitHub stars](https://img.shields.io/github/stars/pasichDev/linqora?style=social)](https://github.com/pasichDev/linqora/stargazers/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-<img src="docs/logo_linqora.png" alt="Linqora Logo" width="200"/>
+<img src="docs/assets/logo_linqora.png" alt="Linqora Logo" width="200"/>
 
 **Linqora — Smart interaction with your computer.**  
 **Monitor system resources, control media playback, manage sound and more — directly from your phone.**

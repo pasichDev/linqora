@@ -1,7 +1,7 @@
 # Linqora Remote
 
 <div align="center">
-<img src="../docs/logo_linqora.png" alt="Linqora Logo" width="200"/>
+<img src="../docs/assets/logo_linqora.png" alt="Linqora Logo" width="200"/>
 
 **Mobile client for Linqora — control your computer from your phone.**
 
