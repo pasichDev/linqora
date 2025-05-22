@@ -2,6 +2,7 @@
 class Assets {
   Assets._();
 
+  static const String imagesLogoWhite = 'assets/images/logo_white.svg';
   static const String languagesDe = 'assets/languages/de.json';
   static const String languagesEn = 'assets/languages/en.json';
   static const String languagesUk = 'assets/languages/uk.json';

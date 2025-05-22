@@ -29,6 +29,7 @@ dependencies:
   package_info_plus: ^8.3.0
   connectivity_plus: ^6.1.4
   getx_multilanguage_helper: ^0.0.2
+  flutter_svg: ^2.1.0
 dev_dependencies:
   flutter_lints: ^5.0.0
   build_runner: ^2.4.0
@@ -39,6 +40,7 @@ flutter:
   assets:
     - assets/
     - assets/languages/
+    - assets/images/
 platforms:
   android:
   ios:

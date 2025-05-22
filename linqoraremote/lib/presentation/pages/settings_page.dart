@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/svg.dart';
 import 'package:get/get.dart';
 import 'package:linqoraremote/core/constants/names.dart';
 import 'package:linqoraremote/presentation/controllers/settings_controller.dart';
@@ -6,6 +7,7 @@ import 'package:linqoraremote/presentation/widgets/settings/sponsor_card.dart';
 
 import '../../core/constants/urls.dart';
 import '../../core/utils/lauch_url.dart';
+import '../../generated/assets.dart';
 import '../widgets/settings/section_header.dart';
 
 class SettingsPage extends GetView<SettingsController> {
@@ -231,10 +233,13 @@ class SettingsPage extends GetView<SettingsController> {
                     color: Get.theme.colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
-                    Icons.computer,
-                    color: Get.theme.colorScheme.primary,
-                    size: 28,
+                  child: SvgPicture.asset(
+                    Assets.imagesLogoWhite,
+                    colorFilter: ColorFilter.mode(
+                      Get.theme.colorScheme.primary,
+                      BlendMode.srcIn,
+                    ),
+                    semanticsLabel: 'Linqora logo',
                   ),
                 ),
                 title: const Text(
