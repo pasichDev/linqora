@@ -2,14 +2,14 @@ import 'dart:async';
 import 'dart:isolate';
 import 'dart:ui';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import '../core/utils/app_logger.dart';
 import '../core/utils/ping.dart';
 
-/// Служба для підтримки з'єднання з хостом у фоновому режимі, коли додаток згорнутий.
-/// Забезпечує постійний зв'язок з сервером та відображення сповіщень про статус з'єднання.
+/// Service for maintaining a connection to the host in the background when the application is minimised.
+/// Provides constant communication with the server and displays notifications about the connection status.
 class BackgroundConnectionService {
   static const String MESSAGE_CHECK_CONNECTION = 'check_connection';
   static const String MESSAGE_CONNECTION_LOST = 'connection_lost';
@@ -21,31 +21,31 @@ class BackgroundConnectionService {
   static ReceivePort? _receivePort;
   static FlutterBackgroundService? _service;
 
-  // Регистрация обработчиков сообщений
+  /// Registration of the background service
   static final List<Function(String)> _messageHandlers = [];
   static final List<Function(Map<String, dynamic>)> _dataHandlers = [];
 
-  /// Добавляет обработчик для текстовых сообщений от фонового сервиса
+  /// Add a message handler for the background service
   static void addMessageHandler(Function(String) handler) {
     _messageHandlers.add(handler);
   }
 
-  /// Удаляет обработчик сообщений
+  /// Delete a message handler
   static void removeMessageHandler(Function(String) handler) {
     _messageHandlers.remove(handler);
   }
 
-  /// Добавляет обработчик для структурированных данных от фонового сервиса
+  /// Adds a structured data handler
   static void addDataHandler(Function(Map<String, dynamic>) handler) {
     _dataHandlers.add(handler);
   }
 
-  /// Удаляет обработчик структурированных данных
+  /// Deletes a structured data handler
   static void removeDataHandler(Function(Map<String, dynamic>) handler) {
     _dataHandlers.remove(handler);
   }
 
-  /// Сообщает фоновому сервису о состоянии соединения
+  /// Sends a message to the background service
   static void reportConnectionState(bool isConnected, {int? latency}) {
     if (_service == null) return;
 
@@ -56,20 +56,20 @@ class BackgroundConnectionService {
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       });
 
-      if (kDebugMode) {
-        print(
-          '[Main] Reported connection state: $isConnected, latency: $latency',
-        );
-      }
+      AppLogger.debug(
+        'Reported connection state: $isConnected, latency: $latency',
+        module: "BackgroundConnectionService",
+      );
     } catch (e) {
-      if (kDebugMode) {
-        print('[Main] Error reporting connection state: $e');
-      }
+      AppLogger.release(
+        'Error reporting connection state: $e',
+        module: "BackgroundConnectionService",
+      );
     }
   }
 
-  /// Ініціалізує фоновий сервіс та налаштовує канали сповіщень.
-  /// Викликається один раз при запуску додатка.
+  /// Initializes the background service and sets up the notification channel.
+  /// Gets called when the app starts.
   static Future<void> initializeService() async {
     final service = FlutterBackgroundService();
     _service = service;
@@ -99,7 +99,7 @@ class BackgroundConnectionService {
       ),
     );
 
-    // Передаем в сервис информацию о том, включены ли уведомления
+    /// Configure the background service
     await service.configure(
       androidConfiguration: AndroidConfiguration(
         onStart: onStart,
@@ -117,7 +117,7 @@ class BackgroundConnectionService {
     );
   }
 
-  /// Принудительно обновляет информацию об устройстве
+  /// Forcefully updates the device information in the background service.
   static Future<void> forceUpdateDeviceInfo(
     String deviceName,
     String deviceAddress,
@@ -134,8 +134,7 @@ class BackgroundConnectionService {
     });
   }
 
-  /// Запускає фоновий сервіс із вказаними параметрами підключення.
-  /// Створює канал зв'язку між основним додатком та фоновою службою.
+  /// Starts the background service and creates a communication channel between the main app and the background service.
   static Future<bool> startService(
     String deviceName,
     String deviceAddress,
@@ -145,7 +144,6 @@ class BackgroundConnectionService {
       await initializeService();
     }
 
-    // Создаем канал для обмена данными между фоновым сервисом и приложением
     if (_receivePort != null) {
       _receivePort!.close();
       IsolateNameServer.removePortNameMapping(_portName);
@@ -154,13 +152,12 @@ class BackgroundConnectionService {
     _receivePort = ReceivePort();
     IsolateNameServer.registerPortWithName(_receivePort!.sendPort, _portName);
 
-    // Настраиваем обработчик сообщений от фонового сервиса
     _receivePort!.listen((message) {
-      if (kDebugMode) {
-        print('Сообщение от фонового сервиса: $message');
-      }
+      AppLogger.debug(
+        'Message: $message',
+        module: "BackgroundConnectionService",
+      );
 
-      // Обрабатываем сообщение
       if (message is String) {
         for (final handler in List<Function(String)>.from(_messageHandlers)) {
           handler(message);
@@ -174,14 +171,12 @@ class BackgroundConnectionService {
       }
     });
 
-    // Запускаем фоновый сервис
     await _service!.startService();
 
     return true;
   }
 
-  /// Зупиняє фоновий сервіс та звільняє використані ресурси.
-  /// Викликається при закритті додатка або за вимогою користувача.
+  /// Stops the background service and closes the communication channel.
   static Future<void> stopService() async {
     if (_service != null) {
       _service!.invoke('stopService');
@@ -193,12 +188,11 @@ class BackgroundConnectionService {
       _receivePort = null;
     }
 
-    // Очищаем все обработчики сообщений
     _messageHandlers.clear();
     _dataHandlers.clear();
   }
 
-  /// Перевіряє, чи активний фоновий сервіс у даний момент.
+  /// Checks if the background service is running.
   static Future<bool> isRunning() async {
     if (_service == null) {
       return false;
@@ -207,16 +201,15 @@ class BackgroundConnectionService {
   }
 }
 
-/// Точка входу для фонового сервісу.
-/// Виконується в окремому ізоляті та підтримує з'єднання з сервером.
+/// Point of entry for the background service.
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) async {
-  String deviceName = 'Неизвестное устройство';
+  String deviceName = 'Unknown Device';
   String deviceAddress = '';
   bool isConnected = true;
   bool notificationsEnabled = false;
 
-  // Отслеживание последнего времени PONG
+  /// Maximum number of missed pings before considering the connection lost
   int lastPongTimestamp = DateTime.now().millisecondsSinceEpoch;
   int consecutivePingFails = 0;
 
@@ -224,20 +217,20 @@ void onStart(ServiceInstance service) async {
     'linqora_background_port',
   );
 
-  // Удобная функция для обновления уведомлений
+  /// Maximum number of missed pings before considering the connection lost
   void updateNotification() {
     if (service is AndroidServiceInstance && notificationsEnabled) {
       service.setForegroundNotificationInfo(
-        title: 'Linqora Remote ${isConnected ? 'подключен' : 'отключен'}',
+        title: 'Linqora Remote',
         content:
             isConnected
-                ? 'Подключено к $deviceName ($deviceAddress)'
-                : 'Соединение с $deviceName потеряно',
+                ? "Connected to $deviceName ($deviceAddress)"
+                : "Disconnected from $deviceName ($deviceAddress)",
       );
     }
   }
 
-  // Обработчик обновления информации об устройстве
+  /// Update the notification with the current connection status
   service.on('updateDeviceInfo').listen((event) {
     if (event != null) {
       deviceName = event['deviceName'] ?? deviceName;
@@ -245,7 +238,6 @@ void onStart(ServiceInstance service) async {
       isConnected = event['isConnected'] ?? isConnected;
       notificationsEnabled = event['notificationsEnabled'] ?? isConnected;
 
-      // Обновляем уведомление
       updateNotification();
 
       if (sendPort != null) {
@@ -254,32 +246,28 @@ void onStart(ServiceInstance service) async {
     }
   });
 
-  // Обработчик статуса соединения из основного приложения
+  /// Update the notification with the current connection status
   service.on('connectionState').listen((event) {
     if (event != null) {
       bool newConnectionState = event['isConnected'] ?? isConnected;
 
-      // Если статус соединения изменился
+      //  Else if the connection state has changed
       if (newConnectionState != isConnected) {
         isConnected = newConnectionState;
 
-        // Обновляем уведомление
         updateNotification();
 
-        // Сбрасываем счетчик неудачных пингов при восстановлении соединения
         if (isConnected) {
           consecutivePingFails = 0;
         }
       }
 
-      // Обновляем timestamp последнего PONG
       if (isConnected && event['timestamp'] != null) {
         lastPongTimestamp = event['timestamp'];
       }
     }
   });
 
-  // Обработчик остановки сервиса
   service.on('stopService').listen((event) {
     if (sendPort != null) {
       sendPort.send('stopping');
@@ -287,18 +275,16 @@ void onStart(ServiceInstance service) async {
     service.stopSelf();
   });
 
-  // Запускаем периодическую проверку соединения
+  /// Periodically check the connection status
   Timer.periodic(const Duration(seconds: 30), (_) {
     if (sendPort != null) {
       final now = DateTime.now().millisecondsSinceEpoch;
       final elapsed = now - lastPongTimestamp;
 
-      // Если прошло более 35 секунд с последнего PONG и соединение считается активным
+      /// If the connection is lost for more than 35 seconds
       if (elapsed > 35000 && isConnected) {
-        // Увеличиваем счетчик неудачных пингов
         consecutivePingFails++;
 
-        // После 2 неудачных пингов считаем соединение потерянным
         if (consecutivePingFails >= maxMissedPings) {
           isConnected = false;
           sendPort.send(BackgroundConnectionService.MESSAGE_CONNECTION_LOST);
@@ -306,12 +292,12 @@ void onStart(ServiceInstance service) async {
         }
       }
 
-      // Отправляем сигнал проверки соединения
+      /// If the connection is restored
       sendPort.send(BackgroundConnectionService.MESSAGE_CHECK_CONNECTION);
     }
   });
 
-  // Периодически обновляем состояние сервиса
+  /// Periodically send the current connection status
   Timer.periodic(const Duration(seconds: 5), (_) {
     service.invoke('update', {
       'isRunning': true,
@@ -322,7 +308,7 @@ void onStart(ServiceInstance service) async {
   });
 }
 
-/// Обробник для підтримки фонового режиму на iOS пристроях.
+/// Handler for iOS background execution.
 @pragma('vm:entry-point')
 Future<bool> onIosBackground(ServiceInstance service) async {
   return true;

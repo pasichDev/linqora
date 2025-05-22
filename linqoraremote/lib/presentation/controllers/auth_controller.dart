@@ -1,10 +1,8 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:linqoraremote/data/enums/type_request_host.dart';
@@ -15,6 +13,7 @@ import 'package:linqoraremote/data/providers/websocket_provider.dart';
 
 import '../../core/constants/constants.dart';
 import '../../core/constants/settings.dart';
+import '../../core/utils/app_logger.dart';
 import '../../core/utils/auth_response_handler.dart';
 import '../../core/utils/device_info.dart';
 import '../../core/utils/error_handler.dart';
@@ -31,7 +30,6 @@ class AuthController extends GetxController {
   AuthController({required this.webSocketProvider, required this.mDnsProvider});
 
   final RxList<MdnsDevice> discoveredDevices = <MdnsDevice>[].obs;
- // final RxString statusMessage = ''.obs;
   final RxInt authTimeoutSeconds = 30.obs;
   final Rxn<MdnsDevice> authDevice = Rxn<MdnsDevice>();
   final Rx<AuthStatus> authStatus = AuthStatus.listDevices.obs;
@@ -43,11 +41,17 @@ class AuthController extends GetxController {
 
   @override
   void onInit() {
+    /// Get the last connected device
     _setupMDnsProvider();
+
+    /// Get the last connected device
     _loadSettingsApp();
+
+
     super.onInit();
   }
 
+  /// Load settings from storage
   Future<void> _loadSettingsApp() async {
     _connectivityStream = Connectivity().onConnectivityChanged.map(
       (result) => result.first,
@@ -65,22 +69,12 @@ class AuthController extends GetxController {
     });
   }
 
-  _cancelWifiConnection() async {
-    isWifiConnections.value = false;
-    await _notConnectDevice(isError: false);
-    authStatus.value = AuthStatus.noWifi;
-  }
-
-  _returnWifiConnection() {
-    isWifiConnections.value = true;
-    _getLastConnect();
-  }
-
+  /// Setup mDNS provider
   void _setupMDnsProvider() {
     mDnsProvider.onStatusChanged = (status, {String? message}) {
       switch (status) {
         case DiscoveryStatus.started:
-         authStatus.value = AuthStatus.scanning;
+          authStatus.value = AuthStatus.scanning;
           break;
         case DiscoveryStatus.deviceFound:
           break;
@@ -92,8 +86,8 @@ class AuthController extends GetxController {
           break;
         case DiscoveryStatus.error:
           showErrorSnackbar(
-            "Ошибка поиска устройств",
-            message ?? 'Ошибка поиска устройства не определена',
+            'error_search_device'.tr,
+            message ?? 'error_unknown_device'.tr,
           );
           authStatus.value = AuthStatus.listDevices;
           break;
@@ -101,7 +95,8 @@ class AuthController extends GetxController {
     };
   }
 
-  void _getLastConnect() {
+  /// Get the last connected device
+  void _fetchLastConnect() {
     try {
       final mIsAutoConnectEnable =
           GetStorage(
@@ -109,9 +104,7 @@ class AuthController extends GetxController {
           ).read<bool>(SettingsConst.kEnableAutoConnect) ??
           false;
       isAutoConnectEnable.value = mIsAutoConnectEnable;
-      if (kDebugMode) {
-        print("Autoconnect is $mIsAutoConnectEnable");
-      }
+
       if (mIsAutoConnectEnable) {
         final MdnsDevice lastDevice = MdnsDevice.fromJson(
           (GetStorage(
@@ -119,6 +112,10 @@ class AuthController extends GetxController {
                   ).read<Map<String, dynamic>>(SettingsConst.kLastConnect) ??
                   "")
               as Map<String, dynamic>,
+        );
+        AppLogger.release(
+          'Autoconnect to ${lastDevice.name}',
+          module: "AuthController",
         );
 
         discoveredDevices.add(lastDevice);
@@ -138,6 +135,7 @@ class AuthController extends GetxController {
     super.onClose();
   }
 
+  /// Start discovery of devices
   Future<void> startDiscovery() async {
     discoveredDevices.clear();
     authStatus.value = AuthStatus.scanning;
@@ -147,45 +145,42 @@ class AuthController extends GetxController {
 
       if (devices.isNotEmpty) {
         discoveredDevices.addAll(devices);
-    //    statusMessage.value = 'Найдено ${devices.length} устройств';
         authStatus.value = AuthStatus.listDevices;
       } else {
-    //    statusMessage.value = 'Устройства не найдены';
         authStatus.value = AuthStatus.listDevices;
       }
     } catch (e) {
-   //   statusMessage.value = 'Ошибка при поиске устройств: $e';
+      AppLogger.release(
+        'Error searching devices: $e',
+        module: "AuthController",
+      );
+      showErrorSnackbar('error_search_device'.tr, '$e');
       authStatus.value = AuthStatus.listDevices;
     }
   }
 
+  /// Connect to the selected device
   Future<void> connectToDevice(MdnsDevice device) async {
     if (authStatus.value == AuthStatus.connecting) return;
     authDevice.value = device;
     authStatus.value = AuthStatus.connecting;
-  //  statusMessage.value = 'Подключение к ${device.name}...';
 
-    // Устанавливаем обработчики до попытки подключения
     webSocketProvider.onConnected = () {
       if (authStatus.value != AuthStatus.connecting) {
         return;
       }
-  //    statusMessage.value =
-  //        'Соединение установлено, выполняется авторизация...';
       startAuthProcess();
-      if (kDebugMode) print("onConnected");
     };
 
     webSocketProvider.onDisconnected = () {
-      if (kDebugMode) print("onDisconnected");
       _notConnectDevice();
     };
 
     webSocketProvider.onError = (error) {
-      if (kDebugMode) print("onError: $error");
       _notConnectDevice(errorMessage: error.toString().split('\n').first);
     };
-    // Добавляем небольшую задержку перед подключением для стабильности
+
+    /// Add delay for smooth display of ui
     await Future.delayed(const Duration(seconds: 2));
 
     try {
@@ -195,11 +190,15 @@ class AuthController extends GetxController {
         timeout: const Duration(seconds: 8),
       );
     } catch (e) {
-      if (kDebugMode) print("connect Exception: $e");
+      AppLogger.release(
+        'Connect to Device exception: $e',
+        module: "AuthController",
+      );
       _notConnectDevice(errorMessage: e.toString().split('\n').first);
     }
   }
 
+  /// Start the authorization process
   void startAuthProcess() {
     authTimeoutSeconds.value = 30;
 
@@ -212,19 +211,20 @@ class AuthController extends GetxController {
       _handleAuthPending,
     );
 
-    // Отправляем запрос на авторизацию
+    /// Send the authorization request
     sendAuthRequest();
 
-    // Запускаем таймер для отсчета времени ожидания
+    /// Start the timer for the authorization process
     _authTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (authTimeoutSeconds.value > 0) {
         authTimeoutSeconds.value--;
       } else {
-        cancelAuth('Время ожидания авторизации истекло');
+        cancelAuth('error_timeout_connection'.tr);
       }
     });
   }
 
+  /// Send the authorization request
   void sendAuthRequest() async {
     try {
       final deviceName = await getDeviceName();
@@ -240,15 +240,17 @@ class AuthController extends GetxController {
           'versionClient': await getAppVersion(),
         });
 
-      if (kDebugMode) {
-        print('Sending auth request: ${jsonEncode(message)}');
-      }
       webSocketProvider.sendMessage(message.toJson());
     } catch (e) {
-      cancelAuth('Ошибка при отправке запроса авторизации: $e');
+      AppLogger.release(
+        '${'error_send_auth_request'.tr}: $e',
+        module: "AuthController",
+      );
+      cancelAuth('${'error_send_auth_request'.tr}: $e');
     }
   }
 
+  /// Handle the authorization response
   void _handleAuthResponse(Map<String, dynamic> response) {
     _authTimer?.cancel();
 
@@ -263,13 +265,13 @@ class AuthController extends GetxController {
     }
 
     switch (serverResponse.data?.code) {
-      // Успешная авторизация - устройство уже авторизовано
+      // Authorization is successful
       case AuthStatusCode.authorized || AuthStatusCode.approved:
         webSocketProvider.setAuthenticated(true);
         _navigateToDeviceHome();
         break;
 
-      // Авторизация отклонена хостом
+      // Authorization is cancelled host
       case AuthStatusCode.rejected ||
           AuthStatusCode.invalidFormat ||
           AuthStatusCode.missingDeviceID ||
@@ -278,6 +280,7 @@ class AuthController extends GetxController {
         cancelAuth(serverResponse.data?.localMessage);
         break;
 
+      // Authorization is cancelled for unsupported version
       case AuthStatusCode.unsupportedVersion:
         cancelAuth(serverResponse.data?.localMessage);
 
@@ -285,19 +288,20 @@ class AuthController extends GetxController {
         break;
 
       default:
+        AppLogger.release(
+          'error_unknown_auth_request'.tr,
+          module: "AuthController",
+        );
         cancelAuth(
-          'Неизвестная ошибка авторизации (код: ${serverResponse.data?.code})',
+          '${'error_unknown_auth_request'.tr} : (${serverResponse.data?.code})',
         );
 
         break;
     }
   }
 
-  /// Обработчик уведомлений о статусе ожидания авторизации
+  /// Handle the pending authorization response
   void _handleAuthPending(Map<String, dynamic> response) {
-    if (kDebugMode) {
-      print("Auth pending response: $response");
-    }
     final serverResponse = ServerResponse<AuthData>.fromJson(
       response,
       (data) => AuthData.fromJson(data),
@@ -310,44 +314,40 @@ class AuthController extends GetxController {
 
     switch (serverResponse.data?.code) {
       case AuthStatusCode.pending:
-      //  statusMessage.value = 'Ожидание подтверждения на устройстве хоста...';
-
         if (authStatus.value != AuthStatus.pendingAuth) {
           authStatus.value = AuthStatus.pendingAuth;
         }
         break;
 
       default:
-      /*  statusMessage.value =
-            serverResponse.data!.message.isNotEmpty
-                ? serverResponse.data!.message
-                : 'Ожидание авторизации...';
-
-       */
+        AppLogger.release(
+          "${'error_unknown_auth_request'.tr} ${serverResponse.data!.message}",
+          module: "AuthController",
+        );
+        cancelAuth(
+          "${'error_unknown_auth_request'.tr} ${serverResponse.data!.message}",
+        );
         break;
     }
   }
 
+  /// Navigate to the device home screen
   void _navigateToDeviceHome() {
     if (authDevice.value == null) {
-      showErrorSnackbar(
-        'Ошибка',
-        "Невозможно перейти на страницу устройства: нет информации об устройстве",
-      );
-
+      showErrorSnackbar('error'.tr, 'error_no_info_navigate_home'.tr);
       return;
     }
     Get.toNamed(
       AppRoutes.DEVICE_HOME,
       arguments: {'device': authDevice.value!.toJson()},
     );
-
+    /// Handler closing other screens
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _cleanupResources(resetStatus: true, clearHandlers: true);
-    //  statusMessage.value = '';
     });
   }
 
+  /// Cancel the authorization process
   void cancelAuth([String? reason]) {
     _cleanupResources(
       resetStatus: true,
@@ -356,23 +356,40 @@ class AuthController extends GetxController {
     );
 
     if (reason != null) {
-      showErrorSnackbar('Ошибка авторизации', reason);
+      showErrorSnackbar('error_auth'.tr, reason);
     }
   }
 
+  /// Handle the case when the device cannot be connected
   Future<void> _notConnectDevice({
-    String errorMessage = 'Не удалось подключиться к устройству',
+    String errorMessage = "",
     bool isError = true,
   }) async {
     _cleanupResources(resetStatus: true);
 
+    if (errorMessage.isEmpty) {
+      errorMessage = 'error_auth_to_device'.tr;
+    }
+
     if (isError) {
-      showErrorSnackbar('Ошибка подключения', errorMessage);
-    } else {
-    //  statusMessage.value = 'Соединение прервано';
+      showErrorSnackbar('error_connection'.tr, errorMessage);
     }
   }
 
+  /// Cancel wifi connection
+  _cancelWifiConnection() async {
+    isWifiConnections.value = false;
+    await _notConnectDevice(isError: false);
+    authStatus.value = AuthStatus.noWifi;
+  }
+
+  /// Return wifi connection
+  _returnWifiConnection() {
+    isWifiConnections.value = true;
+    _fetchLastConnect();
+  }
+
+  /// Cleanup resources after auth process
   void _cleanupResources({
     bool resetStatus = true,
     bool clearHandlers = true,

@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class PermissionsService {
-  /// Проверяет наличие разрешения на уведомления
+  /// Checks if the app has permission to access notifications
   static Future<bool> checkNotificationPermission() async {
     try {
       final status = await Permission.notification.status;
@@ -15,7 +15,7 @@ class PermissionsService {
     }
   }
 
-  /// Запрашивает разрешение на уведомления
+  /// Requests permission to access notifications
   static Future<bool> requestNotificationPermission() async {
     try {
       final status = await Permission.notification.request();
@@ -28,7 +28,7 @@ class PermissionsService {
     }
   }
 
-  /// Открывает настройки приложения
+  /// Checks if the app has permission to access location
   static Future<void> openAppSettings() async {
     try {
       await openAppSettings();
