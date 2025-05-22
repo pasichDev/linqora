@@ -47,7 +47,6 @@ class AuthController extends GetxController {
     /// Get the last connected device
     _loadSettingsApp();
 
-
     super.onInit();
   }
 
@@ -165,19 +164,23 @@ class AuthController extends GetxController {
     authDevice.value = device;
     authStatus.value = AuthStatus.connecting;
 
-    webSocketProvider.onConnected = () {
-      if (authStatus.value != AuthStatus.connecting) {
-        return;
+    webSocketProvider.onAuthStatusChanged = (status, {String? message}) {
+      switch (status) {
+        case WebSocketState.hold:
+          break;
+        case WebSocketState.connected:
+          if (authStatus.value != AuthStatus.connecting) {
+            return;
+          }
+          startAuthProcess();
+          break;
+        case WebSocketState.error:
+          _notConnectDevice(errorMessage: message.toString().split('\n').first);
+          break;
+        case WebSocketState.disconnected:
+          _notConnectDevice();
+          break;
       }
-      startAuthProcess();
-    };
-
-    webSocketProvider.onDisconnected = () {
-      _notConnectDevice();
-    };
-
-    webSocketProvider.onError = (error) {
-      _notConnectDevice(errorMessage: error.toString().split('\n').first);
     };
 
     /// Add delay for smooth display of ui
@@ -267,7 +270,6 @@ class AuthController extends GetxController {
     switch (serverResponse.data?.code) {
       // Authorization is successful
       case AuthStatusCode.authorized || AuthStatusCode.approved:
-        webSocketProvider.setAuthenticated(true);
         _navigateToDeviceHome();
         break;
 
@@ -341,10 +343,14 @@ class AuthController extends GetxController {
       AppRoutes.DEVICE_HOME,
       arguments: {'device': authDevice.value!.toJson()},
     );
+
     /// Handler closing other screens
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _cleanupResources(resetStatus: true, clearHandlers: true);
     });
+
+    /// Скасовуємо колбек який діяв при авторизації
+    webSocketProvider.onAuthStatusChanged = null;
   }
 
   /// Cancel the authorization process

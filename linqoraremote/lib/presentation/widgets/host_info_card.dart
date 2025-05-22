@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:linqoraremote/presentation/widgets/default_card.dart';
 import 'package:linqoraremote/presentation/widgets/shimmer_effect.dart';
 
 import '../../data/models/host_info.dart';
@@ -21,11 +22,7 @@ class HostInfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Card(
-      margin: const EdgeInsets.all(16),
-      elevation: 0,
-      color: colorScheme.surfaceContainer,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    return DefaultCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(

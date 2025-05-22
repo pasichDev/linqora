@@ -59,7 +59,7 @@ class AppBarHomePage extends StatelessWidget implements PreferredSizeWidget {
       leading: IconButton(
         icon: Obx(
           () => Icon(
-            controller.isConnected.value &&
+            controller.webSocketProvider.isConnected &&
                     controller.selectedMenuIndex.value == -1
                 ? Icons.close
                 : Icons.arrow_back,
@@ -70,18 +70,15 @@ class AppBarHomePage extends StatelessWidget implements PreferredSizeWidget {
             controller.selectMenuItem(-1);
             return;
           }
-          if (controller.isConnected.value &&
+          if (controller.webSocketProvider.isConnected &&
               controller.selectedMenuIndex.value == -1) {
-            final result = await DisconnectConfirmationDialog.show(
-              onConfirm: () {
-                controller.disconnectFromDevice();
-              },
+            await DisconnectConfirmationDialog.show(
+              onConfirm:
+                  () => {controller.disconnectFromDevice(isCleaned: true)},
+              onCancel: () => {},
             );
-            if (result == true) {
-              controller.disconnectFromDevice();
-            }
           } else {
-            controller.disconnectFromDevice();
+            controller.disconnectFromDevice(isCleaned: true);
           }
         },
       ),

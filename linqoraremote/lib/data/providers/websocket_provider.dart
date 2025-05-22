@@ -8,25 +8,17 @@ import 'package:web_socket_channel/status.dart' as status;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../core/utils/app_logger.dart';
+import '../../core/utils/ping.dart';
 import '../enums/type_request_host.dart';
 import '../models/discovered_service.dart';
 import '../models/ws_message.dart';
+
+enum WebSocketState { hold, connected, error, disconnected }
 
 class WebSocketProvider {
   /// The WebSocket channel used for communication.
   /// This is initialized when a connection is established and set to `null` when disconnected.
   WebSocketChannel? _channel;
-
-  /// Callback function triggered when the WebSocket connection is successfully established.
-  Function()? onConnected;
-
-  /// Callback function triggered when the WebSocket connection is closed or disconnected.
-  Function()? onDisconnected;
-
-  /// Callback function triggered when an error occurs during WebSocket communication.
-  /// - **Parameters**:
-  ///   - `error` (`Object`): The error object describing the issue.
-  Function(Object error)? onError;
 
   /// A map of message handlers for processing incoming WebSocket messages.
   /// - **Key**: The message type as a `String`.
@@ -40,10 +32,6 @@ class WebSocketProvider {
   /// Indicates whether the WebSocket connection is currently active.
   /// - **Default**: `false`.
   bool _isConnected = false;
-
-  /// Indicates whether the client is authenticated with the WebSocket server.
-  /// - **Default**: `false`.
-  bool _isAuthenticated = false;
 
   /// The subscription to the WebSocket stream for receiving messages.
   /// This is used to manage the lifecycle of the stream.
@@ -61,6 +49,14 @@ class WebSocketProvider {
   /// - **Returns**: `true` if the connection is active, otherwise `false`.
   bool get isConnected => _isConnected;
 
+  DateTime _lastPongTime = DateTime.now();
+
+  int _consecutivePingFails = 0;
+
+  /// This callback is used to track the status of the connection.
+  Function(WebSocketState status, {String? message})? onAuthStatusChanged;
+  Function(bool isDisconnect)? onDisconnectedChanger;
+
   Future<bool> connect(
     MdnsDevice device, {
     bool allowSelfSigned = true,
@@ -73,7 +69,6 @@ class WebSocketProvider {
 
     final wsUrl =
         '${device.supportsTLS ? 'wss' : 'ws'}://${device.address}:${device.port}/ws';
-
     AppLogger.release('Connecting to $wsUrl', module: "WebSocketProvider");
     try {
       await _establishConnection(
@@ -94,18 +89,20 @@ class WebSocketProvider {
           _handleMessage(message);
         },
         onError: (error) {
-          _isConnected = false;
+          onAuthStatusChanged?.call(WebSocketState.error);
           _handleError(error);
         },
         onDone: () {
           _isConnected = false;
+          onAuthStatusChanged?.call(WebSocketState.disconnected);
+          BackgroundConnectionService.reportConnectionState(false);
           _handleDone();
         },
         cancelOnError: false,
       );
 
       _isConnected = true;
-      onConnected?.call();
+      onAuthStatusChanged?.call(WebSocketState.connected);
 
       AppLogger.release('Connected to $wsUrl', module: "WebSocketProvider");
       registerHandler('pong', _handlePongMessage);
@@ -119,7 +116,10 @@ class WebSocketProvider {
         'Error connecting to WebSocket: $e',
         module: "WebSocketProvider",
       );
-      onError?.call(e);
+      onAuthStatusChanged?.call(
+        WebSocketState.error,
+        message: "Failed to activate multicast: $e",
+      );
       return false;
     }
   }
@@ -277,7 +277,7 @@ class WebSocketProvider {
     _pingTimer?.cancel();
     _pingTimer = null;
 
-    if (_isConnected && _isAuthenticated && _channel != null) {
+    if (_isConnected && _channel != null) {
       for (var room in _joinedRooms.toList()) {
         try {
           final leaveRoomMessage = WsMessage(
@@ -310,7 +310,6 @@ class WebSocketProvider {
     }
 
     _isConnected = false;
-    _isAuthenticated = false;
     _joinedRooms.clear();
 
     if (clearHandlers) {
@@ -357,7 +356,7 @@ class WebSocketProvider {
 
   /// Checks if the client is ready to send commands.
   bool isReadyForCommand() {
-    if (!_isConnected || !_isAuthenticated || _channel == null) {
+    if (!_isConnected || _channel == null) {
       AppLogger.release(
         'Operation cannot be performed: the client is not connected or logged in',
         module: "WebSocketProvider",
@@ -375,11 +374,6 @@ class WebSocketProvider {
     _messageHandlers[messageType] = handler;
   }
 
-  /// Sets the authentication status of the client.
-  void setAuthenticated(bool isAuthenticated) {
-    _isAuthenticated = isAuthenticated;
-  }
-
   /// Removes a message handler for a specific message type.
   void removeHandler(String messageType) {
     _messageHandlers.remove(messageType);
@@ -387,13 +381,14 @@ class WebSocketProvider {
 
   /// Handles errors that occur during WebSocket communication.
   void _handleError(error) {
-    onError?.call(error);
     AppLogger.release('WebSocket error', module: "WebSocketProvider");
   }
 
   /// Sends a ping message to the WebSocket server.
   Future<void> sendPing() async {
-    if (!isConnected) return;
+    if (!isConnected) {
+      BackgroundConnectionService.reportConnectionState(false);
+    }
 
     try {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -401,6 +396,30 @@ class WebSocketProvider {
         ..setField('data', {'timestamp': timestamp});
 
       sendMessage(message.toJson());
+
+      /// Set a timer to check for a pong response
+      Timer(Duration(seconds: 10), () {
+        if (_lastPongTime.millisecondsSinceEpoch < timestamp) {
+          _consecutivePingFails++;
+
+          AppLogger.debug(
+            'Ping timeout, consecutive fails: $_consecutivePingFails',
+            module: "WebSocketProvider",
+          );
+
+          /// Set the connection state to false if the ping fails
+          BackgroundConnectionService.reportConnectionState(
+            _consecutivePingFails < maxMissedPings,
+            latency: null,
+          );
+
+          /// If the number of consecutive ping fails exceeds the maximum allowed,
+          if (_consecutivePingFails >= maxMissedPings) {
+            _handleConnectionLost();
+          }
+        }
+      });
+
       AppLogger.debug(
         'Sending ping with timestamp: $timestamp',
         module: "WebSocketProvider",
@@ -408,22 +427,55 @@ class WebSocketProvider {
     } catch (e) {
       AppLogger.release('Error sending ping: $e', module: "WebSocketProvider");
 
-      /// If an error occurs while sending the ping, report the connection state as false
+      /// If an error occurs while sending the ping, set the connection state to false
       BackgroundConnectionService.reportConnectionState(false);
     }
   }
 
+  /// Method to handle connection loss.
+  void _handleConnectionLost() {
+    AppLogger.release(
+      'Connection lost detected, closing WebSocket',
+      module: "WebSocketProvider",
+    );
+
+    _isConnected = false;
+
+    BackgroundConnectionService.reportConnectionState(false);
+
+    if (onDisconnectedChanger != null) {
+      try {
+        onDisconnectedChanger?.call(true);
+      } catch (e) {
+        AppLogger.release(
+          'Error in onDisconnectedChanger callback: $e',
+          module: "WebSocketProvider",
+        );
+      }
+    }
+
+    // Закрываем соединение после колбека
+    disconnect(clearHandlers: false);
+  }
+
   /// Handles the pong message received from the WebSocket server.
   void _handlePongMessage(Map<String, dynamic> data) {
-    /// Check if the data contains a timestamp
+    _consecutivePingFails = 0;
+    _lastPongTime = DateTime.now();
+
+    /// Calculate the latency based on the timestamp received in the pong message
     int? latency;
     if (data['data'] != null && data['data']['timestamp'] != null) {
       final timestamp = data['data']['timestamp'] as int;
       final now = DateTime.now().millisecondsSinceEpoch;
       latency = now - timestamp;
+
+      AppLogger.debug(
+        'Pong received, latency: $latency ms',
+        module: "WebSocketProvider",
+      );
     }
 
-    /// Report the connection state to the background service
     BackgroundConnectionService.reportConnectionState(true, latency: latency);
   }
 
@@ -441,8 +493,6 @@ class WebSocketProvider {
       module: "WebSocketProvider",
     );
     _isConnected = false;
-    _isAuthenticated = false;
     _joinedRooms.clear();
-    onDisconnected?.call();
   }
 }

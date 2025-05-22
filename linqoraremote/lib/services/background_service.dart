@@ -73,6 +73,7 @@ class BackgroundConnectionService {
   static Future<void> initializeService() async {
     final service = FlutterBackgroundService();
     _service = service;
+    bool isRunning = await _service!.isRunning();
 
     const AndroidNotificationChannel channel = AndroidNotificationChannel(
       _notificationChannelId,
@@ -84,37 +85,39 @@ class BackgroundConnectionService {
       enableVibration: false,
     );
 
-    final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+    if (!isRunning) {
+      final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
-    await flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >()
-        ?.createNotificationChannel(channel);
+      await flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
+          ?.createNotificationChannel(channel);
 
-    await flutterLocalNotificationsPlugin.initialize(
-      const InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-        iOS: DarwinInitializationSettings(),
-      ),
-    );
+      await flutterLocalNotificationsPlugin.initialize(
+        const InitializationSettings(
+          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+          iOS: DarwinInitializationSettings(),
+        ),
+      );
 
-    /// Configure the background service
-    await service.configure(
-      androidConfiguration: AndroidConfiguration(
-        onStart: onStart,
-        autoStart: false,
-        isForegroundMode: true,
-        notificationChannelId: _notificationChannelId,
-        foregroundServiceNotificationId: _notificationId,
-        autoStartOnBoot: false,
-      ),
-      iosConfiguration: IosConfiguration(
-        autoStart: false,
-        onForeground: onStart,
-        onBackground: onIosBackground,
-      ),
-    );
+      /// Configure the background service
+      await service.configure(
+        androidConfiguration: AndroidConfiguration(
+          onStart: onStart,
+          autoStart: false,
+          isForegroundMode: true,
+          notificationChannelId: _notificationChannelId,
+          foregroundServiceNotificationId: _notificationId,
+          autoStartOnBoot: false,
+        ),
+        iosConfiguration: IosConfiguration(
+          autoStart: false,
+          onForeground: onStart,
+          onBackground: onIosBackground,
+        ),
+      );
+    }
   }
 
   /// Forcefully updates the device information in the background service.
@@ -177,19 +180,50 @@ class BackgroundConnectionService {
   }
 
   /// Stops the background service and closes the communication channel.
-  static Future<void> stopService() async {
-    if (_service != null) {
-      _service!.invoke('stopService');
-    }
+  /// If `isPause` is true, timers inside the service are stopped but the service continues to run.
+  /// If `isPause` is false, the service is completely stopped.
+  static Future<void> stopService({bool isPause = false}) async {
+    try {
+      AppLogger.release(
+        isPause
+            ? 'Pausing background service...'
+            : 'Stopping background service...',
+        module: "BackgroundConnectionService",
+      );
 
-    if (_receivePort != null) {
-      _receivePort!.close();
-      IsolateNameServer.removePortNameMapping(_portName);
-      _receivePort = null;
-    }
+      if (_service != null && await _service!.isRunning()) {
+        if (isPause) {
+          _service!.invoke('pauseService');
 
-    _messageHandlers.clear();
-    _dataHandlers.clear();
+          AppLogger.release(
+            'Background service paused (timers stopped)',
+            module: "BackgroundConnectionService",
+          );
+        } else {
+          await Future.delayed(Duration(milliseconds: 500));
+          _service!.invoke('stopService');
+
+          if (_receivePort != null) {
+            _receivePort!.close();
+            IsolateNameServer.removePortNameMapping(_portName);
+            _receivePort = null;
+          }
+
+          _messageHandlers.clear();
+          _dataHandlers.clear();
+
+          AppLogger.release(
+            'Background service stopped completely',
+            module: "BackgroundConnectionService",
+          );
+        }
+      }
+    } catch (e) {
+      AppLogger.release(
+        'Error ${isPause ? 'pausing' : 'stopping'} background service: $e',
+        module: "BackgroundConnectionService",
+      );
+    }
   }
 
   /// Checks if the background service is running.
@@ -213,6 +247,9 @@ void onStart(ServiceInstance service) async {
   int lastPongTimestamp = DateTime.now().millisecondsSinceEpoch;
   int consecutivePingFails = 0;
 
+  Timer? connectionCheckTimer;
+  Timer? statusUpdateTimer;
+
   final sendPort = IsolateNameServer.lookupPortByName(
     'linqora_background_port',
   );
@@ -229,6 +266,35 @@ void onStart(ServiceInstance service) async {
       );
     }
   }
+
+  service.on('pauseService').listen((event) {
+    AppLogger.debug(
+      'Received pause service command - stopping timers',
+      module: "BackgroundService",
+    );
+
+    /// Stop all timers
+    connectionCheckTimer?.cancel();
+    statusUpdateTimer?.cancel();
+
+    if (sendPort != null) {
+      sendPort.send('service_paused');
+    }
+  });
+
+  /// Stop the background service
+  service.on('stopService').listen((event) {
+    AppLogger.debug(
+      'Received stop service command',
+      module: "BackgroundService",
+    );
+
+    /// Stop all timers
+    connectionCheckTimer?.cancel();
+    statusUpdateTimer?.cancel();
+
+    service.stopSelf();
+  });
 
   /// Update the notification with the current connection status
   service.on('updateDeviceInfo').listen((event) {
@@ -251,54 +317,63 @@ void onStart(ServiceInstance service) async {
     if (event != null) {
       bool newConnectionState = event['isConnected'] ?? isConnected;
 
-      //  Else if the connection state has changed
+      /// Elsewhere in the code, we assume that the connection is lost
       if (newConnectionState != isConnected) {
+        AppLogger.debug(
+          'Connection state changed: $isConnected -> $newConnectionState',
+          module: "BackgroundService",
+        );
+
         isConnected = newConnectionState;
+        lastPongTimestamp = DateTime.now().millisecondsSinceEpoch;
+        consecutivePingFails = 0;
 
         updateNotification();
 
-        if (isConnected) {
-          consecutivePingFails = 0;
+        /// Send a message to the main isolate
+        if (sendPort != null && !isConnected) {
+          sendPort.send(BackgroundConnectionService.MESSAGE_CONNECTION_LOST);
         }
-      }
-
-      if (isConnected && event['timestamp'] != null) {
-        lastPongTimestamp = event['timestamp'];
+      } else if (isConnected) {
+        /// If the connection is still active, update the last pong timestamp
+        lastPongTimestamp = DateTime.now().millisecondsSinceEpoch;
+        consecutivePingFails = 0;
       }
     }
-  });
-
-  service.on('stopService').listen((event) {
-    if (sendPort != null) {
-      sendPort.send('stopping');
-    }
-    service.stopSelf();
   });
 
   /// Periodically check the connection status
-  Timer.periodic(const Duration(seconds: 30), (_) {
+  connectionCheckTimer = Timer.periodic(const Duration(seconds: 15), (_) {
     if (sendPort != null) {
-      final now = DateTime.now().millisecondsSinceEpoch;
-      final elapsed = now - lastPongTimestamp;
+      /// Request a connection check
+      sendPort.send(BackgroundConnectionService.MESSAGE_CHECK_CONNECTION);
 
-      /// If the connection is lost for more than 35 seconds
-      if (elapsed > 35000 && isConnected) {
-        consecutivePingFails++;
+      /// Check if the connection is still active
+      if (isConnected) {
+        final now = DateTime.now().millisecondsSinceEpoch;
+        final elapsed = now - lastPongTimestamp;
 
-        if (consecutivePingFails >= maxMissedPings) {
-          isConnected = false;
-          sendPort.send(BackgroundConnectionService.MESSAGE_CONNECTION_LOST);
-          updateNotification();
+        /// Elapsed time since the last pong
+        if (elapsed > 30000) {
+          consecutivePingFails++;
+
+          AppLogger.debug(
+            'Background service timeout check: $consecutivePingFails, elapsed: ${elapsed / 1000}s',
+            module: "BackgroundService",
+          );
+
+          if (consecutivePingFails >= maxMissedPings) {
+            isConnected = false;
+            updateNotification();
+            sendPort.send(BackgroundConnectionService.MESSAGE_CONNECTION_LOST);
+          }
         }
       }
-
-      /// If the connection is restored
-      sendPort.send(BackgroundConnectionService.MESSAGE_CHECK_CONNECTION);
     }
   });
 
   /// Periodically send the current connection status
-  Timer.periodic(const Duration(seconds: 5), (_) {
+  statusUpdateTimer = Timer.periodic(const Duration(seconds: 5), (_) {
     service.invoke('update', {
       'isRunning': true,
       'timestamp': DateTime.now().toIso8601String(),

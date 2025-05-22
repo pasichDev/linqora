@@ -2,19 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 class DisconnectConfirmationDialog extends StatelessWidget {
-  final Function() onConfirm;
-  final Function()? onCancel;
+  final VoidCallback? onConfirm;
+  final VoidCallback? onCancel;
 
   const DisconnectConfirmationDialog({
     super.key,
-    required this.onConfirm,
+    this.onConfirm,
     this.onCancel,
   });
 
-  static Future<bool?> show({
-    required Function() onConfirm,
-    Function()? onCancel,
-  }) {
+  static Future<bool?> show({VoidCallback? onConfirm, VoidCallback? onCancel}) {
     return Get.dialog<bool>(
       DisconnectConfirmationDialog(onConfirm: onConfirm, onCancel: onCancel),
     );
@@ -29,21 +26,28 @@ class DisconnectConfirmationDialog extends StatelessWidget {
         style: Get.textTheme.bodyMedium,
       ),
       actions: [
-        TextButton(
+        _buildActionButton(
+          label: 'cancel'.tr,
           onPressed: () {
             Get.back(result: false);
-            if (onCancel != null) onCancel!();
+            onCancel?.call();
           },
-          child: Text('cancel'.tr),
         ),
-        TextButton(
+        _buildActionButton(
+          label: 'disconnect'.tr,
           onPressed: () {
             Get.back(result: true);
-            onConfirm();
+            onConfirm?.call();
           },
-          child: Text('disconnect'.tr),
         ),
       ],
     );
+  }
+
+  Widget _buildActionButton({
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    return TextButton(onPressed: onPressed, child: Text(label));
   }
 }

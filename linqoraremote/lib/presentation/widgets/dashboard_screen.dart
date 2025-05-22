@@ -72,13 +72,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       child: Obx(
                         () =>
                             _homeController.hostInfo.value != null
-                                ? HostInfoCard(
-                                  host: _homeController.hostInfo.value!,
-                                  refresh: _homeController.refreshHostInfo,
-                                  toggleShowHostFull:
-                                      _homeController.toggleShowHostFull,
-                                  isExpanded:
-                                      _homeController.showHostFull.value,
+                                ? Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: HostInfoCard(
+                                    host: _homeController.hostInfo.value!,
+                                    refresh: _homeController.refreshHostInfo,
+                                    toggleShowHostFull:
+                                        _homeController.toggleShowHostFull,
+                                    isExpanded:
+                                        _homeController.showHostFull.value,
+                                  ),
                                 )
                                 : const HostInfoCardSkeleton(),
                       ),

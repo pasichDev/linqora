@@ -22,17 +22,13 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
 
   DeviceHomeController({required this.webSocketProvider});
 
-  final RxBool isConnected = false.obs;
   final RxInt selectedMenuIndex = (-1).obs;
-  final RxBool isBackgroundServiceRunning = false.obs;
-  final RxBool isReconnecting = false.obs;
   final RxBool showHostFull = false.obs;
   final RxMap deviceInfo = {}.obs;
   final Rxn<HostSystemInfo> hostInfo = Rxn<HostSystemInfo>();
   final Rxn<MdnsDevice> authDevice = Rxn<MdnsDevice>();
 
   DateTime _refreshLastTime = DateTime.now();
-  Timer? _serviceStatusTimer;
 
   @override
   Future<void> onInit() async {
@@ -48,9 +44,6 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
     _setupWebSocketHandlers();
 
     /// Set up the background service handlers
-    _startServiceStatusCheck();
-
-    /// Set up the background service handlers
     setupBackgroundServiceHandlers();
 
     /// Start the background service if needed
@@ -59,13 +52,10 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
 
   @override
   void onClose() {
-    stopBackgroundService();
-    _serviceStatusTimer?.cancel();
     webSocketProvider.removeHandler(TypeMessageWs.host_info.value);
     BackgroundConnectionService.removeMessageHandler(
       _handleBackgroundServiceMessage,
     );
-
     super.onClose();
   }
 
@@ -76,7 +66,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
           GetStorage(
             SettingsConst.kSettings,
           ).read<bool>(SettingsConst.kShowHostInfo) ??
-          true;
+          false;
     } catch (e) {
       AppLogger.release(
         'Error loading settings: $e',
@@ -87,7 +77,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
 
   /// Start the background service if needed
   void _startBackgroundServiceIfNeeded() async {
-    if (authDevice.value != null && isConnected.value) {
+    if (authDevice.value != null && webSocketProvider.isConnected) {
       final deviceName = authDevice.value!.name;
       final deviceAddress =
           "${authDevice.value!.address}:${authDevice.value!.port}";
@@ -104,7 +94,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
       await BackgroundConnectionService.startService(
         deviceName,
         deviceAddress,
-        isConnected.value,
+        webSocketProvider.isConnected,
       );
 
       /// Force update device info
@@ -112,7 +102,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
         BackgroundConnectionService.forceUpdateDeviceInfo(
           deviceName,
           deviceAddress,
-          isConnected.value,
+          webSocketProvider.isConnected,
           notificationsSettings && statusDevicePermission,
         );
       });
@@ -129,22 +119,23 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
   /// Method to handle messages from the background service
   void _handleBackgroundServiceMessage(String message) {
     if (message == BackgroundConnectionService.MESSAGE_CHECK_CONNECTION) {
-      _checkConnection();
+      if (webSocketProvider.isConnected) {
+        webSocketProvider.sendPing();
+        return;
+      }
+      disconnectFromDevice(isCleaned: true, servicePause: true);
     } else if (message == BackgroundConnectionService.MESSAGE_CONNECTION_LOST) {
       if (webSocketProvider.isConnected) {
-        _checkConnection(forcePing: true);
+        webSocketProvider.sendPing();
+        showErrorSnackbar(
+          'connection_unstable_title'.tr,
+          'connection_unstable_message'.tr,
+        );
+        return;
       }
-    }
-  }
 
-  /// Check the connection status
-  void _checkConnection({bool forcePing = false}) {
-    if (!webSocketProvider.isConnected && !forcePing) {
-      BackgroundConnectionService.reportConnectionState(false);
-      return;
+      disconnectFromDevice(isCleaned: true, servicePause: true);
     }
-
-    webSocketProvider.sendPing();
   }
 
   /// Method to handle the background service message
@@ -165,19 +156,19 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
           );
         }
       }
-
-      isConnected.value = webSocketProvider.isConnected;
     }
   }
 
   /// Method to set up WebSocket handlers
   void _setupWebSocketHandlers() {
-    webSocketProvider.onDisconnected = () {
-      showErrorSnackbar(
-        'connection_broken'.tr,
-        'connection_broken_description'.tr,
-      );
-      disconnectFromDevice();
+    webSocketProvider.onDisconnectedChanger = (disconnected) {
+      if (disconnected) {
+        showErrorSnackbar(
+          'connection_broken'.tr,
+          'connection_broken_description'.tr,
+        );
+        disconnectFromDevice(servicePause: true);
+      }
     };
 
     webSocketProvider.registerHandler(
@@ -188,43 +179,18 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
     _requestSystemInfo();
   }
 
-  /// Method to start the background service
-  void _startServiceStatusCheck() {
-    _serviceStatusTimer = Timer.periodic(Duration(seconds: 5), (timer) async {
-      isBackgroundServiceRunning.value =
-          await BackgroundConnectionService.isRunning();
-    });
-  }
-
-  /// Stop the background service
-  Future<void> stopBackgroundService() async {
-    try {
-      await BackgroundConnectionService.stopService();
-      isBackgroundServiceRunning.value = false;
-      AppLogger.release(
-        'Background service stopped',
-        module: "DeviceHomeController",
-      );
-    } catch (e) {
-      AppLogger.release(
-        'Error stopping background service: $e',
-        module: "DeviceHomeController",
-      );
-    }
-  }
-
   /// Method to refresh the host information
   void refreshHostInfo() {
     bool difference =
         DateTime.now().difference(_refreshLastTime).inSeconds >= 30;
-    if (isConnected.value && difference) {
+    if (webSocketProvider.isConnected && difference) {
       _requestSystemInfo();
     }
   }
 
   /// Request system information
   void _requestSystemInfo() {
-    if (!isConnected.value) return;
+    if (!webSocketProvider.isConnected) return;
     _refreshLastTime = DateTime.now();
     try {
       webSocketProvider.sendMessage(
@@ -284,11 +250,20 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
   }
 
   /// Disconnect from the device
-  Future<void> disconnectFromDevice() async {
-    await BackgroundConnectionService.stopService();
-    stopBackgroundService();
-    webSocketProvider.disconnect();
-    isConnected.value = false;
-    Get.back(result: {'disconnectReason': true});
+  Future<void> disconnectFromDevice({
+    bool isCleaned = false,
+    bool servicePause = false,
+  }) async {
+    await BackgroundConnectionService.stopService(isPause: servicePause);
+
+    if (isCleaned) {
+      webSocketProvider.disconnect(clearHandlers: true);
+    }
+    Get.back();
+
+    AppLogger.release(
+      'Close DeviceHomeController',
+      module: "DeviceHomeController",
+    );
   }
 }

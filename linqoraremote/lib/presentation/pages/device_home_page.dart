@@ -17,18 +17,14 @@ class DeviceHomePage extends GetView<DeviceHomeController> {
           controller.selectMenuItem(-1);
           return false;
         }
-        if (controller.isConnected.value &&
+        if (controller.webSocketProvider.isConnected &&
             controller.selectedMenuIndex.value == -1) {
-          final result = await DisconnectConfirmationDialog.show(
-            onConfirm: () {
-              controller.disconnectFromDevice();
-            },
+          await DisconnectConfirmationDialog.show(
+            onConfirm: () => {controller.disconnectFromDevice(isCleaned: true)},
+            onCancel: () => {},
           );
-          if (result == true) {
-            controller.disconnectFromDevice();
-          }
         } else {
-          controller.disconnectFromDevice();
+          controller.disconnectFromDevice(isCleaned: true);
           return true;
         }
         return false;
