@@ -93,5 +93,14 @@
   "error_auth": "Authorization error",
   "error_auth_to_device": "Failed to connect to device",
   "error_connection": "Connection error",
-  "error_timeout_connection": "Request timed out"
+  "error_timeout_connection": "Request timed out",
+  "cpu": "CPU",
+  "cores": "Cores",
+  "ram": "RAM",
+  "gpu": "GPU",
+  "unknown": "Unknown",
+  "used": "Used",
+  "available": "Available",
+  "disk": "Disks",
+  "free": "Free"
 }

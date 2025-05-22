@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:linqoraremote/presentation/widgets/default_card.dart';
 import 'package:linqoraremote/presentation/widgets/shimmer_effect.dart';
 
@@ -96,34 +97,33 @@ class HostInfoCard extends StatelessWidget {
               Column(
                 children: [
                   const SizedBox(height: 12),
-                  // Разделитель
+
                   Divider(
                     height: 1,
                     color: colorScheme.outlineVariant.withValues(alpha: 0.5),
                   ),
                   const SizedBox(height: 12),
 
-                  // Процессор
                   _buildInfoRow(
                     context,
                     Icons.developer_board,
-                    'Процессор',
+                    'cpu'.tr,
                     host.cpu.model,
-                    "${host.cpu.frequency} MHz • ${host.cpu.physicalCores}/${host.cpu.logicalCores} ядер",
+                    "${host.cpu.frequency} MHz • ${host.cpu.physicalCores}/${host.cpu.logicalCores} ${'cores'.tr}",
                   ),
 
                   const SizedBox(height: 12),
 
-                  // Память
+
                   _buildInfoRow(
                     context,
                     Icons.memory_outlined,
-                    'Память',
+                    'ram'.tr,
                     _formatRamInfo(),
                     _formatRamUsage(),
                   ),
 
-                  // GPU - показываем только если есть информация
+
                   if (host.gpu.model != 'Unknown')
                     Column(
                       children: [
@@ -131,14 +131,13 @@ class HostInfoCard extends StatelessWidget {
                         _buildInfoRow(
                           context,
                           Icons.developer_board_rounded,
-                          'Видеокарта',
+                          'gpu'.tr,
                           host.gpu.model,
                           _formatGpuInfo(),
                         ),
                       ],
                     ),
 
-                  // Диски - показываем если есть хотя бы один диск
                   if (host.disks.isNotEmpty)
                     Column(
                       children: [
@@ -155,10 +154,10 @@ class HostInfoCard extends StatelessWidget {
     );
   }
 
-  // Форматирование информации о RAM
+
   String _formatRamInfo() {
     String info = "${host.ram.total} GB";
-    if (host.ram.type != 'Unknown') {
+    if (host.ram.type != 'unknown'.tr) {
       info += " • ${host.ram.type}";
     }
     if (host.ram.frequency > 0) {
@@ -167,21 +166,19 @@ class HostInfoCard extends StatelessWidget {
     return info;
   }
 
-  // Форматирование использования RAM
   String _formatRamUsage() {
     if (host.ram.used > 0 && host.ram.total > 0) {
-      return "Используется: ${host.ram.used} GB • Доступно: ${host.ram.total} GB";
+      return "${'used'.tr}: ${host.ram.used} GB • ${'available'.tr}: ${host.ram.total} GB";
     } else if (host.ram.used > 0) {
-      return "Используется: ${host.ram.used} GB";
+      return "${'used'.tr}: ${host.ram.used} GB";
     }
     return "";
   }
 
-  // Форматирование информации о GPU
+  /// Format GPU information
   String _formatGpuInfo() {
     String info = "";
 
-    // Базовая информация о памяти
     if (host.gpu.memory > 0) {
       double gpuMemoryGB = host.gpu.memory / 1024.0;
       info += "${gpuMemoryGB.toStringAsFixed(1)} GB";
@@ -190,7 +187,6 @@ class HostInfoCard extends StatelessWidget {
     return info;
   }
 
-  // Виджет для информации о дисках
   Widget _buildDisksInfo(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -202,7 +198,7 @@ class HostInfoCard extends StatelessWidget {
             Icon(Icons.storage_rounded, color: colorScheme.secondary, size: 18),
             const SizedBox(width: 8),
             Text(
-              'Диски',
+              'disk'.tr,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
@@ -227,7 +223,7 @@ class HostInfoCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  "${disk.total} GB • Свободно: ${disk.free} GB • ${disk.fileSystem}",
+                  "${disk.total} GB • ${'free'.tr}: ${disk.free} GB • ${disk.fileSystem}",
                   style: TextStyle(
                     fontSize: 12,
                     color: colorScheme.onSurfaceVariant,

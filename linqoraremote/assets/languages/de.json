@@ -93,5 +93,14 @@
   "error_auth": "Autorisierungsfehler",
   "error_auth_to_device": "Verbindung zum Gerät konnte nicht hergestellt werden",
   "error_connection": "Verbindungsfehler",
-  "error_timeout_connection": "Zeitüberschreitung bei der Anfrage"
+  "error_timeout_connection": "Zeitüberschreitung bei der Anfrage",
+  "cpu": "Prozessor",
+  "cores": "Kerne",
+  "ram": "Arbeitsspeicher",
+  "gpu": "Grafikkarte",
+  "unknown": "Unbekannt",
+  "used": "Verwendet",
+  "available": "Verfügbar",
+  "disk": "Festplatten",
+  "free": "Frei"
 }
