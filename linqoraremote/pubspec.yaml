@@ -3,7 +3,7 @@ description: "Tool for intelligent interaction with a computer"
 
 publish_to: 'https://github.com/pasichDev/linqora'
 
-version: 1.0.0+1
+version: 0.1.0+1
 
 environment:
   sdk: ^3.7.2

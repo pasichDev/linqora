@@ -1,39 +1,54 @@
 # Linqora Remote
 
-<p align="center"> 
-  <img src="../docs/logo_linqora.png" alt="Linqora Logo" width="200"/> 
-</p> 
+<div align="center">
+<img src="../docs/logo_linqora.png" alt="Linqora Logo" width="200"/>
 
-   <b>Linqora Remote</b> — клієнтський застосунок, що працює у звʼязці з
-  <b>[Linqora Host](https://github.com/yourusername/linqora/tree/main.LinqoraHost)</b> та забезпечує віддалену взаємодію з вашим пристроєм.</br>
-</p>
+**Mobile client for Linqora — control your computer from your phone.**
+
+</div>
+
+## About
+
+Linqora Remote is a mobile client application that works in conjunction with [Linqora Host](https://github.com/pasichDev/linqora/LinqoraHost) to provide remote interaction with your device.
 
 
-## Особливості
-- Моніторинг системних ресурсів віддаленого пристрою
-- Керування живленням (вимкнення, перезапуск, блокування)
-- Керування медіа та гучністю
+### Requirements
 
-## Вимоги
 - Android 7.0+
-- Запущений Linqora Host на віддаленому пристрої
-- Обидва пристрої мають бути в одній wifi мережі
+- Linqora Host running on the remote device
+- Both devices must be on the same WiFi network
 
-## Початок роботи
-Скористайтесь готовою версією:
+### Getting Started
 
-- Релізи на GitHub
-- Linqora Remote на Google Play (якщо опубліковано)
+You can use a pre-built version:
 
-#### Або зберіть застосунок самостійно за офіційною інструкцією Flutter
+- [Releases on GitHub](https://github.com/pasichDev/linqora/releases)
+- Linqora Remote on Google Play (if published)
 
-``` bash
+#### Or build the application yourself using the official Flutter instructions
+
+```bash
+flutter pub get
 flutter build apk --release
-Після цього ви знайдете файл app-release.apk у папці build/app/outputs/flutter-apk/.
+
+# The APK file will be located at build/app/outputs/flutter-apk/app-release.apk
 ```
 
+#### Usage
 
-## Ліцензія
+1. Make sure Linqora Host is running on your computer
+2. Launch Linqora Remote on your Android device
+3. Allow the app to scan for devices on your local network
+4. Select your computer from the list of discovered devices
+5. Accept the connection request on your computer
+6. Use the app interface to monitor and control your computer
+
+
+## Screenshots
+
+(Coming soon)
+
+
+## License
 
 MIT © [pasichDev](https://github.com/pasichDev)
-

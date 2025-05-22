@@ -12,11 +12,10 @@ import (
 
 const (
 	// Мінімальна версія клієнта
-	MinVersionClient = "1.0.0"
+	MinVersionClient = "0.1.0"
 )
 
 type AuthResponse struct {
-	//	Type    string `json:"type"`
 	Success bool   `json:"success"`
 	Code    int    `json:"code"`
 	Message string `json:"message"`

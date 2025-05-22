@@ -1,53 +1,64 @@
-# Linqora Remote
+# Linqora Host
 
 <div align="center">
 <img src="../docs/logo_linqora.png" alt="Linqora Logo" width="200"/>
 
-**Mobile client for Linqora — control your computer from your phone.**
+**Server component of Linqora — smart interaction with your computer.**
 
 </div>
 
+---
+
 ## About
 
-Linqora Remote is a mobile client application that works in conjunction with [Linqora Host](https://github.com/pasichDev/linqora/LinqoraHost) to provide remote interaction with your device.
+Linqora Host is a server application that runs on your computer and enables remote interaction with your device from the Linqora Remote mobile application.
+
+### Features
+
+- 🔒 Secure authentication system
+- 🌐 Local network discovery via mDNS
+- 🔌 WebSocket-based communication
 
 
 ### Requirements
 
-- Android 7.0+
-- Linqora Host running on the remote device
-- Both devices must be on the same WiFi network
+- **Linux**: Modern distribution with systemd (Ubuntu 20.04+, Fedora 32+, etc.)
+- **Windows**: Expected
+- **macOS**: Expected
 
-### Getting Started
 
-You can use a pre-built version:
+### Installation
 
-- [Releases on GitHub](https://github.com/pasichDev/linqora/releases)
-- Linqora Remote on Google Play (if published)
+#### Pre-built binaries
 
-#### Or build the application yourself using the official Flutter instructions
+1. Download the latest release for your platform from the [Releases](https://github.com/pasichDev/linqora/releases) page
+2. Extract the archive
+3. Run the executable
+
+#### Building from source
 
 ```bash
-flutter pub get
-flutter build apk --release
+# Clone the repository
+git clone https://github.com/pasichDev/linqora.git
 
-# The APK file will be located at build/app/outputs/flutter-apk/app-release.apk
+# Navigate to the host directory
+cd linqora/LinqoraHost
+
+# Build for your platform
+go build ./cmd/linqora_cli.go
+
 ```
 
-#### Usage
+### Usage
 
-1. Make sure Linqora Host is running on your computer
-2. Launch Linqora Remote on your Android device
-3. Allow the app to scan for devices on your local network
-4. Select your computer from the list of discovered devices
-5. Accept the connection request on your computer
-6. Use the app interface to monitor and control your computer
+1. Launch the Linqora Host application on your computer
+2. Install and open Linqora Remote on your mobile device
+3. Connect to your computer through the mobile application
+4. Authenticate the connection when prompted on your computer
 
+## API Documentation
 
-## Screenshots
-
-(Coming soon)
-
+Detailed API documentation will be provided separately.
 
 ## License
 
