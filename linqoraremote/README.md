@@ -46,7 +46,12 @@ flutter build apk --release
 
 ## Screenshots
 
-(Coming soon)
+<div style="display: flex; gap: 10px; flex-wrap: wrap; ">
+  <img src="../docs/assets/screenshots/remote/scr_1.jpg" width="200"/>
+  <img src="../docs/assets/screenshots/remote/scr_2.jpg" width="200"/>
+  <img src="../docs/assets/screenshots/remote/scr_3.jpg" width="200"/>
+  <img src="../docs/assets/screenshots/remote/scr_4.jpg" width="200"/>
+</div>
 
 
 ## License
