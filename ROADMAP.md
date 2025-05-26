@@ -42,8 +42,6 @@ This document outlines the development plan and key tasks for the **Linqora** pr
 
 You may use labels in the repository to categorize tasks:
 
-- `pre-release` – Tasks to be completed before the next release
-- `post-release` – Tasks to be done after a version release
 - `enhancement` – Feature improvements and optimizations
 - `security` – Security-related improvements
 - `documentation` – Tasks related to documentation
