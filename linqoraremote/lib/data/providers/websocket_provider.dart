@@ -7,8 +7,8 @@ import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/status.dart' as status;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import '../../core/constants/constants.dart';
 import '../../core/utils/app_logger.dart';
-import '../../core/utils/ping.dart';
 import '../enums/type_request_host.dart';
 import '../models/discovered_service.dart';
 import '../models/ws_message.dart';

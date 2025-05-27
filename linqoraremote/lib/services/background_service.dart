@@ -5,8 +5,8 @@ import 'dart:ui';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import '../core/constants/constants.dart';
 import '../core/utils/app_logger.dart';
-import '../core/utils/ping.dart';
 
 /// Service for maintaining a connection to the host in the background when the application is minimised.
 /// Provides constant communication with the server and displays notifications about the connection status.
