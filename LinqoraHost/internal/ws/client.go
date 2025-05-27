@@ -23,13 +23,13 @@ const (
 
 // Client представляє WebSocket клієнта
 type Client struct {
-	Conn         *websocket.Conn
-	DeviceCode   string
-	DeviceName   string
-	IP           string
-	Rooms        map[string]bool
-	SendChannel  chan []byte
-	roomManager  *RoomManager
+	Conn        *websocket.Conn
+	DeviceCode  string
+	DeviceName  string
+	IP          string
+	Rooms       map[string]bool
+	SendChannel chan []byte
+	//roomManager  *RoomManager
 	mu           sync.Mutex
 	closed       bool
 	DeviceID     string
@@ -37,13 +37,14 @@ type Client struct {
 }
 
 // NewClient створює нового клієнта
-func NewClient(conn *websocket.Conn, ip string, roomManager *RoomManager) *Client {
+func NewClient(conn *websocket.Conn, ip string, //, roomManager *RoomManager
+) *Client {
 	return &Client{
-		Conn:         conn,
-		IP:           ip,
-		Rooms:        make(map[string]bool),
-		SendChannel:  make(chan []byte, 256),
-		roomManager:  roomManager,
+		Conn:        conn,
+		IP:          ip,
+		Rooms:       make(map[string]bool),
+		SendChannel: make(chan []byte, 256),
+		//	roomManager:  roomManager,
 		lastPingTime: time.Now(),
 	}
 }
@@ -291,4 +292,14 @@ func (c *Client) Close() {
 	}
 
 	log.Printf("Client %s closed gracefully", c.DeviceName)
+}
+
+// Lock блокирует мьютекс клиента
+func (c *Client) Lock() {
+	c.mu.Lock()
+}
+
+// Unlock разблокирует мьютекс клиента
+func (c *Client) Unlock() {
+	c.mu.Unlock()
 }

@@ -9,7 +9,9 @@ import (
 	"sync"
 	"time"
 
+	"LinqoraHost/internal/collectors"
 	"LinqoraHost/internal/config"
+	"LinqoraHost/internal/deviceinfo"
 	"LinqoraHost/internal/media"
 	"LinqoraHost/internal/metrics"
 	"LinqoraHost/internal/power"
@@ -30,10 +32,15 @@ type WSServer struct {
 	clientsMutex sync.Mutex
 	upgrader     websocket.Upgrader
 	authManager  interfaces.AuthManagerInterface
+	ctx          context.Context
+	cancel       context.CancelFunc
 }
 
-// NewWSServer створює новий WebSocket сервер
+// NewWSServer создаёт новый WebSocket сервер
 func NewWSServer(config *config.ServerConfig, authManager interfaces.AuthManagerInterface) *WSServer {
+	// Создаем контекст с возможностью отмены
+	ctx, cancel := context.WithCancel(context.Background())
+
 	roomManager := NewRoomManager()
 
 	server := &WSServer{
@@ -44,10 +51,21 @@ func NewWSServer(config *config.ServerConfig, authManager interfaces.AuthManager
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool { return true },
 		},
+		ctx:    ctx,
+		cancel: cancel,
 	}
 
-	// Инициализируем broadcaster после создания server
-	server.broadcaster = NewBroadcaster(roomManager)
+	// Инициализируем broadcaster
+	broadcaster := NewBroadcaster(roomManager)
+	server.broadcaster = broadcaster
+
+	// Инициализируем коллекторы (но не запускаем их)
+	metricsCollector := collectors.NewMetricsCollector(broadcaster.GetMetricsBroadcaster())
+	mediaCollector := collectors.NewMediaCollector(broadcaster.GetMediaBroadcaster())
+
+	// Создаем и регистрируем менеджер коллекторов
+	collectorManager := collectors.NewCollectorManager(metricsCollector, mediaCollector)
+	roomManager.AddRoomListener(collectorManager)
 
 	// Запускаем мониторинг неактивных клиентов
 	server.StartInactiveClientsMonitor()
@@ -57,33 +75,38 @@ func NewWSServer(config *config.ServerConfig, authManager interfaces.AuthManager
 	return server
 }
 
-func (s *WSServer) Start(ctx context.Context) error {
+// Start запускает сервер и ожидает его завершения
+func (s *WSServer) Start(parentCtx context.Context) error {
+	// Создаем мультиплексор HTTP запросов
 	mux := http.NewServeMux()
 
-	// Обробник WebSocket з'єднання
+	// Обработчик WebSocket соединения
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		s.handleWSConnection(w, r)
 	})
 
+	// Создаем HTTP сервер
 	s.httpServer = &http.Server{
 		Addr:    fmt.Sprintf(":%d", s.config.Port),
 		Handler: mux,
 	}
 
-	// Запускаємо HTTP сервер у goroutine
+	// Канал для ошибок сервера
 	serverErr := make(chan error, 1)
+
+	// Запускаем HTTP сервер в горутине
 	go func() {
 		var err error
 		log.Printf("WebSocket server started at :%d", s.config.Port)
 
 		if s.config.EnableTLS {
-			// Запускаємо з TLS (WSS)
+			// Запускаем с TLS (WSS)
 			err = s.httpServer.ListenAndServeTLS(
 				s.config.CertFile,
 				s.config.KeyFile,
 			)
 		} else {
-			// Звичайний запуск без TLS (WS)
+			// Обычный запуск без TLS (WS)
 			err = s.httpServer.ListenAndServe()
 		}
 
@@ -93,8 +116,12 @@ func (s *WSServer) Start(ctx context.Context) error {
 		}
 	}()
 
+	// Ожидаем завершения сервера или контекста
 	select {
-	case <-ctx.Done():
+	case <-parentCtx.Done():
+		log.Println("Parent context cancelled, shutting down...")
+		return s.Shutdown()
+	case <-s.ctx.Done():
 		log.Println("Server context cancelled, shutting down...")
 		return s.Shutdown()
 	case err := <-serverErr:
@@ -102,7 +129,7 @@ func (s *WSServer) Start(ctx context.Context) error {
 	}
 }
 
-// Улучшенный метод Shutdown
+// Shutdown останавливает сервер
 func (s *WSServer) Shutdown() error {
 	log.Println("Shutting down WebSocket server...")
 
@@ -130,7 +157,16 @@ func (s *WSServer) Shutdown() error {
 		return err
 	}
 
+	// Вызываем функцию отмены контекста для завершения горутин
+	s.cancel()
+
 	log.Println("WebSocket server stopped successfully")
+	return nil
+}
+
+// StopServer останавливает сервер (вспомогательный метод для внешних вызовов)
+func (s *WSServer) StopServer() error {
+	s.cancel()
 	return nil
 }
 
@@ -153,7 +189,7 @@ func (s *WSServer) handleWSConnection(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 
-	client := NewClient(conn, r.RemoteAddr, s.roomManager)
+	client := NewClient(conn, r.RemoteAddr) //del rootManager
 
 	s.clientsMutex.Lock()
 	s.clients[client] = true
@@ -195,7 +231,7 @@ func (s *WSServer) removeClient(client *Client) {
 // Новый метод для запуска проверки неактивных клиентов
 func (s *WSServer) StartInactiveClientsMonitor() {
 	go func() {
-		ticker := time.NewTicker(30 * time.Second)
+		ticker := time.NewTicker(40 * time.Second)
 		defer ticker.Stop()
 
 		for {
@@ -307,7 +343,7 @@ func extractPingData(data json.RawMessage) (map[string]interface{}, error) {
 func (s *WSServer) handleHostInfoMessage(client *Client) {
 	// Базовая информация о системе
 	cpuInfo, _ := metrics.GetCPUInfo()
-	deviceInfo := metrics.GetDeviceInfo()
+	deviceInfo := deviceinfo.GetDeviceInfo()
 
 	// Новая информация
 	ramInfo, _ := metrics.GetRAMInfo()
@@ -349,17 +385,12 @@ func (s *WSServer) handleLeaveRoomMessage(client *Client, msg *ClientMessage) {
 
 }
 
+/*
 // GetRoomManager повертає менеджер кімнат
 func (s *WSServer) GetRoomManager() *RoomManager {
 	return s.roomManager
-} // Используем broadcaster вместо прямых реализаций методов
-func (s *WSServer) BroadcastMetrics(metricsData []byte) {
-	s.broadcaster.BroadcastMetrics(metricsData)
 }
-
-func (s *WSServer) BroadcastMedia(mediaData []byte) {
-	s.broadcaster.BroadcastMedia(mediaData)
-}
+*/
 
 // handleMediaCommand обрабатывает команды управления мультимедиа,и звуком
 func (s *WSServer) handleMediaCommand(client *Client, msg *ClientMessage) {

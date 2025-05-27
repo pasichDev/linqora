@@ -51,13 +51,3 @@ func NewErrorResponse(responseType string, message string, code ...int) ServerRe
 		Error: &errorInfo,
 	}
 }
-
-type MediaMessage struct {
-	Type string          `json:"type"`
-	Data json.RawMessage `json:"data"`
-}
-
-type MetricsMessage struct {
-	Type string          `json:"type"`
-	Data json.RawMessage `json:"data"`
-}

@@ -11,6 +11,18 @@ type BroadcastMessage interface {
 	ToJSON() ([]byte, error)
 }
 
+// MetricsMessage представляет сообщение с метриками системы
+type MetricsMessage struct {
+	Type    string      `json:"type"`
+	Metrics interface{} `json:"metrics"`
+}
+
+// MediaMessage представляет сообщение с информацией о медиа
+type MediaMessage struct {
+	Type  string      `json:"type"`
+	Media interface{} `json:"media"`
+}
+
 func (m MetricsMessage) GetType() string {
 	return m.Type
 }
@@ -39,25 +51,6 @@ func NewBroadcaster(roomManager *RoomManager) *Broadcaster {
 	}
 }
 
-// BroadcastToRoom отправляет сообщение всем клиентам в указанной комнате
-func (b *Broadcaster) BroadcastToRoom(roomName string, message BroadcastMessage, excludeClient *Client) {
-	// Проверяем, существует ли комната и есть ли в ней клиенты
-	room := b.roomManager.GetRoom(roomName)
-	if room == nil || room.ClientCount() == 0 {
-		return
-	}
-
-	// Преобразуем сообщение в JSON
-	messageJSON, err := message.ToJSON()
-	if err != nil {
-		log.Printf("Error marshaling %s message: %v", message.GetType(), err)
-		return
-	}
-
-	// Отправляем сообщение всем клиентам в комнате
-	b.roomManager.BroadcastToRoom(roomName, messageJSON, excludeClient)
-}
-
 // BroadcastMetrics отправляет метрики всем клиентам в комнате metrics
 func (b *Broadcaster) BroadcastMetrics(metricsData []byte) {
 	var payload interface{}
@@ -67,15 +60,25 @@ func (b *Broadcaster) BroadcastMetrics(metricsData []byte) {
 	}
 
 	// Рассылаем всем клиентам в комнате
-	b.roomManager.BroadcastToRoom("metrics", payload, nil)
+	b.roomManager.SendToRoom("metrics", "metrics", payload, nil)
 }
 
 // BroadcastMedia отправляет медиаданные всем клиентам в комнате media
 func (b *Broadcaster) BroadcastMedia(mediaData []byte) {
 	var payload interface{}
 	if err := json.Unmarshal(mediaData, &payload); err != nil {
-		log.Printf("Error unmarshaling metrics data: %v", err)
+		log.Printf("Error unmarshaling media data: %v", err)
 		return
 	}
-	b.roomManager.BroadcastToRoom("media", payload, nil)
+	b.roomManager.SendToRoom("media", "media", payload, nil)
+}
+
+// GetMetricsBroadcaster возвращает функцию для трансляции метрик
+func (b *Broadcaster) GetMetricsBroadcaster() func([]byte) {
+	return b.BroadcastMetrics
+}
+
+// GetMediaBroadcaster возвращает функцию для трансляции медиаданных
+func (b *Broadcaster) GetMediaBroadcaster() func([]byte) {
+	return b.BroadcastMedia
 }

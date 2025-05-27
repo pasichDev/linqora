@@ -4,9 +4,10 @@ import (
 	"LinqoraHost/internal/auth"
 	"LinqoraHost/internal/certutils"
 	"LinqoraHost/internal/config"
+	"LinqoraHost/internal/deviceinfo"
 	"LinqoraHost/internal/interfaces"
 	"LinqoraHost/internal/mdns"
-	"LinqoraHost/internal/metrics"
+	"LinqoraHost/internal/ws"
 	"bufio"
 	"context"
 	"fmt"
@@ -18,14 +19,11 @@ import (
 	"syscall"
 	"time"
 
-	"LinqoraHost"
-
 	"github.com/spf13/cobra"
 )
 
 var (
 	port           int
-	server         *LinqoraHost.Server
 	mdnsServer     *mdns.MDNSServer
 	authManager    *auth.AuthManager
 	authChan       = make(chan interfaces.PendingAuthRequest, 10)
@@ -107,7 +105,7 @@ func gracefulShutdown(cancel context.CancelFunc) {
 func runServer(cmd *cobra.Command, args []string) {
 
 	// Get device information
-	deviceInfo := metrics.GetDeviceInfo()
+	deviceInfo := deviceinfo.GetDeviceInfo()
 
 	// Get command line flags
 	disableTLS, _ := cmd.Flags().GetBool("notls")
@@ -153,9 +151,6 @@ func runServer(cmd *cobra.Command, args []string) {
 		fmt.Printf("Error saving configuration: %v\n", err)
 	}
 
-	// Verify that certificates exist (extract embedded certificates if necessary)
-	//cfg.EnsureCertsExist()
-
 	// Print server header
 	fmt.Println("====================================================")
 	fmt.Println("                 LINQORA HOST SERVER                ")
@@ -174,7 +169,7 @@ func runServer(cmd *cobra.Command, args []string) {
 	// Initialise the authorisation manager
 	authManager = auth.NewAuthManager(cfg, authChan)
 
-	// Ініціалізуємо обробник консольної авторизації
+	// Initialize the console authorization handler
 	consoleHandler = auth.NewConsoleAuthHandler(authManager)
 
 	// Create mDNS server configuration && and start it
@@ -185,7 +180,7 @@ func runServer(cmd *cobra.Command, args []string) {
 	}
 
 	// Initialize the Linqora Host server
-	server = LinqoraHost.NewServer(cfg, authManager)
+	server := ws.NewWSServer(cfg, authManager)
 
 	// Run the server in a separate goroutine
 	go startCommandProcessor()
