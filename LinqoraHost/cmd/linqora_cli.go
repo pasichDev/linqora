@@ -2,6 +2,7 @@ package main
 
 import (
 	"LinqoraHost/internal/auth"
+	"LinqoraHost/internal/certutils"
 	"LinqoraHost/internal/config"
 	"LinqoraHost/internal/interfaces"
 	"LinqoraHost/internal/mdns"
@@ -12,7 +13,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -124,45 +124,21 @@ func runServer(cmd *cobra.Command, args []string) {
 		cfg = config.DefaultConfig()
 	}
 
-	// Check for certificates if TLS is enabled
+	// We will check the availability of certificates to confirm the TLS status
 	if enableTLS {
-		certExists := true
-		keyExists := true
-		isDevCert := false
-
-		if _, err := os.Stat(certFile); os.IsNotExist(err) {
-			certExists = false
-			fmt.Printf("Warning: Certificate file %s not found\n", certFile)
-		} else {
-			// Проверяем, является ли сертификат dev/тестовым
-			certFileName := filepath.Base(certFile)
-			if strings.HasPrefix(strings.ToLower(certFileName), "dev") {
-				isDevCert = true
+		if !certutils.UserCertExists(certFile, keyFile) {
+			// User certificates do not exist, extract from embedded resources
+			certExists, err := certutils.EnsureCertsExist()
+			if err != nil {
+				fmt.Printf("Error ensuring certificates exist: %v\n", err)
 			}
-		}
+			enableTLS = certExists
 
-		if _, err := os.Stat(keyFile); os.IsNotExist(err) {
-			keyExists = false
-			fmt.Printf("Warning: Key file %s not found\n", keyFile)
-		} else {
-
-			// Check if the dev/test key is a test key
-			keyFileName := filepath.Base(keyFile)
-			if strings.HasPrefix(strings.ToLower(keyFileName), "dev") {
-				isDevCert = true
-			}
-
-			// If the files do not exist or if they are dev certificates, we display a warning message
-			if !certExists || !keyExists || isDevCert {
-				fmt.Println("┌─────────────────────────────────────────────────────┐")
-				fmt.Println("│                   SECURITY WARNING                  │")
-				fmt.Println("├─────────────────────────────────────────────────────┤")
-				fmt.Println("│ TLS enabled with untrusted development certificates │")
-				fmt.Println("│ Mobile clients must allow self-signed certificates  │")
-				fmt.Println("└─────────────────────────────────────────────────────┘")
-			}
 		}
 	}
+
+	// Check if the certificate is valid
+	enableTLS = certutils.IsValidCertificate(certFile)
 
 	// Update configuration with command line flags
 	if port != 0 {
@@ -178,7 +154,7 @@ func runServer(cmd *cobra.Command, args []string) {
 	}
 
 	// Verify that certificates exist (extract embedded certificates if necessary)
-	cfg.EnsureCertsExist()
+	//cfg.EnsureCertsExist()
 
 	// Print server header
 	fmt.Println("====================================================")

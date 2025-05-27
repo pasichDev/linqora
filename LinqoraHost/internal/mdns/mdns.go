@@ -16,7 +16,6 @@ const (
 	MDNSDomain = "local"
 )
 
-// MDNSServer представляє mDNS сервер для виявлення в мережі
 type MDNSServer struct {
 	server     *zeroconf.Server
 	config     *config.ServerConfig
@@ -44,10 +43,10 @@ func NewMDNSServer(cfg *config.ServerConfig) *MDNSServer {
 	}
 }
 
-// Start запускає mDNS сервер
+// Start registers the mDNS service with the provided configuration.
 func (s *MDNSServer) Start() error {
 
-	// Перетворюємо метадані в правильний формат для TXT записів
+	// Prepare TXT records with service information
 	txtRecords := []string{
 		fmt.Sprintf("hostname=%s", s.hostname),
 		fmt.Sprintf("tls=%v", s.config.EnableTLS),

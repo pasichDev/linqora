@@ -7,21 +7,19 @@ import (
 	"strings"
 )
 
-// CheckAdminPrivileges проверяет, запущена ли программа с правами администратора (sudo/admin)
+// Checks if is running with administrator rights (sudo/admin)
 func CheckAdminPrivileges() bool {
 	switch runtime.GOOS {
 	case "linux", "darwin":
-		// В Linux/macOS проверяем, являемся ли мы root пользователем (ID = 0)
+		// In Linux/macOS, we check if we are the root user (ID = 0)
 		currentUser, err := user.Current()
 		if err != nil {
 			return false
 		}
-
-		// Uid = "0" означает root пользователя
 		return currentUser.Uid == "0"
 
 	case "windows":
-		// В Windows запускаем PowerShell команду для проверки прав администратора
+		// In Windows, run the PowerShell cmdlet to verify administrator privileges
 		cmd := exec.Command("powershell", "-Command",
 			"([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)")
 
@@ -30,7 +28,7 @@ func CheckAdminPrivileges() bool {
 			return false
 		}
 
-		// Если команда вернула "True", значит у нас права администратора
+		// If the command returns ‘True’, then we have administrator privileges
 		return strings.TrimSpace(string(output)) == "True"
 
 	default:
@@ -38,8 +36,8 @@ func CheckAdminPrivileges() bool {
 	}
 }
 
-// CanExecuteSudo проверяет, может ли текущий пользователь выполнять команды с sudo
-// Это полезно для решения, стоит ли пытаться использовать sudo в командах
+// CanExecuteSudo checks whether the current user can execute commands with sudo
+// This is useful for deciding whether to try to use sudo in commands
 func CanExecuteSudo() bool {
 	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
 		return false

@@ -9,7 +9,7 @@ import (
 	"LinqoraHost/internal/interfaces"
 )
 
-// AuthManager управляет авторизацией клиентов
+// Mange authorization requests and device authentication
 type AuthManager struct {
 	config        *config.ServerConfig
 	pendingAuth   map[string]*interfaces.PendingAuthRequest
@@ -122,7 +122,7 @@ func (am *AuthManager) CheckPendingResult(deviceID string) (bool, bool) {
 	return result, exists
 }
 
-// RevokeAuth отзывает авторизацию устройства
+// Delete authorization for a device
 func (am *AuthManager) RevokeAuth(deviceID string) {
 	am.mu.Lock()
 	defer am.mu.Unlock()
@@ -137,7 +137,7 @@ func (am *AuthManager) RevokeAuth(deviceID string) {
 	}
 }
 
-// ListDevices возвращает список авторизованных устройств
+// Get ListDevices returns a list of all authorized devices
 func (am *AuthManager) ListDevices() []config.DeviceAuth {
 	am.mu.Lock()
 	defer am.mu.Unlock()

@@ -12,7 +12,7 @@ import (
 	"LinqoraHost/internal/config"
 	"LinqoraHost/internal/media"
 	"LinqoraHost/internal/metrics"
-	"LinqoraHost/internal/powermanagement"
+	"LinqoraHost/internal/power"
 	"LinqoraHost/internal/privileges"
 
 	"LinqoraHost/internal/interfaces"
@@ -53,7 +53,7 @@ func NewWSServer(config *config.ServerConfig, authManager interfaces.AuthManager
 	server.StartInactiveClientsMonitor()
 
 	// Запускаем мониторинг состояния блокировки
-	powermanagement.StartLockStateMonitor()
+	power.StartLockStateMonitor()
 	return server
 }
 
@@ -403,17 +403,17 @@ func (s *WSServer) handleMediaCommand(client *Client, msg *ClientMessage) {
 	})
 }
 
-// handlePowerCommand обрабатывает команды управления питанием
+// Handle commands for power management
 func (s *WSServer) handlePowerCommand(client *Client, msg *ClientMessage) {
 
-	var powerCmd powermanagement.PowerCommand
+	var powerCmd power.PowerCommand
 	if err := json.Unmarshal(msg.Data, &powerCmd); err != nil {
 		client.SendError("power", "Invalid power command format", 400)
 		return
 	}
 
-	if powermanagement.IsDeviceLocked() {
-		// Отправляем ответ до выполнения команды блокировки
+	if power.IsDeviceLocked() {
+		// Send a response before the lock command is executed
 		client.SendSuccess("power", map[string]interface{}{
 			"action": powerCmd.Action,
 			"status": "locked",
@@ -421,23 +421,23 @@ func (s *WSServer) handlePowerCommand(client *Client, msg *ClientMessage) {
 		return
 	}
 
-	// Если это команда Lock, то обрабатываем ее отдельно
-	if powerCmd.Action == powermanagement.Lock {
+	// If it is a Lock command, process it separately
+	if powerCmd.Action == power.Lock {
 		// Отправляем ответ до выполнения команды блокировки
 		client.SendSuccess("power", map[string]interface{}{
 			"action": powerCmd.Action,
 			"status": "executing",
 		})
-		// Проверяем, есть ли у клиента права на выполнение команды блокировки
-		// Выполняем команду блокировки
+		// If it is a Lock command, process it separately// Check if the client has rights to execute the Lock command
+		// Execute the Lock command
 		go func() {
 			log.Printf("Executing lock action requested by client %s", client.DeviceName)
 
-			if err := powermanagement.ExecutePowerAction(powerCmd.Action); err != nil {
+			if err := power.ExecutePowerAction(powerCmd.Action); err != nil {
 				log.Printf("Error executing lock command: %v", err)
 			} else {
 				// Устанавливаем флаг блокировки
-				powermanagement.SetDeviceLocked(true)
+				power.SetDeviceLocked(true)
 				log.Printf("Device locked successfully")
 			}
 		}()
@@ -445,15 +445,15 @@ func (s *WSServer) handlePowerCommand(client *Client, msg *ClientMessage) {
 	}
 
 	// Для других команд (выключение, перезагрузка) проверяем состояние блокировки
-	locked, err := powermanagement.IsSystemLocked()
+	locked, err := power.IsSystemLocked()
 	if err != nil {
 		log.Printf("Warning: Failed to check system lock state: %v", err)
 		// Используем внутреннее состояние
-		locked = powermanagement.IsDeviceLocked()
+		locked = power.IsDeviceLocked()
 	}
 
 	if locked {
-		lockTime := powermanagement.GetLockTime()
+		lockTime := power.GetLockTime()
 		client.SendError("power", fmt.Sprintf("Device is locked (since %s), power action not permitted",
 			lockTime.Format("15:04:05")), 403)
 		return
@@ -470,7 +470,7 @@ func (s *WSServer) handlePowerCommand(client *Client, msg *ClientMessage) {
 		log.Printf("Executing power action: %d requested by client %s",
 			powerCmd.Action, client.DeviceName)
 
-		if err := powermanagement.ExecutePowerAction(powerCmd.Action); err != nil {
+		if err := power.ExecutePowerAction(powerCmd.Action); err != nil {
 			log.Printf("Error executing power command: %v", err)
 		}
 	}()
