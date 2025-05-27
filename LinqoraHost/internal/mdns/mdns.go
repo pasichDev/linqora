@@ -26,10 +26,11 @@ type MDNSServer struct {
 	mdnsDomain string
 }
 
-func NewMDNSServer(cfg *config.ServerConfig) (*MDNSServer, error) {
+func NewMDNSServer(cfg *config.ServerConfig) *MDNSServer {
 	hostname, err := os.Hostname()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get hostname: %w", err)
+		hostname = "linqora-host"
+		log.Printf("Failed to get hostname: %v, using default 'linqora-host'", err)
 	}
 
 	cleanHostname := strings.ToLower(strings.ReplaceAll(hostname, " ", "_"))
@@ -40,12 +41,11 @@ func NewMDNSServer(cfg *config.ServerConfig) (*MDNSServer, error) {
 		mdnsName:   cleanHostname,
 		mdnsType:   MDNSType,
 		mdnsDomain: MDNSDomain,
-	}, nil
+	}
 }
 
 // Start запускає mDNS сервер
 func (s *MDNSServer) Start() error {
-	port := s.config.Port
 
 	// Перетворюємо метадані в правильний формат для TXT записів
 	txtRecords := []string{
@@ -58,7 +58,7 @@ func (s *MDNSServer) Start() error {
 		s.mdnsName,
 		s.mdnsType,
 		s.mdnsDomain,
-		port,
+		s.config.Port,
 		txtRecords,
 		nil,
 	)
@@ -68,7 +68,7 @@ func (s *MDNSServer) Start() error {
 
 	s.server = server
 	log.Printf("mDNS server started as '%s.%s.%s' on port %d",
-		s.mdnsName, s.mdnsType, s.mdnsDomain, port)
+		s.mdnsName, s.mdnsType, s.mdnsDomain, s.config.Port)
 	return nil
 }
 

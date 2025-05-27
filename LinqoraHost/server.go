@@ -6,7 +6,6 @@ import (
 
 	"LinqoraHost/internal/auth"
 	"LinqoraHost/internal/config"
-	"LinqoraHost/internal/mdns"
 	"LinqoraHost/internal/media"
 	"LinqoraHost/internal/metrics"
 	"LinqoraHost/internal/ws"
@@ -18,12 +17,11 @@ type Server struct {
 	cancel           context.CancelFunc
 	config           *config.ServerConfig
 	wsServer         *ws.WSServer
-	mdnsService      *mdns.MDNSServer
 	metricsCollector *metrics.MetricsCollector
 	mediaCollector   *media.MediaCollector
 }
 
-// NewServer створює новий сервер
+// Create a new Server instance
 func NewServer(cfg *config.ServerConfig, authManager *auth.AuthManager) *Server {
 	if cfg == nil {
 		cfg = config.DefaultConfig()
@@ -33,15 +31,7 @@ func NewServer(cfg *config.ServerConfig, authManager *auth.AuthManager) *Server 
 
 	wsServer := ws.NewWSServer(cfg, authManager)
 
-	// Створюємо mDNS сервіс
-	mdnsService, err := mdns.NewMDNSServer(cfg)
-	if err != nil {
-		log.Printf("Failed to create mDNS server: %v", err)
-		cancel()
-		return nil
-	}
-
-	// Створюємо колектор метрик
+	// Create metrics and media collectors
 	metricsCollector := metrics.NewMetricsCollector(wsServer.BroadcastMetrics)
 	mediaCollector := media.NewMediaCollector(wsServer.BroadcastMedia)
 
@@ -50,7 +40,6 @@ func NewServer(cfg *config.ServerConfig, authManager *auth.AuthManager) *Server 
 		cancel:           cancel,
 		config:           cfg,
 		wsServer:         wsServer,
-		mdnsService:      mdnsService,
 		metricsCollector: metricsCollector,
 		mediaCollector:   mediaCollector,
 	}
@@ -59,7 +48,7 @@ func NewServer(cfg *config.ServerConfig, authManager *auth.AuthManager) *Server 
 func (s *Server) Start(ctx context.Context) error {
 	var err error
 
-	// Запускаем WebSocket сервер
+	// Start the WebSocket server in a goroutine
 	wsErrCh := make(chan error, 1)
 	go func() {
 		log.Println("Starting WebSocket server...")
@@ -80,15 +69,10 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 }
 
-// Shutdown зупиняє сервер
+// Shutdown runs the shutdown process for the server
 func (s *Server) Shutdown() error {
 	log.Println("Shutting down Linqora server...")
 
 	s.cancel()
 	return nil
-}
-
-// GetConfig повертає конфігурацію сервера
-func (s *Server) GetConfig() *config.ServerConfig {
-	return s.config
 }

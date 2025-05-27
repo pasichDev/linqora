@@ -24,18 +24,17 @@ import (
 )
 
 var (
-	port         int
-	server       *LinqoraHost.Server
-	mdnsServer   *mdns.MDNSServer
-	authManager  *auth.AuthManager
-	consoleMutex sync.Mutex
-	authChan     = make(chan interfaces.PendingAuthRequest, 10)
-	stopCh       = make(chan struct{})
-	restart      = make(chan struct{})
-	serverMu     sync.Mutex
-	cfg          *config.ServerConfig
+	port           int
+	server         *LinqoraHost.Server
+	mdnsServer     *mdns.MDNSServer
+	authManager    *auth.AuthManager
+	authChan       = make(chan interfaces.PendingAuthRequest, 10)
+	stopCh         = make(chan struct{})
+	restart        = make(chan struct{})
+	serverMu       sync.Mutex
+	cfg            *config.ServerConfig
+	consoleHandler *auth.ConsoleAuthHandler
 
-	// Головна команда
 	rootCmd = &cobra.Command{
 		Use:   "linqorahost",
 		Short: "Linqora Host is a server that provides API endpoints for Linqora Remote.",
@@ -45,140 +44,78 @@ var (
 )
 
 func init() {
-	// Додаємо флаги
 	rootCmd.Flags().IntVarP(&port, "port", "p", 8070, "Port for LinqoraHost server")
 	rootCmd.Flags().BoolP("notls", "s", false, "Disable TLS/SSL for LinqoraHost server")
 	rootCmd.Flags().String("cert", "./certificates/dev_cert.pem", "Path to the TLS certificate file")
 	rootCmd.Flags().String("key", "./certificates/dev_key.pem", "Path to the TLS key file")
 }
+
+// startCommandProcessor handles console input for the Linqora Host server.
 func startCommandProcessor() {
 	scanner := bufio.NewScanner(os.Stdin)
-	authRequests := make(map[string]interfaces.PendingAuthRequest)
 
-	authTimers := make(map[string]*time.Timer)
-
-	var requestsMutex sync.Mutex
-
-	go func() {
-		for {
-			select {
-			case req := <-authChan:
-				requestsMutex.Lock()
-				consoleMutex.Lock()
-				fmt.Printf("\n\n===> AUTHORIZATION REQUEST <===\n")
-				fmt.Printf("Device:  %s\n", req.DeviceName)
-				fmt.Printf("ID:      %s\n", req.DeviceID)
-				fmt.Printf("IP:      %s\n", req.IP)
-				fmt.Printf("Time:    %s\n\n", req.RequestTime.Format("15:04:05"))
-				fmt.Printf("Allow connection? (y/n): ")
-
-				// Сохраняем запрос для последующей обработки
-				authRequests[req.DeviceID] = req
-
-				timer := time.AfterFunc(30*time.Second, func() {
-					// Эта функция будет вызвана через 30 секунд
-					requestsMutex.Lock()
-					defer requestsMutex.Unlock()
-
-					// Проверяем, существует ли еще запрос
-					if expiredReq, exists := authRequests[req.DeviceID]; exists {
-
-						consoleMutex.Lock()
-						fmt.Printf("\n\nAuthorization request for device %s (%s) has expired\n",
-							expiredReq.DeviceName, expiredReq.DeviceID)
-						fmt.Print("> ")
-						consoleMutex.Unlock()
-
-						// Отклоняем запрос автоматически
-						authManager.RespondToAuthRequest(req.DeviceID, false)
-
-						// Удаляем запрос и таймер из карт
-						delete(authRequests, req.DeviceID)
-						delete(authTimers, req.DeviceID)
-					}
-				})
-
-				// Сохраняем таймер для возможности отмены
-				authTimers[req.DeviceID] = timer
-
-				consoleMutex.Unlock()
-				requestsMutex.Unlock()
-
-			case <-stopCh:
-				// Остановка всех таймеров при завершении
-				requestsMutex.Lock()
-				for _, timer := range authTimers {
-					if timer != nil {
-						timer.Stop()
-					}
-				}
-				requestsMutex.Unlock()
-				return
-			}
-		}
-	}()
+	// Start the console handler for processing auth requests
+	go consoleHandler.ProcessAuthRequests(authChan, stopCh)
 
 	for scanner.Scan() {
 		command := scanner.Text()
 
-		// Проверка на ответы на запросы авторизации
-		if len(authRequests) > 0 && (strings.ToLower(command) == "y" || strings.ToLower(command) == "n") {
-			requestsMutex.Lock()
-
-			// Находим последний запрос авторизации
-			var latestReq interfaces.PendingAuthRequest
-			var latestDeviceID string
-			latestTime := time.Time{}
-
-			for id, req := range authRequests {
-				if latestTime.IsZero() || req.RequestTime.After(latestTime) {
-					latestReq = req
-					latestDeviceID = id
-					latestTime = req.RequestTime
-				}
-			}
-
-			approved := strings.ToLower(command) == "y"
-
-			// Останавливаем таймер для этого запроса
-			if timer, exists := authTimers[latestDeviceID]; exists && timer != nil {
-				timer.Stop()
-				delete(authTimers, latestDeviceID)
-			}
-
-			// Отвечаем на запрос
-			authManager.RespondToAuthRequest(latestDeviceID, approved)
-
-			if approved {
-				fmt.Printf("Authorization for device %s approved\n", latestReq.DeviceName)
-			} else {
-				fmt.Printf("Authorization for device %s rejected\n", latestReq.DeviceName)
-			}
-
-			// Удаляем обработанный запрос
-			delete(authRequests, latestDeviceID)
-			requestsMutex.Unlock()
-
-			continue
+		// Check if the command is empty
+		if !consoleHandler.ProcessAuthResponse(strings.ToLower(command)) {
+			// Else, handle the command
+			handleCommand(command)
 		}
-
-		fmt.Print("> ")
 	}
 }
 
-// Главная функция запуска сервера
+// handleCommand обробляє команди користувача
+func handleCommand(command string) {
+	auth.ConsoleMutex.Lock()
+	fmt.Printf("command> %s\n", command)
+	auth.ConsoleMutex.Unlock()
+}
+
+// gracefulShutdown handles stopping the server cleanly
+func gracefulShutdown(cancel context.CancelFunc) {
+	fmt.Println("Stopping server...")
+	cancel()
+
+	// Stop the WebSocket server
+	if mdnsServer != nil {
+		mdnsServer.Stop()
+	}
+
+	// Timeout for graceful shutdown
+	shutdownTimeout := time.NewTimer(5 * time.Second)
+	shutdownDone := make(chan struct{})
+
+	go func() {
+		close(stopCh)
+		close(shutdownDone)
+	}()
+
+	// Pending shutdown
+	select {
+	case <-shutdownDone:
+		fmt.Println("Server successfully stopped")
+	case <-shutdownTimeout.C:
+		fmt.Println("Timeout while stopping the server")
+	}
+}
+
+// RunServer starts the Linqora Host server with the specified configuration.
 func runServer(cmd *cobra.Command, args []string) {
 
-	// Получаем системную информацию
+	// Get device information
 	deviceInfo := metrics.GetDeviceInfo()
 
-	// Получаем значения TLS-флагов
+	// Get command line flags
 	disableTLS, _ := cmd.Flags().GetBool("notls")
 	enableTLS := !disableTLS
 	certFile, _ := cmd.Flags().GetString("cert")
 	keyFile, _ := cmd.Flags().GetString("key")
 
-	// Загружаем конфигурацию
+	// Load configuration
 	var err error
 	cfg, err = config.LoadConfig()
 	if err != nil {
@@ -186,7 +123,8 @@ func runServer(cmd *cobra.Command, args []string) {
 		fmt.Println("Default configuration will be used.")
 		cfg = config.DefaultConfig()
 	}
-	// Проверяем наличие сертификатов, если TLS включен
+
+	// Check for certificates if TLS is enabled
 	if enableTLS {
 		certExists := true
 		keyExists := true
@@ -207,13 +145,14 @@ func runServer(cmd *cobra.Command, args []string) {
 			keyExists = false
 			fmt.Printf("Warning: Key file %s not found\n", keyFile)
 		} else {
-			// Проверяем, является ли ключ dev/тестовым
+
+			// Check if the dev/test key is a test key
 			keyFileName := filepath.Base(keyFile)
 			if strings.HasPrefix(strings.ToLower(keyFileName), "dev") {
 				isDevCert = true
 			}
 
-			// Если файлы не существуют или это dev-сертификаты, выводим предупреждение
+			// If the files do not exist or if they are dev certificates, we display a warning message
 			if !certExists || !keyExists || isDevCert {
 				fmt.Println("┌─────────────────────────────────────────────────────┐")
 				fmt.Println("│                   SECURITY WARNING                  │")
@@ -225,61 +164,60 @@ func runServer(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	// Обновляем порт, если указан в аргументах
+	// Update configuration with command line flags
 	if port != 0 {
 		cfg.Port = port
 	}
-
-	// Обновляем настройки TLS
 	cfg.EnableTLS = enableTLS
 	cfg.CertFile = certFile
 	cfg.KeyFile = keyFile
 
-	// Сохраняем обновленную конфигурацию
+	// Save the configuration if it has changed
 	if err := cfg.SaveConfig(); err != nil {
 		fmt.Printf("Error saving configuration: %v\n", err)
 	}
+
+	// Verify that certificates exist (extract embedded certificates if necessary)
+	cfg.EnsureCertsExist()
+
+	// Print server header
 	fmt.Println("====================================================")
 	fmt.Println("                 LINQORA HOST SERVER                ")
 	fmt.Println("====================================================")
 
-	// Убеждаемся, что сертификаты существуют (извлекаем встроенные при необходимости)
-	cfg.EnsureCertsExist()
-	// Выводим основную информацию о сервере
+	// Print server information
 	fmt.Printf("TLS:         %t\n", enableTLS)
 	fmt.Printf("Хост IP:     %s\n", deviceInfo.IP)
 	fmt.Printf("Порт:        %d\n", cfg.Port)
 	fmt.Printf("ОС:          %s\n", deviceInfo.OS)
 	fmt.Println("====================================================")
 
-	// Инициализируем канал для запросов авторизации
+	// Initialise the channel for authorisation requests
 	authChan = make(chan interfaces.PendingAuthRequest, 10)
 
-	// Инициализируем менеджер авторизации
+	// Initialise the authorisation manager
 	authManager = auth.NewAuthManager(cfg, authChan)
 
-	// Запускаем сервер mDNS
-	mdnsServer, err = mdns.NewMDNSServer(cfg)
-	if err != nil {
-		fmt.Printf("Error creating mDNS server: %v\n", err)
-	}
+	// Ініціалізуємо обробник консольної авторизації
+	consoleHandler = auth.NewConsoleAuthHandler(authManager)
 
-	// Запускаем mDNS сервер
+	// Create mDNS server configuration && and start it
+	mdnsServer = mdns.NewMDNSServer(cfg)
 	if err := mdnsServer.Start(); err != nil {
 		fmt.Printf("Error starting mDNS server: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Инициализируем основной сервер
+	// Initialize the Linqora Host server
 	server = LinqoraHost.NewServer(cfg, authManager)
 
-	// Запускаем обработчик команд в отдельной горутине
+	// Run the server in a separate goroutine
 	go startCommandProcessor()
 
-	// Создаем контекст для управляемого завершения
+	// Create a context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Запускаем сервер в отдельной горутине
+	// Start the WebSocket server
 	go func() {
 		if err := server.Start(ctx); err != nil {
 			log.Printf("WebSocket server error: %v", err)
@@ -287,11 +225,11 @@ func runServer(cmd *cobra.Command, args []string) {
 		}
 	}()
 
-	// Настройка обработчика сигналов для graceful shutdown
+	// Set up signal handling for graceful shutdown
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 
-	// Ожидаем сигнала завершения
+	// Wait for a signal to stop the server
 	select {
 	case <-stopCh:
 		fmt.Println("Server stop signal received...")
@@ -299,33 +237,7 @@ func runServer(cmd *cobra.Command, args []string) {
 		fmt.Printf("Signal %v received...\n", sig)
 	}
 
-	fmt.Println("Stopping server...")
-	cancel()
-
-	// Останавливаем mDNS сервер
-	if mdnsServer != nil {
-		mdnsServer.Stop()
-	}
-
-	// Даем время на завершение всех подключений
-	shutdownTimeout := time.NewTimer(5 * time.Second)
-	shutdownDone := make(chan struct{})
-
-	go func() {
-		// Закрываем канал остановки обработчика команд консоли
-		close(stopCh)
-
-		// Сигнализируем о завершении процедуры shutdown
-		close(shutdownDone)
-	}()
-
-	// Ожидаем завершения всех операций или таймаута
-	select {
-	case <-shutdownDone:
-		fmt.Println("Server successfully stopped")
-	case <-shutdownTimeout.C:
-		fmt.Println("Timeout while stopping the server")
-	}
+	gracefulShutdown(cancel)
 }
 
 func main() {
