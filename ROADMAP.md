@@ -6,10 +6,7 @@ This document outlines the development plan and key tasks for the **Linqora** pr
 
 ## ✅ Pre-Release Tasks for v0.1.0
 
-- [ ] Review the codebase of `LinqoraHost`
-- [ ] Implement a separate CLI command for:
-  - [ ] Managing configuration
-  - [ ] Managing the list of authorized devices
+- [ ] Review the codebase of `LinqoraHost` #3
 - [ ] Review and optimize collectors for metrics and media data
 - [ ] Add **Windows** support for `LinqoraHost`
 
@@ -35,6 +32,9 @@ This document outlines the development plan and key tasks for the **Linqora** pr
   - [ ] Register scripts on the host
   - [ ] Execute or schedule them via the client
 - [ ] Explore improvements to security
+- [ ] Implement a separate CLI command for:
+  - [ ] Managing configuration
+  - [ ] Managing the list of authorized devices
 
 ---
 
