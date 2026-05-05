@@ -10,6 +10,8 @@ import (
 	"LinqoraHost/internal/ws"
 	"bufio"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"os"
@@ -28,6 +30,7 @@ var (
 	authManager    *auth.AuthManager
 	authChan       = make(chan interfaces.PendingAuthRequest, 10)
 	stopCh         = make(chan struct{})
+	stopOnce       sync.Once // prevents double-close panic on stopCh
 	restart        = make(chan struct{})
 	serverMu       sync.Mutex
 	cfg            *config.ServerConfig
@@ -41,11 +44,87 @@ var (
 	}
 )
 
+var deviceListCmd = &cobra.Command{
+	Use:   "device-list",
+	Short: "List all authorized devices",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadConfig()
+		if err != nil {
+			return fmt.Errorf("failed to load config: %w", err)
+		}
+		if len(cfg.AuthorizedDevs) == 0 {
+			fmt.Println("No authorized devices.")
+			return nil
+		}
+		fmt.Printf("%-36s  %-24s  %s\n", "Device ID", "Name", "Last Auth")
+		fmt.Println(strings.Repeat("-", 80))
+		for _, d := range cfg.AuthorizedDevs {
+			fmt.Printf("%-36s  %-24s  %s\n", d.DeviceID, d.DeviceName, d.LastAuth)
+		}
+		return nil
+	},
+}
+
+var deviceRevokeCmd = &cobra.Command{
+	Use:   "device-revoke <device-id>",
+	Short: "Revoke authorization for a device",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		deviceID := args[0]
+		cfg, err := config.LoadConfig()
+		if err != nil {
+			return fmt.Errorf("failed to load config: %w", err)
+		}
+		if _, ok := cfg.AuthorizedDevs[deviceID]; !ok {
+			return fmt.Errorf("device %q not found in authorized devices", deviceID)
+		}
+		delete(cfg.AuthorizedDevs, deviceID)
+		if err := cfg.SaveConfig(); err != nil {
+			return fmt.Errorf("failed to save config: %w", err)
+		}
+		fmt.Printf("Device %q revoked successfully.\n", deviceID)
+		return nil
+	},
+}
+
+var genSecretCmd = &cobra.Command{
+	Use:   "gen-secret",
+	Short: "Generate a new shared secret and write it to config",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		buf := make([]byte, 32)
+		if _, err := rand.Read(buf); err != nil {
+			return fmt.Errorf("failed to generate secret: %w", err)
+		}
+		secret := hex.EncodeToString(buf)
+
+		cfg, err := config.LoadConfig()
+		if err != nil {
+			return fmt.Errorf("failed to load config: %w", err)
+		}
+		cfg.SharedSecret = secret
+		if err := cfg.SaveConfig(); err != nil {
+			return fmt.Errorf("failed to save config: %w", err)
+		}
+
+		fmt.Printf("New shared secret written to config:\n%s\n\nEnter this secret in the Linqora Remote app to enable HMAC authentication.\n", secret)
+		return nil
+	},
+}
+
 func init() {
 	rootCmd.Flags().IntVarP(&port, "port", "p", 8070, "Port for LinqoraHost server")
 	rootCmd.Flags().BoolP("notls", "s", false, "Disable TLS/SSL for LinqoraHost server")
 	rootCmd.Flags().String("cert", "./certificates/dev_cert.pem", "Path to the TLS certificate file")
 	rootCmd.Flags().String("key", "./certificates/dev_key.pem", "Path to the TLS key file")
+
+	rootCmd.AddCommand(deviceListCmd)
+	rootCmd.AddCommand(deviceRevokeCmd)
+	rootCmd.AddCommand(genSecretCmd)
+}
+
+// safeCloseStop closes stopCh exactly once; subsequent calls are no-ops.
+func safeCloseStop() {
+	stopOnce.Do(func() { close(stopCh) })
 }
 
 // startCommandProcessor handles console input for the Linqora Host server.
@@ -78,7 +157,7 @@ func gracefulShutdown(cancel context.CancelFunc) {
 	fmt.Println("Stopping server...")
 	cancel()
 
-	// Stop the WebSocket server
+	// Stop the mDNS server
 	if mdnsServer != nil {
 		mdnsServer.Stop()
 	}
@@ -88,7 +167,8 @@ func gracefulShutdown(cancel context.CancelFunc) {
 	shutdownDone := make(chan struct{})
 
 	go func() {
-		close(stopCh)
+		// safeCloseStop is idempotent — safe even if the WS goroutine already closed it
+		safeCloseStop()
 		close(shutdownDone)
 	}()
 
@@ -163,6 +243,10 @@ func runServer(cmd *cobra.Command, args []string) {
 	fmt.Printf("ОС:          %s\n", deviceInfo.OS)
 	fmt.Println("====================================================")
 
+	// Reinitialise stop primitives for this run
+	stopCh = make(chan struct{})
+	stopOnce = sync.Once{}
+
 	// Initialise the channel for authorisation requests
 	authChan = make(chan interfaces.PendingAuthRequest, 10)
 
@@ -192,7 +276,9 @@ func runServer(cmd *cobra.Command, args []string) {
 	go func() {
 		if err := server.Start(ctx); err != nil {
 			log.Printf("WebSocket server error: %v", err)
-			close(stopCh)
+			// Use safeCloseStop so that gracefulShutdown won't panic
+			// if it also tries to close the channel.
+			safeCloseStop()
 		}
 	}()
 

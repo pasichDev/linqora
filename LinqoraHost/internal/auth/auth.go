@@ -15,6 +15,7 @@ type AuthManager struct {
 	pendingAuth   map[string]*interfaces.PendingAuthRequest
 	pendingChan   chan<- interfaces.PendingAuthRequest
 	pendingResult map[string]bool
+	challenges    *ChallengeStore
 	mu            sync.Mutex
 }
 
@@ -24,6 +25,7 @@ func NewAuthManager(cfg *config.ServerConfig, authChan chan<- interfaces.Pending
 		pendingAuth:   make(map[string]*interfaces.PendingAuthRequest),
 		pendingChan:   authChan,
 		pendingResult: make(map[string]bool),
+		challenges:    NewChallengeStore(),
 	}
 }
 

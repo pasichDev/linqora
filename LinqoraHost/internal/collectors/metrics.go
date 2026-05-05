@@ -42,7 +42,6 @@ func (mc *MetricsCollector) Start() {
 		return
 	}
 
-	// Создаем новый контекст с возможностью отмены
 	ctx, cancel := context.WithCancel(context.Background())
 	mc.ctx = ctx
 	mc.cancel = cancel
@@ -50,8 +49,12 @@ func (mc *MetricsCollector) Start() {
 
 	log.Println("Starting metrics collector")
 
-	// Запускаем сбор в отдельной горутине
-	go mc.collectLoop(ctx)
+	go func() {
+		// Seed the CPU baseline before the first measurement so that
+		// Percent(0,...) returns a real value instead of 0.
+		metrics.InitCPUBaseline()
+		mc.collectLoop(ctx)
+	}()
 }
 
 // Stop останавливает сбор метрик

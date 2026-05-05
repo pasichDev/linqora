@@ -14,8 +14,10 @@ import (
 	"LinqoraHost/internal/deviceinfo"
 	"LinqoraHost/internal/media"
 	"LinqoraHost/internal/metrics"
+	"LinqoraHost/internal/mouse"
 	"LinqoraHost/internal/power"
 	"LinqoraHost/internal/privileges"
+	"LinqoraHost/internal/scheduler"
 
 	"LinqoraHost/internal/interfaces"
 
@@ -24,16 +26,17 @@ import (
 
 // WSServer WebSocket сервер
 type WSServer struct {
-	config       *config.ServerConfig
-	httpServer   *http.Server
-	roomManager  *RoomManager
-	broadcaster  *Broadcaster
-	clients      map[*Client]bool
-	clientsMutex sync.Mutex
-	upgrader     websocket.Upgrader
-	authManager  interfaces.AuthManagerInterface
-	ctx          context.Context
-	cancel       context.CancelFunc
+	config        *config.ServerConfig
+	httpServer    *http.Server
+	roomManager   *RoomManager
+	broadcaster   *Broadcaster
+	clients       map[*Client]bool
+	clientsMutex  sync.Mutex
+	upgrader      websocket.Upgrader
+	authManager   interfaces.AuthManagerInterface
+	scriptManager *scheduler.Manager
+	ctx           context.Context
+	cancel        context.CancelFunc
 }
 
 // NewWSServer создаёт новый WebSocket сервер
@@ -44,12 +47,18 @@ func NewWSServer(config *config.ServerConfig, authManager interfaces.AuthManager
 	roomManager := NewRoomManager()
 
 	server := &WSServer{
-		config:      config,
-		roomManager: roomManager,
-		clients:     make(map[*Client]bool),
-		authManager: authManager,
+		config:        config,
+		roomManager:   roomManager,
+		clients:       make(map[*Client]bool),
+		authManager:   authManager,
+		scriptManager: scheduler.NewManager(scheduler.DefaultScriptsPath()),
 		upgrader: websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool { return true },
+			// Native clients (mobile app) send no Origin header.
+			// Browsers always set Origin, so rejecting non-empty Origin blocks
+			// cross-site WebSocket hijacking (CSRF via browser pages).
+			CheckOrigin: func(r *http.Request) bool {
+				return r.Header.Get("Origin") == ""
+			},
 		},
 		ctx:    ctx,
 		cancel: cancel,
@@ -70,8 +79,8 @@ func NewWSServer(config *config.ServerConfig, authManager interfaces.AuthManager
 	// Запускаем мониторинг неактивных клиентов
 	server.StartInactiveClientsMonitor()
 
-	// Запускаем мониторинг состояния блокировки
-	power.StartLockStateMonitor()
+	// Start the lock-state monitor; it stops when the server context is cancelled
+	power.StartLockStateMonitor(ctx)
 	return server
 }
 
@@ -181,15 +190,11 @@ func (s *WSServer) handleWSConnection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Настройка параметров WebSocket соединения
-	conn.SetReadLimit(2048)
-	conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-	conn.SetPongHandler(func(string) error {
-		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-		return nil
-	})
-
-	client := NewClient(conn, r.RemoteAddr) //del rootManager
+	// Connection parameters (read limit, deadline, pong handler) are configured
+	// inside StartReadPump using the package-level constants. Setting them here
+	// would be overwritten immediately and would cause an inconsistent read limit
+	// (2048 here vs maxMessageSize=512 in StartReadPump).
+	client := NewClient(conn, r.RemoteAddr)
 
 	s.clientsMutex.Lock()
 	s.clients[client] = true
@@ -228,7 +233,8 @@ func (s *WSServer) removeClient(client *Client) {
 	}
 }
 
-// Новый метод для запуска проверки неактивных клиентов
+// StartInactiveClientsMonitor periodically disconnects clients that stopped
+// sending pings. The goroutine exits when the server context is cancelled.
 func (s *WSServer) StartInactiveClientsMonitor() {
 	go func() {
 		ticker := time.NewTicker(40 * time.Second)
@@ -238,6 +244,8 @@ func (s *WSServer) StartInactiveClientsMonitor() {
 			select {
 			case <-ticker.C:
 				s.checkInactiveClients()
+			case <-s.ctx.Done():
+				return
 			}
 		}
 	}()
@@ -282,7 +290,7 @@ func (s *WSServer) checkInactiveClients() {
 // handleClientMessage обробляє повідомлення від клієнта
 func (s *WSServer) handleClientMessage(client *Client, msg *ClientMessage) {
 
-	if msg.Type != "auth_request" && msg.Type != "auth_check" && msg.Type != "ping" {
+	if msg.Type != "auth_request" && msg.Type != "auth_check" && msg.Type != "ping" && msg.Type != "auth_challenge_response" {
 		if !s.authManager.IsAuthorized(client.GetDeviceID()) {
 			client.SendError(msg.Type, "Unauthorized access", 401)
 			return
@@ -304,12 +312,30 @@ func (s *WSServer) handleClientMessage(client *Client, msg *ClientMessage) {
 		s.handleMediaCommand(client, msg)
 	case "power":
 		s.handlePowerCommand(client, msg)
+	case "mouse":
+		s.handleMouseCommand(client, msg)
+	case "script_list":
+		s.handleScriptList(client)
+	case "script_execute":
+		s.handleScriptExecute(client, msg)
 	case "auth_request":
 		if s.authManager != nil {
 			s.authManager.HandleAuthRequest(client, msg)
 		} else {
 			log.Printf("ERROR: authManager is nil, cannot process auth_request")
 			client.SendError("auth_request", "Internal server error: auth manager not initialized", 500)
+		}
+	case "auth_check":
+		if s.authManager != nil {
+			s.authManager.HandleAuthCheck(client)
+		} else {
+			client.SendError("auth_check", "Internal server error: auth manager not initialized", 500)
+		}
+	case "auth_challenge_response":
+		if s.authManager != nil {
+			s.authManager.HandleChallengeResponse(client, msg)
+		} else {
+			client.SendError("auth_challenge_response", "Internal server error: auth manager not initialized", 500)
 		}
 	default:
 		log.Printf("Unknown message type: %s", msg.Type)
@@ -349,23 +375,18 @@ func (s *WSServer) handleHostInfoMessage(client *Client) {
 	ramInfo, _ := metrics.GetRAMInfo()
 	gpuInfo, _ := metrics.GetGPUInfo()
 	diskInfo, _ := metrics.GetDiskInfo()
+	batteryInfo, _ := metrics.GetBatteryInfo()
 
 	// Формируем расширенный ответ
 	hostInfo := map[string]interface{}{
-		// Базовая информация
 		"os":       deviceInfo.OS,
 		"hostname": deviceInfo.Hostname,
 		"su":       privileges.CheckAdminPrivileges(),
 		"cpu":      cpuInfo,
-
-		// RAM информация
-		"ram": ramInfo,
-
-		// Информация о GPU
-		"gpu": gpuInfo,
-
-		// Информация о дисках
-		"disks": diskInfo,
+		"ram":      ramInfo,
+		"gpu":      gpuInfo,
+		"disks":    diskInfo,
+		"battery":  batteryInfo,
 	}
 
 	// Отправляем ответ
@@ -432,6 +453,53 @@ func (s *WSServer) handleMediaCommand(client *Client, msg *ClientMessage) {
 		"value":  int(value),
 		"status": "success",
 	})
+}
+
+func (s *WSServer) handleScriptList(client *Client) {
+	client.SendSuccess("script_list", map[string]interface{}{
+		"scripts": s.scriptManager.List(),
+	})
+}
+
+func (s *WSServer) handleScriptExecute(client *Client, msg *ClientMessage) {
+	var req struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(msg.Data, &req); err != nil || req.ID == "" {
+		client.SendError("script_execute", "Missing or invalid script id", 400)
+		return
+	}
+
+	go func() {
+		result, err := s.scriptManager.Execute(req.ID)
+		if err != nil {
+			client.SendError("script_execute", err.Error(), 404)
+			return
+		}
+		client.SendSuccess("script_execute", map[string]interface{}{
+			"id":          result.ID,
+			"exit_code":   result.ExitCode,
+			"stdout":      result.Stdout,
+			"stderr":      result.Stderr,
+			"duration_ms": result.Duration,
+		})
+	}()
+}
+
+func (s *WSServer) handleMouseCommand(client *Client, msg *ClientMessage) {
+	var cmd mouse.MouseCommand
+	if err := json.Unmarshal(msg.Data, &cmd); err != nil {
+		client.SendError("mouse", "Invalid mouse command format", 400)
+		return
+	}
+	if err := mouse.HandleMouseCommand(cmd); err != nil {
+		client.SendError("mouse", fmt.Sprintf("Mouse error: %v", err), 500)
+		return
+	}
+	// Move events don't need a success reply — reduces latency and bandwidth.
+	if cmd.Action != mouse.ActionMove {
+		client.SendSuccess("mouse", map[string]interface{}{"action": cmd.Action})
+	}
 }
 
 // Handle commands for power management

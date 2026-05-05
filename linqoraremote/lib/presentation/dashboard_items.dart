@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:linqoraremote/presentation/widgets/monitoring_view.dart';
 import 'package:linqoraremote/presentation/widgets/powermanagment_view.dart';
+import 'package:linqoraremote/presentation/widgets/touchpad_view.dart';
 
 import 'widgets/media_view.dart';
 
@@ -28,5 +29,10 @@ final menuOptions = [
     title: 'power'.tr,
     icon: Icons.energy_savings_leaf_outlined,
     view: PowerManagementView(),
+  ),
+  MenuOption(
+    title: 'touchpad'.tr,
+    icon: Icons.mouse_outlined,
+    view: TouchpadView(),
   ),
 ];

@@ -29,23 +29,22 @@ type Client struct {
 	IP          string
 	Rooms       map[string]bool
 	SendChannel chan []byte
-	//roomManager  *RoomManager
-	mu           sync.Mutex
-	closed       bool
-	DeviceID     string
+	mu          sync.Mutex
+	closed      bool
+	DeviceID    string
 	lastPingTime time.Time
+	limiter      *clientRateLimiter
 }
 
 // NewClient створює нового клієнта
-func NewClient(conn *websocket.Conn, ip string, //, roomManager *RoomManager
-) *Client {
+func NewClient(conn *websocket.Conn, ip string) *Client {
 	return &Client{
-		Conn:        conn,
-		IP:          ip,
-		Rooms:       make(map[string]bool),
-		SendChannel: make(chan []byte, 256),
-		//	roomManager:  roomManager,
+		Conn:         conn,
+		IP:           ip,
+		Rooms:        make(map[string]bool),
+		SendChannel:  make(chan []byte, 256),
 		lastPingTime: time.Now(),
+		limiter:      newClientRateLimiter(),
 	}
 }
 
@@ -134,6 +133,15 @@ func (c *Client) StartReadPump(handleMessage func(*ClientMessage), onDisconnect 
 			continue
 		}
 
+		// Drop the message if the client exceeds the allowed rate.
+		// Ping messages are exempt so that the connection health check
+		// is never throttled regardless of burst traffic.
+		if clientMsg.Type != "ping" && !c.limiter.Allow() {
+			log.Printf("Rate limit exceeded for client %s, dropping %q", c.DeviceName, clientMsg.Type)
+			c.SendError(clientMsg.Type, "Rate limit exceeded, slow down", 429)
+			continue
+		}
+
 		// Передача сообщения обработчику с защитой от паники
 		func() {
 			defer func() {
@@ -158,7 +166,10 @@ func (c *Client) StartWritePump() {
 	}()
 
 	for {
-		if c.closed {
+		// Use IsClosed() (which acquires the mutex) instead of reading c.closed
+		// directly. The bare read was a data race: sendMessage writes c.closed
+		// under c.mu while we were reading it here without any lock.
+		if c.IsClosed() {
 			return
 		}
 
@@ -208,14 +219,15 @@ func (c *Client) sendMessage(message []byte) error {
 		return fmt.Errorf("attempting to send message to closed client: %s", c.DeviceName)
 	}
 
-	// Отправляем сообщение неблокирующим способом
+	// Non-blocking send; if the channel is full the client is too slow.
 	select {
 	case c.SendChannel <- message:
 		return nil
 	default:
-		// Если канал полон, закрываем соединение
-		c.closed = true // Помечаем как закрытый
-		c.Conn.Close()
+		// Close via the proper Close() method so that SendChannel is also
+		// closed and StartWritePump can exit cleanly instead of blocking
+		// forever on a channel that will never receive another value.
+		go c.Close()
 		return fmt.Errorf("send channel full for client: %s", c.DeviceName)
 	}
 }

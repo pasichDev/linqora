@@ -2,17 +2,18 @@ package auth
 
 // Коды типов сообщений
 const (
-	// Тип сообщения - ответ авторизации
-	MessageTypeAuthResponse = "auth_response"
-
-	// Тип сообщения - ожидание авторизации
-	MessageTypeAuthPending = "auth_pending"
+	MessageTypeAuthResponse         = "auth_response"
+	MessageTypeAuthPending          = "auth_pending"
+	MessageTypeAuthChallenge        = "auth_challenge"
+	MessageTypeAuthChallengeResp    = "auth_challenge_response"
 )
 
 // Коды статусов авторизации
 const (
-	// Устройство не авторизовано (0xx)
 	AuthStatusNotAuthorized = 001
+
+	// Challenge-response (3xx)
+	AuthStatusChallengeInvalid = 300
 
 	// Устройство уже авторизовано (1xx)
 	AuthStatusAuthorized = 100
@@ -44,6 +45,7 @@ const (
 
 // Сообщения для кодов статуса
 var authMessages = map[int]string{
+	AuthStatusChallengeInvalid: "Challenge verification failed",
 	AuthStatusNotAuthorized:      "Device not authorized",
 	AuthStatusAuthorized:         "Device authorized",
 	AuthStatusApproved:           "Authorization approved",

@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
@@ -10,6 +12,7 @@ import 'package:linqoraremote/data/models/auth_response_handler.dart';
 import 'package:linqoraremote/data/models/ws_message.dart';
 import 'package:linqoraremote/data/providers/mdns_provider.dart';
 import 'package:linqoraremote/data/providers/websocket_provider.dart';
+import 'package:linqoraremote/data/services/secure_storage_service.dart';
 
 import '../../core/constants/constants.dart';
 import '../../core/constants/settings.dart';
@@ -36,6 +39,7 @@ class AuthController extends GetxController {
   final RxBool isWifiConnections = false.obs;
   final RxBool isAutoConnectEnable = false.obs;
   Timer? _authTimer;
+  StreamSubscription<ConnectivityResult>? _connectivitySub;
 
   late final Stream<ConnectivityResult> _connectivityStream;
 
@@ -56,7 +60,8 @@ class AuthController extends GetxController {
       (result) => result.first,
     );
 
-    _connectivityStream.listen((result) {
+    // Store the subscription so we can cancel it in onClose() and avoid leaks.
+    _connectivitySub = _connectivityStream.listen((result) {
       switch (result) {
         case ConnectivityResult.wifi:
           _returnWifiConnection();
@@ -105,13 +110,23 @@ class AuthController extends GetxController {
       isAutoConnectEnable.value = mIsAutoConnectEnable;
 
       if (mIsAutoConnectEnable) {
-        final MdnsDevice lastDevice = MdnsDevice.fromJson(
-          (GetStorage(
-                    SettingsConst.kSettings,
-                  ).read<Map<String, dynamic>>(SettingsConst.kLastConnect) ??
-                  "")
-              as Map<String, dynamic>,
-        );
+        // Read explicitly as dynamic first to avoid a TypeError when the stored
+        // value is absent or corrupted (e.g. empty string from an older build).
+        final raw = GetStorage(SettingsConst.kSettings)
+            .read<dynamic>(SettingsConst.kLastConnect);
+
+        if (raw == null || raw is! Map<String, dynamic>) {
+          AppLogger.release(
+            'No valid last-connect data found, starting discovery',
+            module: "AuthController",
+          );
+          isAutoConnectEnable.value = false;
+          authStatus.value = AuthStatus.scanning;
+          startDiscovery();
+          return;
+        }
+
+        final lastDevice = MdnsDevice.fromJson(raw);
         AppLogger.release(
           'Autoconnect to ${lastDevice.name}',
           module: "AuthController",
@@ -125,12 +140,15 @@ class AuthController extends GetxController {
       }
     } catch (e) {
       isAutoConnectEnable.value = false;
+      authStatus.value = AuthStatus.scanning;
+      startDiscovery();
     }
   }
 
   @override
   void onClose() {
     _authTimer?.cancel();
+    _connectivitySub?.cancel(); // prevent StreamSubscription memory leak
     super.onClose();
   }
 
@@ -212,6 +230,10 @@ class AuthController extends GetxController {
     webSocketProvider.registerHandler(
       TypeMessageWs.auth_pending.value,
       _handleAuthPending,
+    );
+    webSocketProvider.registerHandler(
+      TypeMessageWs.auth_challenge.value,
+      _handleAuthChallenge,
     );
 
     /// Send the authorization request
@@ -395,6 +417,37 @@ class AuthController extends GetxController {
     _fetchLastConnect();
   }
 
+  /// Handles a challenge issued by the server.
+  /// Computes HMAC-SHA256(token, sharedSecret) and sends the response.
+  Future<void> _handleAuthChallenge(Map<String, dynamic> response) async {
+    final data = response['data'];
+    final token = data is Map ? data['token'] as String? : null;
+
+    if (token == null || token.isEmpty) {
+      cancelAuth('error_send_auth_request'.tr);
+      return;
+    }
+
+    final secret = await SecureStorageService.getSharedSecret();
+    if (secret == null || secret.isEmpty) {
+      AppLogger.release(
+        'No shared secret stored — cannot respond to challenge',
+        module: 'AuthController',
+      );
+      cancelAuth('error_send_auth_request'.tr);
+      return;
+    }
+
+    final hmacBytes = Hmac(sha256, utf8.encode(secret)).convert(utf8.encode(token));
+    final hmacHex = hmacBytes.toString();
+
+    final msg = WsMessage(type: TypeMessageWs.auth_challenge_response.value)
+      ..setField('data', {'token': token, 'hmac': hmacHex});
+
+    webSocketProvider.sendMessage(msg.toJson());
+    AppLogger.release('Challenge response sent', module: 'AuthController');
+  }
+
   /// Cleanup resources after auth process
   void _cleanupResources({
     bool resetStatus = true,
@@ -404,6 +457,7 @@ class AuthController extends GetxController {
     if (clearHandlers) {
       webSocketProvider.removeHandler(TypeMessageWs.auth_response.value);
       webSocketProvider.removeHandler(TypeMessageWs.auth_pending.value);
+      webSocketProvider.removeHandler(TypeMessageWs.auth_challenge.value);
     }
 
     if (resetStatus) {

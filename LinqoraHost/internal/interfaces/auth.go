@@ -38,7 +38,7 @@ type AuthManagerInterface interface {
 	CheckPendingResult(deviceID string) (bool, bool)
 	RevokeAuth(deviceID string)
 
-	// Методы теперь используют интерфейсы вместо конкретных типов
 	HandleAuthRequest(client WSClient, msg WSMessage)
 	HandleAuthCheck(client WSClient)
+	HandleChallengeResponse(client WSClient, msg WSMessage)
 }

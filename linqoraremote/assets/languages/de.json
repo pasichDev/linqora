@@ -102,5 +102,11 @@
   "used": "Verwendet",
   "available": "Verfügbar",
   "disk": "Festplatten",
-  "free": "Frei"
+  "free": "Frei",
+  "touchpad": "Touchpad",
+  "sensitivity": "Empfindlichkeit",
+  "touchpad_hint": "Ziehen zum Bewegen  •  Tippen zum Klicken  •  Halten für Rechtsklick",
+  "scroll": "Scrollen",
+  "left_click": "Linksklick",
+  "right_click": "Rechtsklick"
 }

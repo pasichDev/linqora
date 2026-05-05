@@ -68,12 +68,26 @@ func (am *AuthManager) HandleAuthRequest(client interfaces.WSClient, msg interfa
 	log.Printf("Auth request from device %s (%s) at IP %s",
 		authData.DeviceName, deviceID, client.GetIP())
 
-	// Проверяем, авторизовано ли устройство
+	client.SetDeviceID(deviceID)
+	client.SetDeviceName(authData.DeviceName)
+
+	// If a shared secret is configured, issue a challenge instead of going
+	// straight to pending approval or auto-authorise.
+	if am.config.SharedSecret != "" {
+		token, err := am.challenges.Generate(deviceID)
+		if err != nil {
+			log.Printf("Failed to generate challenge for %s: %v", authData.DeviceName, err)
+			sendResponse(client, AuthStatusRequestFailed, false, MessageTypeAuthResponse)
+			return
+		}
+		client.SendSuccess(MessageTypeAuthChallenge, map[string]interface{}{"token": token})
+		log.Printf("Challenge issued to device %s (%s)", authData.DeviceName, deviceID)
+		return
+	}
+
+	// Проверяем, авторизовано ли устройство (no shared secret path)
 	if am.IsAuthorized(deviceID) {
 		log.Printf("Device %s already authorized", authData.DeviceName)
-		client.SetDeviceID(deviceID)
-		client.SetDeviceName(authData.DeviceName)
-
 		sendResponse(client, AuthStatusAuthorized, true, MessageTypeAuthResponse)
 		return
 	}
@@ -164,6 +178,49 @@ func (am *AuthManager) HandleAuthCheck(client interfaces.WSClient) {
 
 	// Запрос авторизации все еще в ожидании
 	sendResponse(client, AuthStatusPending, false, MessageTypeAuthPending)
+}
+
+// HandleChallengeResponse verifies the HMAC sent by the client in response to
+// the challenge issued by HandleAuthRequest.  If verification passes the device
+// is either auto-authorised (already in the known-devices list) or sent through
+// the normal pending-approval flow.
+func (am *AuthManager) HandleChallengeResponse(client interfaces.WSClient, msg interfaces.WSMessage) {
+	var data struct {
+		Token string `json:"token"`
+		HMAC  string `json:"hmac"`
+	}
+	if err := json.Unmarshal(msg.GetData(), &data); err != nil {
+		log.Printf("Error parsing challenge response: %v", err)
+		sendResponse(client, AuthStatusInvalidFormat, false, MessageTypeAuthResponse)
+		return
+	}
+
+	deviceID := client.GetDeviceID()
+	if deviceID == "" {
+		sendResponse(client, AuthStatusMissingDeviceID, false, MessageTypeAuthResponse)
+		return
+	}
+
+	if !am.challenges.Verify(deviceID, data.Token, data.HMAC, am.config.SharedSecret) {
+		log.Printf("Challenge HMAC mismatch for device %s", client.GetDeviceName())
+		sendResponse(client, AuthStatusChallengeInvalid, false, MessageTypeAuthResponse)
+		return
+	}
+
+	log.Printf("Challenge verified for device %s (%s)", client.GetDeviceName(), deviceID)
+
+	if am.IsAuthorized(deviceID) {
+		sendResponse(client, AuthStatusAuthorized, true, MessageTypeAuthResponse)
+		return
+	}
+
+	pending := am.RequestAuthorization(client.GetDeviceName(), deviceID, client.GetIP())
+	if pending {
+		sendResponse(client, AuthStatusPending, false, MessageTypeAuthPending)
+		go am.checkAuthResultPeriodically(client)
+	} else {
+		sendResponse(client, AuthStatusRequestFailed, false, MessageTypeAuthResponse)
+	}
 }
 
 // Функція для відправки відповіді про успішну авторизацію
