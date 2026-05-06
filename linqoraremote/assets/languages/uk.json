@@ -108,6 +108,10 @@
     "touchpad_hint": "Тягни для руху  •  Тап для кліку  •  Утримай для ПКМ",
     "scroll": "Прокрутка",
     "left_click": "Ліва кнопка",
-    "right_click": "Права кнопка"
-
+    "right_click": "Права кнопка",
+    "connect_manually": "Додати вручну",
+    "enter_ip_address": "Введіть IP-адресу пристрою",
+    "ip_address": "IP-адреса",
+    "port": "Порт",
+    "connect": "Підключитися"
 }

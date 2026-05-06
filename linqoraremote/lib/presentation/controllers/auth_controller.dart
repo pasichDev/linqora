@@ -219,6 +219,21 @@ class AuthController extends GetxController {
     }
   }
 
+  /// Connect to the device by IP address
+  Future<void> connectToDeviceByIp(
+    String ip,
+    String port, {
+    bool tls = true,
+  }) async {
+    final device = MdnsDevice(
+      name: 'Manual Connection',
+      address: ip,
+      port: port,
+      supportsTLS: tls,
+    );
+    await connectToDevice(device);
+  }
+
   /// Start the authorization process
   void startAuthProcess() {
     authTimeoutSeconds.value = 30;

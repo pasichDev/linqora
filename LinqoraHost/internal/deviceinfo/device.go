@@ -48,14 +48,39 @@ func getLocalIP() string {
 	if err != nil {
 		return ""
 	}
+
+	var fallbackIP string
+
 	for _, addr := range addrs {
 		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 			if ip4 := ipnet.IP.To4(); ip4 != nil {
-				return ip4.String()
+				ipStr := ip4.String()
+
+				// Skip link-local addresses (APIPA 169.254.x.x)
+				if ip4.IsLinkLocalUnicast() {
+					continue
+				}
+
+				// Prefer typical private networks (Wi-Fi/Ethernet)
+				if ip4.IsPrivate() {
+					// Specifically prioritize 192.168.x.x and 10.x.x.x as they are most common for LAN
+					if (ip4[0] == 192 && ip4[1] == 168) || ip4[0] == 10 {
+						return ipStr
+					}
+
+					// Keep other private IPs (like 172.16.x.x) as fallback
+					if fallbackIP == "" {
+						fallbackIP = ipStr
+					}
+				} else if fallbackIP == "" {
+					// Last resort: any non-loopback IPv4
+					fallbackIP = ipStr
+				}
 			}
 		}
 	}
-	return ""
+
+	return fallbackIP
 }
 
 // Невелика обгортка для покращеного відображення ОС

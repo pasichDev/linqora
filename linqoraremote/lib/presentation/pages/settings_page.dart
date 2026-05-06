@@ -207,6 +207,18 @@ class SettingsPage extends GetView<SettingsController> {
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
+              Obx(
+                () => SwitchListTile(
+                  title: Text(
+                    'allow_self_signed'.tr,
+                    style: Get.textTheme.titleMedium,
+                  ),
+                  subtitle: Text('allow_self_signed_description'.tr),
+                  value: controller.allowSelfSigned.value,
+                  onChanged: (value) => controller.toggleAllowSelfSigned(value),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
             ],
           ),
         ),

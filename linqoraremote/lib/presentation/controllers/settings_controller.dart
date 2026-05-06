@@ -16,6 +16,7 @@ class SettingsController extends GetxController {
   final Rx<ThemeMode> themeMode = ThemeMode.system.obs;
   final RxBool enableNotifications = false.obs;
   final RxBool enableAutoConnect = false.obs;
+  final RxBool allowSelfSigned = false.obs;
   final RxBool notificationPermissionGranted = false.obs;
   final RxString appVersion = ''.obs;
 
@@ -68,6 +69,8 @@ class SettingsController extends GetxController {
           _storage.read<bool>(SettingsConst.kEnableNotifications) ?? false;
       enableAutoConnect.value =
           _storage.read<bool>(SettingsConst.kEnableAutoConnect) ?? false;
+      allowSelfSigned.value =
+          _storage.read<bool>(SettingsConst.kAllowSelfSigned) ?? false;
 
       Get.changeThemeMode(themeMode.value);
     } catch (e) {
@@ -151,6 +154,12 @@ class SettingsController extends GetxController {
   Future<void> toggleAutoConnect(bool value) async {
     enableAutoConnect.value = value;
     await _storage.write(SettingsConst.kEnableAutoConnect, value);
+  }
+
+  /// Save the allow self signed setting to storage
+  Future<void> toggleAllowSelfSigned(bool value) async {
+    allowSelfSigned.value = value;
+    await _storage.write(SettingsConst.kAllowSelfSigned, value);
   }
 
   /// Get the theme mode from string

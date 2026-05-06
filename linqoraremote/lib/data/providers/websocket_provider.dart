@@ -200,7 +200,9 @@ class WebSocketProvider {
           'TLS connection error: $e. Attempting a normal connection...',
           module: "WebSocketProvider",
         );
-        await _establishStandardConnection(wsUrl);
+        // Fallback to non-TLS connection
+        final fallbackUrl = wsUrl.replaceFirst('wss://', 'ws://');
+        await _establishStandardConnection(fallbackUrl);
       }
     } else {
       await _establishStandardConnection(wsUrl);

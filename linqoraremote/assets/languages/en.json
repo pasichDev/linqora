@@ -108,5 +108,12 @@
   "touchpad_hint": "Drag to move  •  Tap to click  •  Hold for right-click",
   "scroll": "Scroll",
   "left_click": "Left click",
-  "right_click": "Right click"
+  "right_click": "Right click",
+  "connect_manually": "Connect manually",
+  "enter_ip_address": "Enter device IP address",
+  "ip_address": "IP Address",
+  "port": "Port",
+  "connect": "Connect",
+  "allow_self_signed": "Allow self-signed certificates",
+  "allow_self_signed_description": "Allows connecting to hosts with untrusted TLS certificates (required for development)"
 }
