@@ -10,6 +10,7 @@ import 'package:linqoraremote/presentation/widgets/dialogs/dialog_cancel_connect
 
 import '../controllers/device_home_controller.dart';
 import '../dashboard_items.dart';
+import '../../routes/app_routes.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -250,6 +251,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 }),
                 const Spacer(),
                 GestureDetector(
+                  onTap: () => Get.toNamed(AppRoutes.SETTINGS),
+                  child: LxGlass(
+                    borderRadius: BorderRadius.circular(12),
+                    child: const SizedBox(
+                      width: 38,
+                      height: 38,
+                      child: Icon(
+                        Icons.settings_outlined,
+                        size: 16,
+                        color: lxTextDim,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
                   onTap: () async {
                     if (_homeController.webSocketProvider.isConnected) {
                       await DisconnectConfirmationDialog.show(
@@ -264,10 +281,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   },
                   child: LxGlass(
                     borderRadius: BorderRadius.circular(12),
-                    child: SizedBox(
+                    child: const SizedBox(
                       width: 38,
                       height: 38,
-                      child: const Icon(
+                      child: Icon(
                         Icons.power_settings_new_rounded,
                         size: 16,
                         color: lxTextDim,
@@ -280,11 +297,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             // --- Hero stat card ---
             const SizedBox(height: 16),
             Obx(() {
+              _homeController.hostInfo.value; // always reactive even when mc is null
               final mc = _monitoringController;
-              final cpu = mc?.getCurrentCPUMetrics();
-              final ram = mc?.getCurrentRAMMetrics();
+              final cpu = mc?.currentCPUMetrics.value;
+              final ram = mc?.currentRAMMetrics.value;
               final cpuVal = cpu?.loadPercent.toDouble() ?? 0.0;
-              final cpuLoads = mc?.getCPULoads() ?? <int>[];
+              final cpuLoads = mc?.cpuLoads.value ?? <int>[];
               return LxGlass(
                 padding: const EdgeInsets.all(14),
                 child: Row(

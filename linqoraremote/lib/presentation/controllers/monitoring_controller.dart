@@ -91,16 +91,45 @@ class MonitoringController extends GetxController {
     super.onClose();
   }
 
+  // Buffer for incoming metrics to provide smooth, delayed updates.
+  final List<({DateTime timestamp, Map<String, dynamic> data})> _metricsBuffer = [];
+  
   void _handleMetricsUpdate(Map<String, dynamic> data) {
     final rawData = data['data'];
-    if (rawData == null || rawData is! Map<String, dynamic>) {
-      AppLogger.release(
-        'Invalid metrics payload — missing or malformed "data" field',
-        module: 'MonitoringController',
-      );
-      return;
-    }
+    if (rawData == null || rawData is! Map<String, dynamic>) return;
 
+    // Add to buffer with current timestamp
+    _metricsBuffer.add((timestamp: DateTime.now(), data: rawData));
+    
+    // Start processing timer if not already running
+    _startBufferTimer();
+  }
+
+  bool _isTimerRunning = false;
+  void _startBufferTimer() {
+    if (_isTimerRunning) return;
+    _isTimerRunning = true;
+    
+    // Check buffer every 500ms
+    Stream.periodic(const Duration(milliseconds: 500)).listen((_) {
+      _processBuffer();
+    });
+  }
+
+  void _processBuffer() {
+    if (_metricsBuffer.isEmpty) return;
+
+    final now = DateTime.now();
+    final delay = const Duration(seconds: 3);
+
+    // Process all metrics that have reached the delay threshold
+    while (_metricsBuffer.isNotEmpty && now.difference(_metricsBuffer.first.timestamp) >= delay) {
+      final entry = _metricsBuffer.removeAt(0);
+      _applyMetrics(entry.data);
+    }
+  }
+
+  void _applyMetrics(Map<String, dynamic> rawData) {
     try {
       final cpuJson = rawData['cpuMetrics'];
       final ramJson = rawData['ramMetrics'];
@@ -120,7 +149,7 @@ class MonitoringController extends GetxController {
       );
     } catch (e) {
       AppLogger.release(
-        'Error parsing metrics: $e',
+        'Error applying metrics: $e',
         module: 'MonitoringController',
       );
     }
@@ -129,6 +158,7 @@ class MonitoringController extends GetxController {
   void _resetMetrics() {
     currentCPUMetrics.value = null;
     currentRAMMetrics.value = null;
+    _metricsBuffer.clear();
     _tempBuf.clear();
     _cpuBuf.clear();
     _ramBuf.clear();

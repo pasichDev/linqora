@@ -154,12 +154,10 @@ class _MonitoringViewState extends State<MonitoringView>
                   ],
                 ),
                 const SizedBox(height: 8),
-                Obx(
-                  () => LxSparkline(
-                    data: _c.cpuLoads,
-                    width: 170,
-                    height: 42,
-                  ),
+                LxSparkline(
+                  data: _c.cpuLoads,
+                  width: 170,
+                  height: 42,
                 ),
                 const SizedBox(height: 6),
                 Row(
@@ -214,35 +212,31 @@ class _MonitoringViewState extends State<MonitoringView>
                   ],
                 ),
                 const SizedBox(height: 4),
-                Obx(
-                  () => RichText(
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: '${_c.currentRAMMetrics.value?.loadPercent ?? 0}',
-                          style: const TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: -0.8,
-                            color: lxText,
-                          ),
+                RichText(
+                  text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text: '${_c.currentRAMMetrics.value?.loadPercent ?? 0}',
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.8,
+                          color: lxText,
                         ),
-                        const TextSpan(
-                          text: '%',
-                          style: TextStyle(fontSize: 14, color: lxTextDim),
-                        ),
-                      ],
-                    ),
+                      ),
+                      const TextSpan(
+                        text: '%',
+                        style: TextStyle(fontSize: 14, color: lxTextDim),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 6),
-                Obx(
-                  () => LxSparkline(
-                    data: _c.ramUsagesPercent,
-                    width: 130,
-                    height: 32,
-                    color: const Color(0xFF7C9CFF),
-                  ),
+                LxSparkline(
+                  data: _c.ramUsagesPercent,
+                  width: 130,
+                  height: 32,
+                  color: const Color(0xFF7C9CFF),
                 ),
               ],
             ),
