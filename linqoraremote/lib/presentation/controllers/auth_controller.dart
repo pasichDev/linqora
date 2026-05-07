@@ -112,8 +112,9 @@ class AuthController extends GetxController {
       if (mIsAutoConnectEnable) {
         // Read explicitly as dynamic first to avoid a TypeError when the stored
         // value is absent or corrupted (e.g. empty string from an older build).
-        final raw = GetStorage(SettingsConst.kSettings)
-            .read<dynamic>(SettingsConst.kLastConnect);
+        final raw = GetStorage(
+          SettingsConst.kSettings,
+        ).read<dynamic>(SettingsConst.kLastConnect);
 
         if (raw == null || raw is! Map<String, dynamic>) {
           AppLogger.release(
@@ -272,10 +273,9 @@ class AuthController extends GetxController {
       final message = WsMessage(type: TypeMessageWs.auth_request.value)
         ..setField('data', {
           'deviceName': deviceName,
-          'deviceId':
-              Platform.isAndroid
-                  ? 'android_${await getDeviceId()}'
-                  : 'ios_${await getDeviceId()}',
+          'deviceId': Platform.isAndroid
+              ? 'android_${await getDeviceId()}'
+              : 'ios_${await getDeviceId()}',
           'ip': await getLocalIpAddress(),
           'versionClient': await getAppVersion(),
         });
@@ -453,7 +453,10 @@ class AuthController extends GetxController {
       return;
     }
 
-    final hmacBytes = Hmac(sha256, utf8.encode(secret)).convert(utf8.encode(token));
+    final hmacBytes = Hmac(
+      sha256,
+      utf8.encode(secret),
+    ).convert(utf8.encode(token));
     final hmacHex = hmacBytes.toString();
 
     final msg = WsMessage(type: TypeMessageWs.auth_challenge_response.value)

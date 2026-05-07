@@ -10,11 +10,7 @@ class SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(
-          icon,
-          color: Theme.of(context).colorScheme.primary,
-          size: 20,
-        ),
+        Icon(icon, color: Theme.of(context).colorScheme.primary, size: 20),
         const SizedBox(width: 10),
         Text(
           title.toUpperCase(),

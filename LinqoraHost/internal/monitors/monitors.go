@@ -2,14 +2,14 @@ package monitors
 
 // MonitorInfo represents metadata about a physical display.
 type MonitorInfo struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	IsPrimary    bool   `json:"is_primary"`
-	Width        int    `json:"width"`
-	Height       int    `json:"height"`
-	RefreshRate  int    `json:"refresh_rate"`
-	X            int    `json:"x"`
-	Y            int    `json:"y"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	IsPrimary   bool   `json:"is_primary"`
+	Width       int    `json:"width"`
+	Height      int    `json:"height"`
+	RefreshRate int    `json:"refresh_rate"`
+	X           int    `json:"x"`
+	Y           int    `json:"y"`
 }
 
 // Resolution represents a display mode.

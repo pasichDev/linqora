@@ -2,11 +2,11 @@ import 'package:get/get.dart';
 import 'package:linqoraremote/data/providers/websocket_provider.dart';
 
 enum MouseAction {
-  move,        // 0
-  leftClick,   // 1
-  rightClick,  // 2
+  move, // 0
+  leftClick, // 1
+  rightClick, // 2
   middleClick, // 3
-  scroll,      // 4
+  scroll, // 4
   doubleClick, // 5
 }
 
@@ -45,12 +45,7 @@ class MouseController extends GetxController {
     if (!webSocketProvider.isReadyForCommand()) return;
     webSocketProvider.sendMessage({
       'type': 'mouse',
-      'data': {
-        'action': action.index,
-        'dx': dx,
-        'dy': dy,
-        'delta': delta,
-      },
+      'data': {'action': action.index, 'dx': dx, 'dy': dy, 'delta': delta},
     });
   }
 }

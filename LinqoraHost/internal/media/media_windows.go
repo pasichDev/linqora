@@ -139,11 +139,15 @@ $volume = $device.Activate($iid, 3, [IntPtr]::Zero)
 
 // setWindowsMasterVolume sets master volume using PowerShell and COM.
 func setWindowsMasterVolume(value int) error {
-	if value < 0 { value = 0 }
-	if value > 100 { value = 100 }
-	
+	if value < 0 {
+		value = 0
+	}
+	if value > 100 {
+		value = 100
+	}
+
 	// Format float with point for PowerShell
-	fVal := float32(value)/100.0
+	fVal := float32(value) / 100.0
 	script := fmt.Sprintf(`
 $obj = New-Object -ComObject MMDeviceEnumerator
 $device = $obj.GetDefaultAudioEndpoint(0, 1)

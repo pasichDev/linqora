@@ -54,12 +54,16 @@ class SponsorCard extends StatelessWidget {
                           gradient: LinearGradient(
                             colors: [
                               Theme.of(context).colorScheme.primary,
-                              Theme.of(context).colorScheme.primary.withBlue(255),
+                              Theme.of(
+                                context,
+                              ).colorScheme.primary.withBlue(255),
                             ],
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.primary.withOpacity(0.3),
                               blurRadius: 12,
                               offset: const Offset(0, 4),
                             ),
@@ -76,7 +80,10 @@ class SponsorCard extends StatelessWidget {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),
-                            textStyle: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                            textStyle: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                            ),
                           ),
                           onPressed: () => launchUrlHandler(supportLinqora),
                         ),
@@ -89,12 +96,18 @@ class SponsorCard extends StatelessWidget {
                         label: Text('send_feedback'.tr),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white,
-                          side: BorderSide(color: Colors.white.withOpacity(0.2), width: 1.5),
+                          side: BorderSide(
+                            color: Colors.white.withOpacity(0.2),
+                            width: 1.5,
+                          ),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          textStyle: const TextStyle(fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                          textStyle: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                         onPressed: () => launchUrlHandler(sendFeedback),
                       ),

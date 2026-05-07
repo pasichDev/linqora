@@ -259,10 +259,9 @@ void onStart(ServiceInstance service) async {
     if (service is AndroidServiceInstance && notificationsEnabled) {
       service.setForegroundNotificationInfo(
         title: 'Linqora Remote',
-        content:
-            isConnected
-                ? "Connected to $deviceName ($deviceAddress)"
-                : "Disconnected from $deviceName ($deviceAddress)",
+        content: isConnected
+            ? "Connected to $deviceName ($deviceAddress)"
+            : "Disconnected from $deviceName ($deviceAddress)",
       );
     }
   }

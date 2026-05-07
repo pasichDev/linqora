@@ -6,5 +6,4 @@ class Assets {
   static const String languagesDe = 'assets/languages/de.json';
   static const String languagesEn = 'assets/languages/en.json';
   static const String languagesUk = 'assets/languages/uk.json';
-
 }

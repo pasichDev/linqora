@@ -139,10 +139,9 @@ class HostSystemInfo {
   factory HostSystemInfo.fromJson(Map<String, dynamic> json) {
     List<DiskInfo> disks = [];
     if (json['disks'] != null) {
-      disks =
-          (json['disks'] as List)
-              .map((diskJson) => DiskInfo.fromJson(diskJson))
-              .toList();
+      disks = (json['disks'] as List)
+          .map((diskJson) => DiskInfo.fromJson(diskJson))
+          .toList();
     }
 
     return HostSystemInfo(

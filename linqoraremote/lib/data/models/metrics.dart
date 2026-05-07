@@ -18,8 +18,8 @@ class CPUMetrics {
     return CPUMetrics(
       temperature: (json['temperature'] as num).toInt(),
       loadPercent: (json['loadPercent'] as num).toInt(),
-      processes:   (json['processes']   as num).toInt(),
-      threads:     (json['threads']     as num).toInt(),
+      processes: (json['processes'] as num).toInt(),
+      threads: (json['threads'] as num).toInt(),
     );
   }
 }
@@ -28,14 +28,11 @@ class RAMMetrics {
   final double usage;
   final int loadPercent;
 
-  RAMMetrics({
-    required this.usage,
-    required this.loadPercent,
-  });
+  RAMMetrics({required this.usage, required this.loadPercent});
 
   factory RAMMetrics.fromJson(Map<String, dynamic> json) {
     return RAMMetrics(
-      usage:       (json['usage']       as num).toDouble(),
+      usage: (json['usage'] as num).toDouble(),
       loadPercent: (json['loadPercent'] as num).toInt(),
     );
   }

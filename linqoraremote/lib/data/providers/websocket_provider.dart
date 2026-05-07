@@ -220,13 +220,11 @@ class WebSocketProvider {
         return CertificateService.verifyOrPin(cert, host);
       };
 
-    final webSocket = await WebSocket.connect(
-      wsUrl,
-      customClient: client,
-    ).timeout(
-      const Duration(seconds: 5),
-      onTimeout: () => throw TimeoutException('TLS connection timeout'),
-    );
+    final webSocket = await WebSocket.connect(wsUrl, customClient: client)
+        .timeout(
+          const Duration(seconds: 5),
+          onTimeout: () => throw TimeoutException('TLS connection timeout'),
+        );
 
     _channel = IOWebSocketChannel(webSocket);
     AppLogger.release('TLS Connect', module: "WebSocketProvider");
@@ -603,7 +601,10 @@ class WebSocketProvider {
       }
       _reconnectRooms.clear();
 
-      AppLogger.release('Reconnected successfully', module: "WebSocketProvider");
+      AppLogger.release(
+        'Reconnected successfully',
+        module: "WebSocketProvider",
+      );
     } catch (e) {
       AppLogger.release(
         'Reconnect attempt failed: $e',

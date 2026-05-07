@@ -29,10 +29,7 @@ class _CircularBuffer<T> {
       return _buf.take(_count).cast<T>().toList();
     }
     // Buffer is full: oldest element is at _head.
-    return [
-      ..._buf.skip(_head).cast<T>(),
-      ..._buf.take(_head).cast<T>(),
-    ];
+    return [..._buf.skip(_head).cast<T>(), ..._buf.take(_head).cast<T>()];
   }
 
   void clear() {
@@ -52,8 +49,8 @@ class MonitoringController extends GetxController {
   static const int maxMetricsCount = 40;
 
   // RxList used for UI reactivity; updated in a single batch per tick.
-  final temperatures     = <int>[].obs;
-  final cpuLoads         = <int>[].obs;
+  final temperatures = <int>[].obs;
+  final cpuLoads = <int>[].obs;
   final ramUsagesPercent = <int>[].obs;
 
   final currentCPUMetrics = Rx<CPUMetrics?>(null);
@@ -61,11 +58,11 @@ class MonitoringController extends GetxController {
 
   // Internal circular buffers — O(1) writes.
   final _tempBuf = _CircularBuffer<int>(maxMetricsCount);
-  final _cpuBuf  = _CircularBuffer<int>(maxMetricsCount);
-  final _ramBuf  = _CircularBuffer<int>(maxMetricsCount);
+  final _cpuBuf = _CircularBuffer<int>(maxMetricsCount);
+  final _ramBuf = _CircularBuffer<int>(maxMetricsCount);
 
-  List<int> getTemperatures()     => temperatures.toList();
-  List<int> getCPULoads()         => cpuLoads.toList();
+  List<int> getTemperatures() => temperatures.toList();
+  List<int> getCPULoads() => cpuLoads.toList();
   List<int> getRAMUsagesPercent() => ramUsagesPercent.toList();
 
   CPUMetrics? getCurrentCPUMetrics() => currentCPUMetrics.value;
@@ -109,10 +106,12 @@ class MonitoringController extends GetxController {
       final ramJson = rawData['ramMetrics'];
       if (cpuJson == null || ramJson == null) return;
 
-      currentCPUMetrics.value =
-          CPUMetrics.fromJson(cpuJson as Map<String, dynamic>);
-      currentRAMMetrics.value =
-          RAMMetrics.fromJson(ramJson as Map<String, dynamic>);
+      currentCPUMetrics.value = CPUMetrics.fromJson(
+        cpuJson as Map<String, dynamic>,
+      );
+      currentRAMMetrics.value = RAMMetrics.fromJson(
+        ramJson as Map<String, dynamic>,
+      );
 
       _updateMetricsArrays(
         currentCPUMetrics.value!.temperature,
@@ -146,8 +145,8 @@ class MonitoringController extends GetxController {
     _cpuBuf.add(cpuLoad);
     _ramBuf.add(ramUsage);
 
-    temperatures.value     = _tempBuf.toList();
-    cpuLoads.value         = _cpuBuf.toList();
+    temperatures.value = _tempBuf.toList();
+    cpuLoads.value = _cpuBuf.toList();
     ramUsagesPercent.value = _ramBuf.toList();
   }
 }
