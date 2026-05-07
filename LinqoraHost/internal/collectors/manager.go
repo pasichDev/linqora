@@ -7,18 +7,19 @@ import (
 )
 
 const (
+	// CollectorInterval defines how often system data is sampled.
 	CollectorInterval = 2 * time.Second
 )
 
-// CollectorManager управляет запуском/остановкой коллекторов
+// CollectorManager coordinates the lifecycle of data collectors based on active room participation.
 type CollectorManager struct {
 	metricsCollector *MetricsCollector
 	mediaCollector   *MediaCollector
-	activeRooms      map[string]int // Счетчик активных клиентов в комнатах
+	activeRooms      map[string]int // Tracks active client counts per room
 	mu               sync.Mutex
 }
 
-// NewCollectorManager создает новый менеджер коллекторов
+// NewCollectorManager initializes the manager with the required collector instances.
 func NewCollectorManager(
 	metricsCollector *MetricsCollector,
 	mediaCollector *MediaCollector,
@@ -30,14 +31,14 @@ func NewCollectorManager(
 	}
 }
 
-// Реализация интерфейса RoomListener
+// OnFirstClientJoined satisfies the RoomListener interface to start collectors when needed.
 func (cm *CollectorManager) OnFirstClientJoined(roomName string) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
 	cm.activeRooms[roomName] = 1
 
-	// Запускаем соответствующий коллектор в зависимости от имени комнаты
+	// Activate the appropriate collector based on the room joined.
 	switch roomName {
 	case "metrics":
 		if !cm.metricsCollector.IsRunning() {
@@ -52,13 +53,14 @@ func (cm *CollectorManager) OnFirstClientJoined(roomName string) {
 	}
 }
 
+// OnLastClientLeft satisfies the RoomListener interface to stop collectors when no longer needed.
 func (cm *CollectorManager) OnLastClientLeft(roomName string) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
 	delete(cm.activeRooms, roomName)
 
-	// Останавливаем соответствующий коллектор в зависимости от имени комнаты
+	// Deactivate the appropriate collector based on the room vacated.
 	switch roomName {
 	case "metrics":
 		if cm.metricsCollector.IsRunning() {

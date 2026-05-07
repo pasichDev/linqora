@@ -5,53 +5,57 @@ import (
 	"log"
 )
 
-// BroadcastMessage - общий интерфейс для сообщений трансляции
+// BroadcastMessage defines a common interface for messages distributed across rooms.
 type BroadcastMessage interface {
 	GetType() string
 	ToJSON() ([]byte, error)
 }
 
-// MetricsMessage представляет сообщение с метриками системы
+// MetricsMessage encapsulates system performance metrics for broadcasting.
 type MetricsMessage struct {
 	Type    string      `json:"type"`
 	Metrics interface{} `json:"metrics"`
 }
 
-// MediaMessage представляет сообщение с информацией о медиа
+// MediaMessage encapsulates multimedia state information for broadcasting.
 type MediaMessage struct {
 	Type  string      `json:"type"`
 	Media interface{} `json:"media"`
 }
 
+// GetType returns the message type for MetricsMessage.
 func (m MetricsMessage) GetType() string {
 	return m.Type
 }
 
+// ToJSON serialises the MetricsMessage to a byte slice.
 func (m MetricsMessage) ToJSON() ([]byte, error) {
 	return json.Marshal(m)
 }
 
+// GetType returns the message type for MediaMessage.
 func (m MediaMessage) GetType() string {
 	return m.Type
 }
 
+// ToJSON serialises the MediaMessage to a byte slice.
 func (m MediaMessage) ToJSON() ([]byte, error) {
 	return json.Marshal(m)
 }
 
-// Broadcaster предоставляет методы для трансляции сообщений в комнаты
+// Broadcaster provides high-level methods to distribute messages into specific rooms.
 type Broadcaster struct {
 	roomManager *RoomManager
 }
 
-// NewBroadcaster создает новый экземпляр транслятора сообщений
+// NewBroadcaster creates a new Broadcaster instance associated with a RoomManager.
 func NewBroadcaster(roomManager *RoomManager) *Broadcaster {
 	return &Broadcaster{
 		roomManager: roomManager,
 	}
 }
 
-// BroadcastMetrics отправляет метрики всем клиентам в комнате metrics
+// BroadcastMetrics sends system metrics to all clients subscribed to the "metrics" room.
 func (b *Broadcaster) BroadcastMetrics(metricsData []byte) {
 	var payload interface{}
 	if err := json.Unmarshal(metricsData, &payload); err != nil {
@@ -59,11 +63,10 @@ func (b *Broadcaster) BroadcastMetrics(metricsData []byte) {
 		return
 	}
 
-	// Рассылаем всем клиентам в комнате
 	b.roomManager.SendToRoom("metrics", "metrics", payload, nil)
 }
 
-// BroadcastMedia отправляет медиаданные всем клиентам в комнате media
+// BroadcastMedia sends multimedia state to all clients subscribed to the "media" room.
 func (b *Broadcaster) BroadcastMedia(mediaData []byte) {
 	var payload interface{}
 	if err := json.Unmarshal(mediaData, &payload); err != nil {
@@ -73,12 +76,12 @@ func (b *Broadcaster) BroadcastMedia(mediaData []byte) {
 	b.roomManager.SendToRoom("media", "media", payload, nil)
 }
 
-// GetMetricsBroadcaster возвращает функцию для трансляции метрик
+// GetMetricsBroadcaster returns a callback function for broadcasting metrics.
 func (b *Broadcaster) GetMetricsBroadcaster() func([]byte) {
 	return b.BroadcastMetrics
 }
 
-// GetMediaBroadcaster возвращает функцию для трансляции медиаданных
+// GetMediaBroadcaster returns a callback function for broadcasting media data.
 func (b *Broadcaster) GetMediaBroadcaster() func([]byte) {
 	return b.BroadcastMedia
 }

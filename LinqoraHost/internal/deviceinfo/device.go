@@ -7,31 +7,29 @@ import (
 	"strconv"
 )
 
+// DeviceInfo provides identification and network details about the host machine.
 type DeviceInfo struct {
 	IP       string `json:"ip"`
 	PORT     string `json:"port"`
 	OS       string `json:"os"`
-	Hostname string `json:"hostname"` // Ім'я хоста
-
+	Hostname string `json:"hostname"`
 }
 
+// GetDeviceInfo aggregates system information including IP, port, OS, and hostname.
 func GetDeviceInfo() DeviceInfo {
-	// Отримати IP-адресу
 	ip := getLocalIP()
 	if ip == "" {
-		ip = "Не вдалося визначити IP"
+		ip = "Unknown IP"
 	}
 
-	// Припустимо, що порт відомий (наприклад, 8070)
+	// Default application port
 	port := 8070
 
-	// Отримати ОС
 	osType := runtime.GOOS
 
-	// Отримати ім'я хоста
 	hostname, err := os.Hostname()
 	if err != nil {
-		hostname = "Не вдалося отримати ім'я хоста"
+		hostname = "Unknown Hostname"
 	}
 
 	return DeviceInfo{
@@ -42,7 +40,7 @@ func GetDeviceInfo() DeviceInfo {
 	}
 }
 
-// Функція для визначення локальної IP-адреси
+// getLocalIP identifies the primary local network address, prioritizing private LAN ranges.
 func getLocalIP() string {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
@@ -83,7 +81,7 @@ func getLocalIP() string {
 	return fallbackIP
 }
 
-// Невелика обгортка для покращеного відображення ОС
+// osPrettyName converts runtime.GOOS into a user-friendly operating system name.
 func osPrettyName(goos string) string {
 	switch goos {
 	case "linux":
@@ -97,7 +95,7 @@ func osPrettyName(goos string) string {
 	}
 }
 
-// Для Linux можна прочитати з /etc/os-release
+// detectLinuxDistro attempts to read the distribution name from /etc/os-release.
 func detectLinuxDistro() string {
 	data, err := os.ReadFile("/etc/os-release")
 	if err != nil {
@@ -114,7 +112,7 @@ func detectLinuxDistro() string {
 	return "Linux"
 }
 
-// Допоміжні утиліти
+// splitLines is a simple utility to break a string into a slice of lines.
 func splitLines(s string) []string {
 	var lines []string
 	curr := ""
@@ -132,6 +130,7 @@ func splitLines(s string) []string {
 	return lines
 }
 
+// trimQuotes removes leading and trailing double quotes from a string.
 func trimQuotes(s string) string {
 	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
 		return s[1 : len(s)-1]

@@ -1,51 +1,41 @@
 package auth
 
-// Коды типов сообщений
+// Message type identifiers for authorization flows.
 const (
-	MessageTypeAuthResponse         = "auth_response"
-	MessageTypeAuthPending          = "auth_pending"
-	MessageTypeAuthChallenge        = "auth_challenge"
-	MessageTypeAuthChallengeResp    = "auth_challenge_response"
+	MessageTypeAuthResponse      = "auth_response"
+	MessageTypeAuthPending       = "auth_pending"
+	MessageTypeAuthChallenge     = "auth_challenge"
+	MessageTypeAuthChallengeResp = "auth_challenge_response"
 )
 
-// Коды статусов авторизации
+// Authorization status codes used in server responses.
 const (
 	AuthStatusNotAuthorized = 001
 
-	// Challenge-response (3xx)
+	// Challenge-response codes (3xx)
 	AuthStatusChallengeInvalid = 300
 
-	// Устройство уже авторизовано (1xx)
-	AuthStatusAuthorized = 100
+	// Success codes (1xx)
+	AuthStatusAuthorized = 100 // Device is already recognized
+	AuthStatusApproved   = 101 // Manual authorization was granted
 
-	// Авторизация одобрена (1xx)
-	AuthStatusApproved = 101
+	// Informational codes (2xx)
+	AuthStatusPending = 200 // Waiting for user interaction on host
 
-	// Ожидание авторизации (2xx)
-	AuthStatusPending = 200
+	// Client-side error codes (4xx)
+	AuthStatusRejected        = 400 // Manual authorization was denied
+	AuthStatusInvalidFormat   = 401 // Request data is malformed
+	AuthStatusMissingDeviceID = 402 // Device ID field is empty
 
-	// Авторизация отклонена (4xx - ошибки клиента)
-	AuthStatusRejected = 400
-
-	// Ошибка неверный формат запроса авторизации
-	AuthStatusInvalidFormat = 401
-
-	// Ошибка отсутствует ID устройства
-	AuthStatusMissingDeviceID = 402
-
-	// Истекло время ожидания авторизации (5xx - ошибки сервера)
-	AuthStatusTimeout = 500
-
-	// Ошибка запроса авторизации
-	AuthStatusRequestFailed = 501
-
-	// Ошибка устаревшая версия клиента
-	AuthStatusUnsupportedVersion = 502
+	// Server-side error codes (5xx)
+	AuthStatusTimeout            = 500 // Authorization expired before approval
+	AuthStatusRequestFailed      = 501 // Internal failure during request processing
+	AuthStatusUnsupportedVersion = 502 // Client version is incompatible with host
 )
 
-// Сообщения для кодов статуса
+// Human-readable descriptions for authorization status codes.
 var authMessages = map[int]string{
-	AuthStatusChallengeInvalid: "Challenge verification failed",
+	AuthStatusChallengeInvalid:   "Challenge verification failed",
 	AuthStatusNotAuthorized:      "Device not authorized",
 	AuthStatusAuthorized:         "Device authorized",
 	AuthStatusApproved:           "Authorization approved",
@@ -58,7 +48,7 @@ var authMessages = map[int]string{
 	AuthStatusUnsupportedVersion: "Client version is outdated and not supported",
 }
 
-// GetAuthMessage возвращает описание для кода статуса
+// GetAuthMessage retrieves the descriptive message associated with a status code.
 func GetAuthMessage(code int) string {
 	if msg, ok := authMessages[code]; ok {
 		return msg

@@ -11,17 +11,18 @@ import (
 )
 
 const (
-	// Мінімальна версія клієнта
+	// MinVersionClient specifies the minimum supported version of the mobile application.
 	MinVersionClient = "0.1.0"
 )
 
+// AuthResponse represents the structure sent back to clients after an auth attempt.
 type AuthResponse struct {
 	Success bool   `json:"success"`
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
 
-// AuthRequestData представляет данные запроса авторизации
+// AuthRequestData identifies the device attempting to connect.
 type AuthRequestData struct {
 	DeviceID      string `json:"deviceId"`
 	DeviceName    string `json:"deviceName"`
@@ -29,7 +30,7 @@ type AuthRequestData struct {
 	VersionClient string `json:"versionClient"`
 }
 
-// IsVersionSupported checks if the client version is supported
+// IsVersionClientSupported checks if the client version meets the minimum requirements.
 func (am *AuthManager) IsVersionClientSupported(version string) bool {
 	clientVersion, err := semver.NewVersion(version)
 	if err != nil {
@@ -40,7 +41,7 @@ func (am *AuthManager) IsVersionClientSupported(version string) bool {
 	return clientVersion.GreaterThan(minVersion) || clientVersion.Equal(minVersion)
 }
 
-// HandleAuthRequest обрабатывает запрос авторизации от клиента
+// HandleAuthRequest processes an incoming authorization request from a client.
 func (am *AuthManager) HandleAuthRequest(client interfaces.WSClient, msg interfaces.WSMessage) {
 	log.Printf("Processing auth request from %s", client.GetIP())
 
@@ -58,7 +59,7 @@ func (am *AuthManager) HandleAuthRequest(client interfaces.WSClient, msg interfa
 		return
 	}
 
-	// Перевіряємо версію клієнта
+	// Verify client compatibility.
 	if !am.IsVersionClientSupported(authData.VersionClient) {
 		log.Printf("Unsupported client version: %s", authData.VersionClient)
 		sendResponse(client, AuthStatusUnsupportedVersion, false, MessageTypeAuthResponse)
@@ -85,24 +86,22 @@ func (am *AuthManager) HandleAuthRequest(client interfaces.WSClient, msg interfa
 		return
 	}
 
-	// Проверяем, авторизовано ли устройство (no shared secret path)
+	// Check if the device is already authorized (no shared secret path).
 	if am.IsAuthorized(deviceID) {
 		log.Printf("Device %s already authorized", authData.DeviceName)
 		sendResponse(client, AuthStatusAuthorized, true, MessageTypeAuthResponse)
 		return
 	}
 
-	// Запрашиваем авторизацию
+	// Request manual authorization if not already authorized.
 	pending := am.RequestAuthorization(authData.DeviceName, deviceID, client.GetIP())
 	if pending {
-		// Сохраняем DeviceID для будущей проверки
 		client.SetDeviceID(deviceID)
 		client.SetDeviceName(authData.DeviceName)
 
-		// Отправляем сообщение, что запрос на авторизацию отправлен
 		sendResponse(client, AuthStatusPending, false, MessageTypeAuthPending)
 
-		// Запускаем фоновую проверку результата
+		// Start background monitoring for the user's decision.
 		go am.checkAuthResultPeriodically(client)
 		log.Printf("Auth request for %s is pending", authData.DeviceName)
 	} else {
@@ -111,7 +110,7 @@ func (am *AuthManager) HandleAuthRequest(client interfaces.WSClient, msg interfa
 	}
 }
 
-// Метод для периодической проверки статуса авторизации
+// checkAuthResultPeriodically polls for authorization results until approval, rejection, or timeout.
 func (am *AuthManager) checkAuthResultPeriodically(client interfaces.WSClient) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
@@ -126,17 +125,14 @@ func (am *AuthManager) checkAuthResultPeriodically(client interfaces.WSClient) {
 				return
 			}
 
-			// Проверяем результат авторизации
 			result, exists := am.CheckPendingResult(deviceID)
 			if exists {
 				if result {
-					// Авторизация одобрена
 					sendResponse(client, AuthStatusApproved, true, MessageTypeAuthResponse)
 				} else {
-					// Авторизация отклонена
 					sendResponse(client, AuthStatusRejected, false, MessageTypeAuthResponse)
 				}
-				return // Завершаем проверку после отправки результата
+				return
 			}
 
 		case <-timeout:
@@ -146,44 +142,35 @@ func (am *AuthManager) checkAuthResultPeriodically(client interfaces.WSClient) {
 	}
 }
 
-// HandleAuthCheck проверяет текущий статус авторизации
+// HandleAuthCheck verifies the current authorization status of a connected client.
 func (am *AuthManager) HandleAuthCheck(client interfaces.WSClient) {
 	deviceID := client.GetDeviceID()
 
-	// Если у клиента нет deviceID, он еще не проходил авторизацию
 	if deviceID == "" {
 		sendResponse(client, AuthStatusNotAuthorized, false, MessageTypeAuthResponse)
 		return
 	}
 
-	// Проверяем, авторизован ли клиент
 	if am.IsAuthorized(deviceID) {
-		// Клиент авторизован
 		sendResponse(client, AuthStatusAuthorized, true, MessageTypeAuthResponse)
 		return
 	}
 
-	// Проверяем результат ожидающего запроса
 	result, exists := am.CheckPendingResult(deviceID)
 	if exists {
 		if result {
-			// Запрос авторизации был одобрен
 			sendResponse(client, AuthStatusApproved, true, MessageTypeAuthResponse)
 		} else {
-			// Запрос авторизации был отклонен
 			sendResponse(client, AuthStatusRejected, false, MessageTypeAuthResponse)
 		}
 		return
 	}
 
-	// Запрос авторизации все еще в ожидании
 	sendResponse(client, AuthStatusPending, false, MessageTypeAuthPending)
 }
 
 // HandleChallengeResponse verifies the HMAC sent by the client in response to
-// the challenge issued by HandleAuthRequest.  If verification passes the device
-// is either auto-authorised (already in the known-devices list) or sent through
-// the normal pending-approval flow.
+// the challenge issued by HandleAuthRequest.
 func (am *AuthManager) HandleChallengeResponse(client interfaces.WSClient, msg interfaces.WSMessage) {
 	var data struct {
 		Token string `json:"token"`
@@ -223,7 +210,7 @@ func (am *AuthManager) HandleChallengeResponse(client interfaces.WSClient, msg i
 	}
 }
 
-// Функція для відправки відповіді про успішну авторизацію
+// sendResponse helper function to transmit authorization status to the client.
 func sendResponse(client interfaces.WSClient, code int, success bool, typeResponse string) {
 	response := AuthResponse{
 		Success: success,

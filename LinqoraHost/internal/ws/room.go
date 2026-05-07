@@ -6,14 +6,14 @@ import (
 	"sync"
 )
 
-// Room represents a room with a set of subscribed clients.
+// Room represents a logical group of WebSocket clients, enabling targeted message broadcasting.
 type Room struct {
 	Name    string
 	Clients map[*Client]bool
 	mu      sync.Mutex
 }
 
-// NewRoom creates a new room.
+// NewRoom initialises a new room with the specified name.
 func NewRoom(name string) *Room {
 	return &Room{
 		Name:    name,
@@ -21,30 +21,23 @@ func NewRoom(name string) *Room {
 	}
 }
 
-// AddClient adds a client to the room.
-// Updating the client's Rooms map is the caller's (RoomManager's) responsibility.
+// AddClient subscribes a client to the room.
+// Note: Management of the client's internal room list is handled by RoomManager.
 func (r *Room) AddClient(client *Client) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.Clients[client] = true
 }
 
-// RemoveClient removes a client from the room.
+// RemoveClient unsubscribes a client from the room.
 func (r *Room) RemoveClient(client *Client) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.Clients, client)
 }
 
-// SendToAllClients broadcasts a message to every client in the room except
-// excludeClient.
-//
-// Previous implementation held r.mu for the entire duration of serialisation
-// and channel sends, which blocked concurrent join/leave operations.
-// This version:
-//  1. Serialises the JSON payload once, outside the lock.
-//  2. Takes a short-lived snapshot of the client list under r.mu.
-//  3. Sends to each client without holding the lock.
+// SendToAllClients broadcasts a message to all subscribers in the room, optionally excluding one.
+// The implementation uses a client list snapshot to avoid holding the lock during network I/O.
 func (r *Room) SendToAllClients(messageType string, message interface{}, excludeClient *Client) {
 	// Serialise once — all clients receive the same bytes.
 	successResponse := NewSuccessResponse(messageType, message)
@@ -70,14 +63,14 @@ func (r *Room) SendToAllClients(messageType string, message interface{}, exclude
 	}
 }
 
-// ClientCount returns the number of clients currently in the room.
+// ClientCount returns the current number of clients in the room.
 func (r *Room) ClientCount() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return len(r.Clients)
 }
 
-// HasClient reports whether the client is in the room.
+// HasClient checks if a specific client is currently in the room.
 func (r *Room) HasClient(client *Client) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()

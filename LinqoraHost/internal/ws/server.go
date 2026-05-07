@@ -24,7 +24,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// WSServer WebSocket сервер
+// WSServer represents the primary WebSocket server coordinating communication
+// between the host and remote clients.
 type WSServer struct {
 	config        *config.ServerConfig
 	httpServer    *http.Server
@@ -39,11 +40,9 @@ type WSServer struct {
 	cancel        context.CancelFunc
 }
 
-// NewWSServer создаёт новый WebSocket сервер
+// NewWSServer initialises a new WebSocket server with the provided configuration.
 func NewWSServer(config *config.ServerConfig, authManager interfaces.AuthManagerInterface) *WSServer {
-	// Создаем контекст с возможностью отмены
 	ctx, cancel := context.WithCancel(context.Background())
-
 	roomManager := NewRoomManager()
 
 	server := &WSServer{
@@ -53,10 +52,10 @@ func NewWSServer(config *config.ServerConfig, authManager interfaces.AuthManager
 		authManager:   authManager,
 		scriptManager: scheduler.NewManager(scheduler.DefaultScriptsPath()),
 		upgrader: websocket.Upgrader{
-			// Native clients (mobile app) send no Origin header.
-			// Browsers always set Origin, so rejecting non-empty Origin blocks
-			// cross-site WebSocket hijacking (CSRF via browser pages).
 			CheckOrigin: func(r *http.Request) bool {
+				// Native clients (mobile app) send no Origin header.
+				// Browsers always set Origin, so rejecting non-empty Origin blocks
+				// cross-site WebSocket hijacking (CSRF via browser pages).
 				return r.Header.Get("Origin") == ""
 			},
 		},
@@ -64,58 +63,50 @@ func NewWSServer(config *config.ServerConfig, authManager interfaces.AuthManager
 		cancel: cancel,
 	}
 
-	// Инициализируем broadcaster
 	broadcaster := NewBroadcaster(roomManager)
 	server.broadcaster = broadcaster
 
-	// Инициализируем коллекторы (но не запускаем их)
+	// Initialise collectors
 	metricsCollector := collectors.NewMetricsCollector(broadcaster.GetMetricsBroadcaster())
 	mediaCollector := collectors.NewMediaCollector(broadcaster.GetMediaBroadcaster())
 
-	// Создаем и регистрируем менеджер коллекторов
+	// Register collector manager
 	collectorManager := collectors.NewCollectorManager(metricsCollector, mediaCollector)
 	roomManager.AddRoomListener(collectorManager)
 
-	// Запускаем мониторинг неактивных клиентов
+	// Start inactivity monitoring
 	server.StartInactiveClientsMonitor()
 
-	// Start the lock-state monitor; it stops when the server context is cancelled
+	// Start the lock-state monitor
 	power.StartLockStateMonitor(ctx)
+
 	return server
 }
 
-// Start запускает сервер и ожидает его завершения
+// Start begins listening for incoming WebSocket connections.
 func (s *WSServer) Start(parentCtx context.Context) error {
-	// Создаем мультиплексор HTTP запросов
 	mux := http.NewServeMux()
-
-	// Обработчик WebSocket соединения
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		s.handleWSConnection(w, r)
 	})
 
-	// Создаем HTTP сервер
 	s.httpServer = &http.Server{
 		Addr:    fmt.Sprintf(":%d", s.config.Port),
 		Handler: mux,
 	}
 
-	// Канал для ошибок сервера
 	serverErr := make(chan error, 1)
 
-	// Запускаем HTTP сервер в горутине
 	go func() {
 		var err error
 		log.Printf("WebSocket server started at :%d", s.config.Port)
 
 		if s.config.EnableTLS {
-			// Запускаем с TLS (WSS)
 			err = s.httpServer.ListenAndServeTLS(
 				s.config.CertFile,
 				s.config.KeyFile,
 			)
 		} else {
-			// Обычный запуск без TLS (WS)
 			err = s.httpServer.ListenAndServe()
 		}
 
@@ -125,7 +116,6 @@ func (s *WSServer) Start(parentCtx context.Context) error {
 		}
 	}()
 
-	// Ожидаем завершения сервера или контекста
 	select {
 	case <-parentCtx.Done():
 		log.Println("Parent context cancelled, shutting down...")
@@ -138,15 +128,13 @@ func (s *WSServer) Start(parentCtx context.Context) error {
 	}
 }
 
-// Shutdown останавливает сервер
+// Shutdown gracefully stops the server and disconnects all clients.
 func (s *WSServer) Shutdown() error {
 	log.Println("Shutting down WebSocket server...")
 
-	// Создаем контекст с таймаутом для корректного закрытия
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	// Отправляем сигнал всем клиентам о закрытии
 	s.clientsMutex.Lock()
 	log.Printf("Closing %d client connections...", len(s.clients))
 	for client := range s.clients {
@@ -160,49 +148,39 @@ func (s *WSServer) Shutdown() error {
 	}
 	s.clientsMutex.Unlock()
 
-	// Останавливаем HTTP сервер
 	if err := s.httpServer.Shutdown(ctx); err != nil {
 		log.Printf("HTTP server shutdown error: %v", err)
 		return err
 	}
 
-	// Вызываем функцию отмены контекста для завершения горутин
 	s.cancel()
-
 	log.Println("WebSocket server stopped successfully")
 	return nil
 }
 
-// StopServer останавливает сервер (вспомогательный метод для внешних вызовов)
+// StopServer triggers an internal cancellation of the server context.
 func (s *WSServer) StopServer() error {
 	s.cancel()
 	return nil
 }
 
-// Обновите метод handleWSConnection
+// handleWSConnection upgrades an HTTP connection to a WebSocket connection.
 func (s *WSServer) handleWSConnection(w http.ResponseWriter, r *http.Request) {
 	log.Println("WebSocket connection attempt from", r.RemoteAddr)
 
-	// Устанавливаем таймауты соединения
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println("Upgrade error:", err)
 		return
 	}
 
-	// Connection parameters (read limit, deadline, pong handler) are configured
-	// inside StartReadPump using the package-level constants. Setting them here
-	// would be overwritten immediately and would cause an inconsistent read limit
-	// (2048 here vs maxMessageSize=512 in StartReadPump).
 	client := NewClient(conn, r.RemoteAddr)
 
 	s.clientsMutex.Lock()
 	s.clients[client] = true
 	s.clientsMutex.Unlock()
 
-	// Запускаем горутины с контролируемым завершением
 	go client.StartWritePump()
-
 	go client.StartReadPump(func(msg *ClientMessage) {
 		s.handleClientMessage(client, msg)
 	}, func() {
@@ -211,9 +189,8 @@ func (s *WSServer) handleWSConnection(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// removeClient видаляє клієнта з сервера
+// removeClient cleans up client resources and removes them from the server registry.
 func (s *WSServer) removeClient(client *Client) {
-	// Проверяем текущее состояние клиента
 	if client == nil {
 		return
 	}
@@ -222,19 +199,13 @@ func (s *WSServer) removeClient(client *Client) {
 	defer s.clientsMutex.Unlock()
 
 	if _, exists := s.clients[client]; exists {
-		// Удаляем из списка активных клиентов
 		delete(s.clients, client)
-
-		// Закрываем клиента (это безопасная операция)
 		client.Close()
-
-		log.Printf("Client %s removed from active clients list",
-			client.DeviceName)
+		log.Printf("Client %s removed from active clients list", client.DeviceName)
 	}
 }
 
-// StartInactiveClientsMonitor periodically disconnects clients that stopped
-// sending pings. The goroutine exits when the server context is cancelled.
+// StartInactiveClientsMonitor periodically purges clients that haven't sent a ping.
 func (s *WSServer) StartInactiveClientsMonitor() {
 	go func() {
 		ticker := time.NewTicker(40 * time.Second)
@@ -251,25 +222,21 @@ func (s *WSServer) StartInactiveClientsMonitor() {
 	}()
 }
 
-// Метод для проверки неактивных клиентов
+// checkInactiveClients identifies and disconnects non-responsive clients.
 func (s *WSServer) checkInactiveClients() {
 	s.clientsMutex.Lock()
 	inactiveClients := make([]*Client, 0)
 
 	for client := range s.clients {
-		// Проверяем время последнего PING
 		if client.TimeSinceLastPing() > 2*time.Minute {
 			inactiveClients = append(inactiveClients, client)
 		}
 	}
 	s.clientsMutex.Unlock()
 
-	// Отключаем неактивных клиентов
 	for _, client := range inactiveClients {
-		log.Printf("Disconnecting inactive client %s (no PING for over 2 minutes)",
-			client.DeviceName)
+		log.Printf("Disconnecting inactive client %s (no PING for over 2 minutes)", client.DeviceName)
 
-		// Отправляем сообщение о закрытии соединения
 		closeMsg := websocket.FormatCloseMessage(
 			websocket.CloseGoingAway,
 			"inactive client timeout (no PING)",
@@ -280,17 +247,23 @@ func (s *WSServer) checkInactiveClients() {
 			time.Now().Add(time.Second),
 		)
 
-		// Закрываем соединение и удаляем клиента
 		client.Conn.Close()
 		s.removeClient(client)
 		s.roomManager.RemoveClientFromAllRooms(client)
 	}
 }
 
-// handleClientMessage обробляє повідомлення від клієнта
+// handleClientMessage routes incoming client messages to appropriate handlers.
 func (s *WSServer) handleClientMessage(client *Client, msg *ClientMessage) {
+	// Skip authorization check for authentication-related messages
+	authExempt := map[string]bool{
+		"auth_request":            true,
+		"auth_check":              true,
+		"ping":                    true,
+		"auth_challenge_response": true,
+	}
 
-	if msg.Type != "auth_request" && msg.Type != "auth_check" && msg.Type != "ping" && msg.Type != "auth_challenge_response" {
+	if !authExempt[msg.Type] {
 		if !s.authManager.IsAuthorized(client.GetDeviceID()) {
 			client.SendError(msg.Type, "Unauthorized access", 401)
 			return
@@ -301,7 +274,6 @@ func (s *WSServer) handleClientMessage(client *Client, msg *ClientMessage) {
 	case "ping":
 		client.UpdateLastPingTime()
 		s.handlePingMessage(client, msg)
-
 	case "host_info":
 		s.handleHostInfoMessage(client)
 	case "join_room":
@@ -330,32 +302,32 @@ func (s *WSServer) handleClientMessage(client *Client, msg *ClientMessage) {
 		if s.authManager != nil {
 			s.authManager.HandleAuthRequest(client, msg)
 		} else {
-			log.Printf("ERROR: authManager is nil, cannot process auth_request")
-			client.SendError("auth_request", "Internal server error: auth manager not initialized", 500)
+			log.Printf("ERROR: authManager is nil")
+			client.SendError("auth_request", "Internal server error", 500)
 		}
 	case "auth_check":
 		if s.authManager != nil {
 			s.authManager.HandleAuthCheck(client)
 		} else {
-			client.SendError("auth_check", "Internal server error: auth manager not initialized", 500)
+			client.SendError("auth_check", "Internal server error", 500)
 		}
 	case "auth_challenge_response":
 		if s.authManager != nil {
 			s.authManager.HandleChallengeResponse(client, msg)
 		} else {
-			client.SendError("auth_challenge_response", "Internal server error: auth manager not initialized", 500)
+			client.SendError("auth_challenge_response", "Internal server error", 500)
 		}
 	default:
 		log.Printf("Unknown message type: %s", msg.Type)
-
 	}
 }
-func (s *WSServer) handlePingMessage(client *Client, msg *ClientMessage) {
 
-	// Извлекаем timestamp из данных (если есть)
+// handlePingMessage responds to client heartbeats.
+func (s *WSServer) handlePingMessage(client *Client, msg *ClientMessage) {
 	var timestamp interface{} = time.Now().UnixMilli()
 	if len(msg.Data) > 0 {
-		if pingData, err := extractPingData(msg.Data); err == nil && pingData["timestamp"] != nil {
+		var pingData map[string]interface{}
+		if err := json.Unmarshal(msg.Data, &pingData); err == nil && pingData["timestamp"] != nil {
 			timestamp = pingData["timestamp"]
 		}
 	}
@@ -363,29 +335,17 @@ func (s *WSServer) handlePingMessage(client *Client, msg *ClientMessage) {
 	client.SendSuccess("pong", map[string]interface{}{
 		"timestamp": timestamp,
 	})
-
 }
 
-// Вспомогательный метод для извлечения данных
-func extractPingData(data json.RawMessage) (map[string]interface{}, error) {
-	var pingData map[string]interface{}
-	err := json.Unmarshal(data, &pingData)
-	return pingData, err
-}
-
-// handleHostInfoMessage обробляє відомлення з інформацією про хост
+// handleHostInfoMessage provides system and hardware specifications to the client.
 func (s *WSServer) handleHostInfoMessage(client *Client) {
-	// Базовая информация о системе
 	cpuInfo, _ := metrics.GetCPUInfo()
 	deviceInfo := deviceinfo.GetDeviceInfo()
-
-	// Новая информация
 	ramInfo, _ := metrics.GetRAMInfo()
 	gpuInfo, _ := metrics.GetGPUInfo()
 	diskInfo, _ := metrics.GetDiskInfo()
 	batteryInfo, _ := metrics.GetBatteryInfo()
 
-	// Формируем расширенный ответ
 	hostInfo := map[string]interface{}{
 		"os":       deviceInfo.OS,
 		"hostname": deviceInfo.Hostname,
@@ -397,33 +357,21 @@ func (s *WSServer) handleHostInfoMessage(client *Client) {
 		"battery":  batteryInfo,
 	}
 
-	// Отправляем ответ
 	client.SendSuccess("host_info", hostInfo)
 }
 
-// handleJoinRoomMessage обробляє повідомлення приєднання до кімнати
+// handleJoinRoomMessage subscribes the client to a broadcast room.
 func (s *WSServer) handleJoinRoomMessage(client *Client, msg *ClientMessage) {
-	// Добавляем клиента в комнату
 	s.roomManager.AddClientToRoom(msg.Room, client)
-
 }
 
-// handleLeaveRoomMessage обробляє повідомлення виходу з кімнати
+// handleLeaveRoomMessage unsubscribes the client from a broadcast room.
 func (s *WSServer) handleLeaveRoomMessage(client *Client, msg *ClientMessage) {
 	s.roomManager.RemoveClientFromRoom(msg.Room, client)
-
 }
 
-/*
-// GetRoomManager повертає менеджер кімнат
-func (s *WSServer) GetRoomManager() *RoomManager {
-	return s.roomManager
-}
-*/
-
-// handleMediaCommand обрабатывает команды управления мультимедиа,и звуком
+// handleMediaCommand processes volume and playback control requests.
 func (s *WSServer) handleMediaCommand(client *Client, msg *ClientMessage) {
-	// First check if client is in media room
 	if !s.roomManager.IsClientInRoom("media", client) {
 		client.SendError("media", "Client not in media room", 403)
 		return
@@ -431,31 +379,27 @@ func (s *WSServer) handleMediaCommand(client *Client, msg *ClientMessage) {
 
 	var data map[string]interface{}
 	if err := json.Unmarshal(msg.Data, &data); err != nil {
-		client.SendError("media", "Invalid media command format", 400)
+		client.SendError("media", "Invalid format", 400)
 		return
 	}
 
 	action, ok1 := data["action"].(float64)
 	value, ok2 := data["value"].(float64)
 
-	// Проверяем, что action и value корректные
 	if !ok1 || !ok2 {
-		client.SendError("media", "Invalid media command parameters", 400)
+		client.SendError("media", "Invalid parameters", 400)
 		return
 	}
 
-	var mediaCommand = media.MediaCommand{
+	err := media.HandleMediaCommand(media.MediaCommand{
 		Action: int(action),
 		Value:  int(value),
-	}
-
-	err := media.HandleMediaCommand(mediaCommand)
+	})
 	if err != nil {
-		client.SendError("media", fmt.Sprintf("Error executing media command: %v", err), 500)
+		client.SendError("media", err.Error(), 500)
 		return
 	}
 
-	// Отправляем успешный ответ
 	client.SendSuccess("media", map[string]interface{}{
 		"action": int(action),
 		"value":  int(value),
@@ -463,12 +407,14 @@ func (s *WSServer) handleMediaCommand(client *Client, msg *ClientMessage) {
 	})
 }
 
+// handleScriptList returns all registered scripts.
 func (s *WSServer) handleScriptList(client *Client) {
 	client.SendSuccess("script_list", map[string]interface{}{
 		"scripts": s.scriptManager.List(),
 	})
 }
 
+// handleScriptAdd registers a new script on the host.
 func (s *WSServer) handleScriptAdd(client *Client, msg *ClientMessage) {
 	var script scheduler.Script
 	if err := json.Unmarshal(msg.Data, &script); err != nil {
@@ -482,6 +428,7 @@ func (s *WSServer) handleScriptAdd(client *Client, msg *ClientMessage) {
 	client.SendSuccess("script_add", script)
 }
 
+// handleScriptUpdate modifies an existing script definition.
 func (s *WSServer) handleScriptUpdate(client *Client, msg *ClientMessage) {
 	var script scheduler.Script
 	if err := json.Unmarshal(msg.Data, &script); err != nil {
@@ -495,12 +442,13 @@ func (s *WSServer) handleScriptUpdate(client *Client, msg *ClientMessage) {
 	client.SendSuccess("script_update", script)
 }
 
+// handleScriptDelete removes a script definition from the host.
 func (s *WSServer) handleScriptDelete(client *Client, msg *ClientMessage) {
 	var req struct {
 		ID string `json:"id"`
 	}
 	if err := json.Unmarshal(msg.Data, &req); err != nil || req.ID == "" {
-		client.SendError("script_delete", "Missing or invalid script id", 400)
+		client.SendError("script_delete", "Invalid script ID", 400)
 		return
 	}
 	if err := s.scriptManager.Delete(req.ID); err != nil {
@@ -510,24 +458,26 @@ func (s *WSServer) handleScriptDelete(client *Client, msg *ClientMessage) {
 	client.SendSuccess("script_delete", req)
 }
 
+// handleScriptStop terminates a running script process.
 func (s *WSServer) handleScriptStop(client *Client, msg *ClientMessage) {
 	var req struct {
 		ID string `json:"id"`
 	}
 	if err := json.Unmarshal(msg.Data, &req); err != nil || req.ID == "" {
-		client.SendError("script_stop", "Missing or invalid script id", 400)
+		client.SendError("script_stop", "Invalid script ID", 400)
 		return
 	}
 	s.scriptManager.Stop(req.ID)
 	client.SendSuccess("script_stop", req)
 }
 
+// handleScriptExecute starts a script and routes its output back to the client.
 func (s *WSServer) handleScriptExecute(client *Client, msg *ClientMessage) {
 	var req struct {
 		ID string `json:"id"`
 	}
 	if err := json.Unmarshal(msg.Data, &req); err != nil || req.ID == "" {
-		client.SendError("script_execute", "Missing or invalid script id", 400)
+		client.SendError("script_execute", "Invalid script ID", 400)
 		return
 	}
 
@@ -551,14 +501,15 @@ func (s *WSServer) handleScriptExecute(client *Client, msg *ClientMessage) {
 	}()
 }
 
+// handleMouseCommand performs cursor movement or button clicks.
 func (s *WSServer) handleMouseCommand(client *Client, msg *ClientMessage) {
 	var cmd mouse.MouseCommand
 	if err := json.Unmarshal(msg.Data, &cmd); err != nil {
-		client.SendError("mouse", "Invalid mouse command format", 400)
+		client.SendError("mouse", "Invalid format", 400)
 		return
 	}
 	if err := mouse.HandleMouseCommand(cmd); err != nil {
-		client.SendError("mouse", fmt.Sprintf("Mouse error: %v", err), 500)
+		client.SendError("mouse", err.Error(), 500)
 		return
 	}
 	// Move events don't need a success reply — reduces latency and bandwidth.
@@ -567,17 +518,15 @@ func (s *WSServer) handleMouseCommand(client *Client, msg *ClientMessage) {
 	}
 }
 
-// Handle commands for power management
+// handlePowerCommand executes system power actions like Lock, Restart, or Shutdown.
 func (s *WSServer) handlePowerCommand(client *Client, msg *ClientMessage) {
-
 	var powerCmd power.PowerCommand
 	if err := json.Unmarshal(msg.Data, &powerCmd); err != nil {
-		client.SendError("power", "Invalid power command format", 400)
+		client.SendError("power", "Invalid format", 400)
 		return
 	}
 
 	if power.IsDeviceLocked() {
-		// Send a response before the lock command is executed
 		client.SendSuccess("power", map[string]interface{}{
 			"action": powerCmd.Action,
 			"status": "locked",
@@ -585,57 +534,44 @@ func (s *WSServer) handlePowerCommand(client *Client, msg *ClientMessage) {
 		return
 	}
 
-	// If it is a Lock command, process it separately
 	if powerCmd.Action == power.Lock {
-		// Отправляем ответ до выполнения команды блокировки
 		client.SendSuccess("power", map[string]interface{}{
 			"action": powerCmd.Action,
 			"status": "executing",
 		})
-		// If it is a Lock command, process it separately// Check if the client has rights to execute the Lock command
-		// Execute the Lock command
 		go func() {
-			log.Printf("Executing lock action requested by client %s", client.DeviceName)
-
+			log.Printf("Executing lock requested by %s", client.DeviceName)
 			if err := power.ExecutePowerAction(powerCmd.Action); err != nil {
-				log.Printf("Error executing lock command: %v", err)
+				log.Printf("Lock failed: %v", err)
 			} else {
-				// Устанавливаем флаг блокировки
 				power.SetDeviceLocked(true)
-				log.Printf("Device locked successfully")
+				log.Printf("Device locked")
 			}
 		}()
 		return
 	}
 
-	// Для других команд (выключение, перезагрузка) проверяем состояние блокировки
 	locked, err := power.IsSystemLocked()
 	if err != nil {
-		log.Printf("Warning: Failed to check system lock state: %v", err)
-		// Используем внутреннее состояние
+		log.Printf("Warning: system lock check failed: %v", err)
 		locked = power.IsDeviceLocked()
 	}
 
 	if locked {
 		lockTime := power.GetLockTime()
-		client.SendError("power", fmt.Sprintf("Device is locked (since %s), power action not permitted",
-			lockTime.Format("15:04:05")), 403)
+		client.SendError("power", fmt.Sprintf("Device is locked (since %s)", lockTime.Format("15:04:05")), 403)
 		return
 	}
 
-	// Отправляем ответ до выполнения команды, так как некоторые команды могут прервать соединение
 	client.SendSuccess("power", map[string]interface{}{
 		"action": powerCmd.Action,
 		"status": "executing",
 	})
 
-	// Выполняем команду управления питанием в отдельной горутине
 	go func() {
-		log.Printf("Executing power action: %d requested by client %s",
-			powerCmd.Action, client.DeviceName)
-
+		log.Printf("Executing power action %d requested by %s", powerCmd.Action, client.DeviceName)
 		if err := power.ExecutePowerAction(powerCmd.Action); err != nil {
-			log.Printf("Error executing power command: %v", err)
+			log.Printf("Power action failed: %v", err)
 		}
 	}()
 }

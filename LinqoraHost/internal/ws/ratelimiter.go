@@ -16,9 +16,8 @@ const (
 	rateLimitPerSec = 30.0
 )
 
-// clientRateLimiter is a token-bucket rate limiter for a single WebSocket
-// client. It is intentionally self-contained so no external dependency is
-// needed. Token refill is computed lazily on each Allow() call.
+// clientRateLimiter implements a token-bucket algorithm to restrict client message rates.
+// It allows for short bursts while maintaining a consistent long-term average rate.
 type clientRateLimiter struct {
 	mu       sync.Mutex
 	tokens   float64
@@ -28,6 +27,7 @@ type clientRateLimiter struct {
 	lastTime time.Time
 }
 
+// newClientRateLimiter creates a new rate limiter with default burst and rate settings.
 func newClientRateLimiter() *clientRateLimiter {
 	return &clientRateLimiter{
 		tokens:   rateLimitBurst,
@@ -37,8 +37,7 @@ func newClientRateLimiter() *clientRateLimiter {
 	}
 }
 
-// Allow returns true when a token is available and consumes it.
-// Returns false when the bucket is empty (rate limit exceeded).
+// Allow checks if a message should be permitted, consuming one token if available.
 func (r *clientRateLimiter) Allow() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
