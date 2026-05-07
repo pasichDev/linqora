@@ -22,7 +22,8 @@ linters-settings:
         arguments:
           - disableStutteringCheck
   govet:
-    check-shadowing: true
+    enable:
+      - shadow
   gofmt:
     simplify: true
 
