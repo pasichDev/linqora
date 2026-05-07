@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"runtime"
 	"sync"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	"LinqoraHost/internal/interfaces"
 
 	"github.com/gorilla/websocket"
+	gopshost "github.com/shirou/gopsutil/v4/host"
 )
 
 // WSServer represents the primary WebSocket server coordinating communication
@@ -364,16 +366,29 @@ func (s *WSServer) handleHostInfoMessage(client *Client) {
 	gpuInfo, _ := metrics.GetGPUInfo()
 	diskInfo, _ := metrics.GetDiskInfo()
 	batteryInfo, _ := metrics.GetBatteryInfo()
+	hostStat, _ := gopshost.Info()
+	uptime, _ := gopshost.Uptime()
+
+	kernelVersion := ""
+	platformVersion := ""
+	if hostStat != nil {
+		kernelVersion = hostStat.KernelVersion
+		platformVersion = hostStat.PlatformVersion
+	}
 
 	hostInfo := map[string]interface{}{
-		"os":       deviceInfo.OS,
-		"hostname": deviceInfo.Hostname,
-		"su":       privileges.CheckAdminPrivileges(),
-		"cpu":      cpuInfo,
-		"ram":      ramInfo,
-		"gpu":      gpuInfo,
-		"disks":    diskInfo,
-		"battery":  batteryInfo,
+		"os":              deviceInfo.OS,
+		"hostname":        deviceInfo.Hostname,
+		"su":              privileges.CheckAdminPrivileges(),
+		"cpu":             cpuInfo,
+		"ram":             ramInfo,
+		"gpu":             gpuInfo,
+		"disks":           diskInfo,
+		"battery":         batteryInfo,
+		"uptime":          uptime,
+		"architecture":    runtime.GOARCH,
+		"kernelVersion":   kernelVersion,
+		"platformVersion": platformVersion,
 	}
 
 	client.SendSuccess("host_info", hostInfo)

@@ -25,6 +25,10 @@ func executePlatformAction(action Action) error {
 		return cmd.Run()
 	case Lock:
 		return lockWorkStationAPI()
+	case Sleep:
+		cmd := exec.Command("rundll32.exe", "powrprof.dll,SetSuspendState", "0,1,0")
+		log.Printf("Executing Windows sleep: %v", cmd.Args)
+		return cmd.Run()
 	default:
 		return fmt.Errorf("unknown power action: %d", action)
 	}

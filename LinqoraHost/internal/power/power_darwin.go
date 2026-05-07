@@ -17,6 +17,8 @@ func executePlatformAction(action Action) error {
 	case Lock:
 		cmd = exec.Command("osascript", "-e",
 			"tell application \"System Events\" to keystroke \"q\" using {command down, control down}")
+	case Sleep:
+		cmd = exec.Command("pmset", "sleepnow")
 	default:
 		return fmt.Errorf("unknown power action: %d", action)
 	}

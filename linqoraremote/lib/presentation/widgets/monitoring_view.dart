@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:linqoraremote/core/themes/lx_theme.dart';
+import 'package:linqoraremote/data/models/metrics.dart';
 import 'package:linqoraremote/data/providers/websocket_provider.dart';
+import 'package:linqoraremote/presentation/controllers/device_home_controller.dart';
 import 'package:linqoraremote/presentation/controllers/monitoring_controller.dart';
-import 'package:linqoraremote/presentation/widgets/loading_view.dart';
-
-import '../../data/models/metrics.dart';
-import 'banner.dart';
-import 'metrics/metric_chart.dart';
-import 'metrics/metric_standart_card.dart';
-import 'metrics/metrics_row.dart';
+import 'package:linqoraremote/presentation/widgets/lx_glass.dart';
+import 'package:linqoraremote/presentation/widgets/lx_header.dart';
+import 'package:linqoraremote/presentation/widgets/lx_ring.dart';
+import 'package:linqoraremote/presentation/widgets/lx_sparkline.dart';
 
 class MonitoringView extends StatefulWidget {
   const MonitoringView({super.key});
@@ -19,14 +19,14 @@ class MonitoringView extends StatefulWidget {
 
 class _MonitoringViewState extends State<MonitoringView>
     with SingleTickerProviderStateMixin {
-  late final MonitoringController _monitoringController;
+  late final MonitoringController _c;
   late final AnimationController _animationController;
   late final Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
-    _monitoringController = Get.put(
+    _c = Get.put(
       MonitoringController(webSocketProvider: Get.find<WebSocketProvider>()),
     );
 
@@ -44,49 +44,347 @@ class _MonitoringViewState extends State<MonitoringView>
 
   @override
   void dispose() {
-    if (_isControllerRegistered<MonitoringController>()) {
+    if (Get.isRegistered<MonitoringController>()) {
       Get.delete<MonitoringController>();
     }
     _animationController.dispose();
     super.dispose();
   }
 
-  bool _isControllerRegistered<T>() {
-    return Get.isRegistered<T>();
-  }
-
   @override
   Widget build(BuildContext context) {
     return FadeTransition(
       opacity: _fadeAnimation,
-      child: Column(
+      child: Obx(() {
+        final cpu = _c.currentCPUMetrics.value;
+        final ram = _c.currentRAMMetrics.value;
+
+        if (cpu == null && ram == null) {
+          return _loading();
+        }
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+          child: Column(
+            children: [
+              _header(),
+              _heroCpuCard(cpu),
+              const SizedBox(height: 10),
+              _ramGpuRow(ram),
+              const SizedBox(height: 10),
+              _perCoreCard(cpu),
+              const SizedBox(height: 10),
+              _statTiles(cpu),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      }),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Header
+  // ---------------------------------------------------------------------------
+
+  Widget _header() {
+    final homeCtrl = Get.find<DeviceHomeController>();
+    return LxHeader(
+      title: 'Monitor',
+      eyebrow: homeCtrl.hostInfo.value?.hostname ?? 'Device',
+      showBack: false,
+      action: GestureDetector(
+        onTap: () => homeCtrl.refreshHostInfo(),
+        child: LxGlass(
+          borderRadius: BorderRadius.circular(12),
+          child: const SizedBox(
+            width: 36,
+            height: 36,
+            child: Center(
+              child: Icon(Icons.refresh_rounded, size: 14, color: lxTextDim),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Hero CPU card
+  // ---------------------------------------------------------------------------
+
+  Widget _heroCpuCard(CPUMetrics? cpu) {
+    final host = Get.find<DeviceHomeController>().hostInfo.value;
+    return LxGlass(
+      padding: const EdgeInsets.all(18),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          LxRing(
+            value: cpu?.loadPercent.toDouble() ?? 0,
+            size: 86,
+            strokeWidth: 2.8,
+            label: 'CPU',
+          ),
+          const SizedBox(width: 18),
           Expanded(
-            child: Obx(() {
-              final cpuMetrics = _monitoringController.getCurrentCPUMetrics();
-              final ramMetrics = _monitoringController.getCurrentRAMMetrics();
-
-              if (cpuMetrics == null || ramMetrics == null) {
-                return LoadingView();
-              }
-
-              return AnimatedOpacity(
-                duration: const Duration(milliseconds: 300),
-                opacity: 1.0,
-                child: SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 16),
-                        !_monitoringController.hasEnoughMetricsData
-                            ? MessageBanner(message: 'calibrate_data'.tr)
-                            : SizedBox.shrink(),
-
-                        _buildMode(ramMetrics, cpuMetrics),
-                      ],
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        host?.cpu.model ?? 'CPU',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: lxTextDim,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
+                    Text(
+                      '${(host?.cpu.frequency ?? 0).toStringAsFixed(0)} MHz',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: lxTextFaint,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                LxSparkline(
+                  data: _c.cpuLoads,
+                  width: 170,
+                  height: 42,
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    _mini('Processes', cpu?.processes.toString() ?? '--'),
+                    const SizedBox(width: 12),
+                    _mini('Threads', cpu?.threads.toString() ?? '--'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // RAM + GPU side-by-side
+  // ---------------------------------------------------------------------------
+
+  Widget _ramGpuRow(RAMMetrics? ram) {
+    final host = Get.find<DeviceHomeController>().hostInfo.value;
+    final totalRam = host?.ram.total ?? 0.0;
+    final usedRam = ram?.usage ?? 0.0;
+
+    return Row(
+      children: [
+        // RAM card
+        Expanded(
+          child: LxGlass(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'RAM',
+                      style: TextStyle(
+                        fontSize: 11,
+                        letterSpacing: 1.2,
+                        color: lxTextFaint,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      '${usedRam.toStringAsFixed(1)}/${totalRam.toStringAsFixed(0)} GB',
+                      style: const TextStyle(fontSize: 10, color: lxTextFaint),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                RichText(
+                  text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text: '${_c.currentRAMMetrics.value?.loadPercent ?? 0}',
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.8,
+                          color: lxText,
+                        ),
+                      ),
+                      const TextSpan(
+                        text: '%',
+                        style: TextStyle(fontSize: 14, color: lxTextDim),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 6),
+                LxSparkline(
+                  data: _c.ramUsagesPercent,
+                  width: 130,
+                  height: 32,
+                  color: const Color(0xFF7C9CFF),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        // GPU card (placeholder — no real GPU stream)
+        Expanded(
+          child: LxGlass(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: const [
+                    Text(
+                      'GPU',
+                      style: TextStyle(
+                        fontSize: 11,
+                        letterSpacing: 1.2,
+                        color: lxTextFaint,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      '—',
+                      style: TextStyle(fontSize: 10, color: lxTextFaint),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                RichText(
+                  text: const TextSpan(
+                    children: [
+                      TextSpan(
+                        text: '—',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.8,
+                          color: lxText,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: lxGlass2,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Per-core load grid
+  // ---------------------------------------------------------------------------
+
+  Widget _perCoreCard(CPUMetrics? cpu) {
+    final host = Get.find<DeviceHomeController>().hostInfo.value;
+    final coreCount =
+        (host?.cpu.logicalCores ?? 0) > 0 ? host!.cpu.logicalCores : 8;
+    final loadVal = cpu?.loadPercent ?? 0;
+
+    return LxGlass(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'PER-CORE LOAD',
+                style: TextStyle(
+                  fontSize: 11,
+                  letterSpacing: 1.2,
+                  color: lxTextFaint,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                '$coreCount cores',
+                style: const TextStyle(fontSize: 10, color: lxTextFaint),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: List.generate(coreCount, (i) {
+              final offset = (i - (coreCount / 2)).round() * 6;
+              final v = (loadVal + offset).clamp(0, 100).toDouble();
+              final isHot = v > 75;
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        height: 32,
+                        child: Stack(
+                          alignment: Alignment.bottomCenter,
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                color: lxGlass2,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                            FractionallySizedBox(
+                              heightFactor: v / 100,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(4),
+                                  gradient: isHot
+                                      ? const LinearGradient(
+                                          begin: Alignment.topCenter,
+                                          end: Alignment.bottomCenter,
+                                          colors: [lxAmber, lxAccent],
+                                        )
+                                      : null,
+                                  color: isHot
+                                      ? null
+                                      : lxAccent.withValues(alpha: 0.85),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'C$i',
+                        style: const TextStyle(
+                          fontSize: 9,
+                          color: lxTextFaint,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               );
@@ -97,64 +395,143 @@ class _MonitoringViewState extends State<MonitoringView>
     );
   }
 
-  _buildMode(RAMMetrics ramMetrics, CPUMetrics cpuMetrics) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        MetricsCard(
-          title: '${'temperature'.tr} CPU',
-          value: '${cpuMetrics.temperature}°C',
-          widget: MetricChart(
-            metricsData: _monitoringController.getTemperatures(),
-          ),
-        ),
-        const SizedBox(height: 16),
-        MetricsCard(
-          title: '${'load'.tr} CPU',
-          value: '${cpuMetrics.loadPercent}%',
-          isWarning: cpuMetrics.loadPercent >= 90,
-          widget: Column(
-            children: [
-              MetricChart(metricsData: _monitoringController.getCPULoads()),
+  // ---------------------------------------------------------------------------
+  // Stat tiles: temp + processes
+  // ---------------------------------------------------------------------------
 
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  children: [
-                    MetricDetailRow(
-                      label: 'processes'.tr,
-                      value:
-                          _monitoringController
-                              .currentCPUMetrics
-                              .value
-                              ?.processes
-                              .toString() ??
-                          "",
+  Widget _statTiles(CPUMetrics? cpu) {
+    return Row(
+      children: [
+        // CPU temperature tile
+        Expanded(
+          child: LxGlass(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: lxGlass2,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.thermostat_rounded,
+                      size: 14,
+                      color: lxAmber,
                     ),
-                    MetricDetailRow(
-                      label: 'threads'.tr,
-                      value:
-                          _monitoringController.currentCPUMetrics.value?.threads
-                              .toString() ??
-                          "",
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'CPU TEMP',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: lxTextFaint,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    Text(
+                      cpu != null ? '${cpu.temperature}°C' : '--',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: lxText,
+                      ),
                     ),
                   ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 16),
-
-        MetricsCard(
-          title: '${'usage'.tr} RAM',
-          value: '${ramMetrics.loadPercent}% (${ramMetrics.usage} GB)',
-          isWarning: ramMetrics.loadPercent >= 90,
-          widget: MetricChart(
-            metricsData: _monitoringController.getRAMUsagesPercent(),
+        const SizedBox(width: 10),
+        // Processes tile
+        Expanded(
+          child: LxGlass(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: lxGlass2,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.memory_rounded,
+                      size: 14,
+                      color: lxAccent,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'PROCESSES',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: lxTextFaint,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      Text(
+                        cpu?.processes.toString() ?? '--',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: lxText,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
+  Widget _mini(String label, String val) {
+    return RichText(
+      text: TextSpan(
+        children: [
+          TextSpan(
+            text: '$label ',
+            style: const TextStyle(fontSize: 10.5, color: lxTextDim),
+          ),
+          TextSpan(
+            text: val,
+            style: const TextStyle(
+              fontSize: 10.5,
+              color: lxText,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _loading() {
+    return const Center(
+      child: CircularProgressIndicator(color: lxAccent, strokeWidth: 2),
     );
   }
 }

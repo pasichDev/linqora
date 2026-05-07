@@ -24,6 +24,8 @@ func executePlatformAction(action Action) error {
 		} else {
 			return fmt.Errorf("no suitable screen lock command found")
 		}
+	case Sleep:
+		cmd = exec.Command("systemctl", "suspend")
 	default:
 		return fmt.Errorf("unknown power action: %d", action)
 	}

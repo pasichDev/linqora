@@ -11,9 +11,10 @@ import (
 
 // SystemMetrics represents a snapshot of the system's performance metrics.
 type SystemMetrics struct {
-	CPUUMetrics metrics.CPUMetrics `json:"cpuMetrics"`
-	RamMetrics  metrics.RamMetrics `json:"ramMetrics"`
-	Timestamp   int64              `json:"timestamp"`
+	CPUUMetrics    metrics.CPUMetrics `json:"cpuMetrics"`
+	RamMetrics     metrics.RamMetrics `json:"ramMetrics"`
+	GpuLoadPercent int                `json:"gpuLoadPercent"`
+	Timestamp      int64              `json:"timestamp"`
 }
 
 // MetricsCollector periodically gathers and broadcasts system performance data.
@@ -113,7 +114,7 @@ func (mc *MetricsCollector) collectAndSend() {
 	mc.broadcaster(metricsJSON)
 }
 
-// collectMetrics retrieves CPU and RAM performance data.
+// collectMetrics retrieves CPU, RAM, and GPU performance data.
 func (mc *MetricsCollector) collectMetrics() (*SystemMetrics, error) {
 	cpuMetrics, err := metrics.GetCPUMetrics()
 	if err != nil {
@@ -125,11 +126,14 @@ func (mc *MetricsCollector) collectMetrics() (*SystemMetrics, error) {
 		return nil, err
 	}
 
-	metrics := &SystemMetrics{
-		CPUUMetrics: cpuMetrics,
-		RamMetrics:  ramMetrics,
-		Timestamp:   time.Now().Unix(),
+	gpuLoad := metrics.GetGPULoadPercent()
+
+	result := &SystemMetrics{
+		CPUUMetrics:    cpuMetrics,
+		RamMetrics:     ramMetrics,
+		GpuLoadPercent: gpuLoad,
+		Timestamp:      time.Now().Unix(),
 	}
 
-	return metrics, nil
+	return result, nil
 }
