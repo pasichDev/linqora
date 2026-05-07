@@ -121,12 +121,40 @@ class DiskInfo {
   }
 }
 
+class BatteryInfo {
+  final bool isPresent;
+  final int level;
+  final bool isCharging;
+  final String status;
+
+  const BatteryInfo({
+    this.isPresent = false,
+    this.level = 0,
+    this.isCharging = false,
+    this.status = 'Unknown',
+  });
+
+  factory BatteryInfo.fromJson(Map<String, dynamic> json) {
+    return BatteryInfo(
+      isPresent: json['isPresent'] ?? false,
+      level: (json['level'] ?? 0).toInt(),
+      isCharging: json['isCharging'] ?? false,
+      status: json['status'] ?? 'Unknown',
+    );
+  }
+}
+
 class HostSystemInfo {
   final BaseSystemInfo baseInfo;
   final CPUInfo cpu;
   final RAMInfo ram;
   final GPUInfo gpu;
   final List<DiskInfo> disks;
+  final BatteryInfo battery;
+  final int uptime;
+  final String architecture;
+  final String kernelVersion;
+  final String platformVersion;
 
   HostSystemInfo({
     required this.baseInfo,
@@ -134,6 +162,11 @@ class HostSystemInfo {
     required this.ram,
     required this.gpu,
     this.disks = const [],
+    this.battery = const BatteryInfo(),
+    this.uptime = 0,
+    this.architecture = '',
+    this.kernelVersion = '',
+    this.platformVersion = '',
   });
 
   factory HostSystemInfo.fromJson(Map<String, dynamic> json) {
@@ -150,6 +183,11 @@ class HostSystemInfo {
       ram: RAMInfo.fromJson(json['ram'] ?? {}),
       gpu: GPUInfo.fromJson(json['gpu'] ?? {}),
       disks: disks,
+      uptime: (json['uptime'] ?? 0).toInt(),
+      architecture: json['architecture'] ?? '',
+      kernelVersion: json['kernelVersion'] ?? '',
+      platformVersion: json['platformVersion'] ?? '',
+      battery: json['battery'] != null ? BatteryInfo.fromJson(json['battery']) : const BatteryInfo(),
     );
   }
 

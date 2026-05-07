@@ -165,6 +165,27 @@ func getMacOSGPUInfo() (GPUInfo, error) {
 	return info, nil
 }
 
+// ── GPU load ─────────────────────────────────────────────────────────────────
+
+// GetGPULoadPercent returns the current GPU utilisation as an integer percentage
+// (0-100). It tries nvidia-smi first; if that is unavailable or fails it
+// returns 0 without an error so callers can treat missing data gracefully.
+func GetGPULoadPercent() int {
+	out, err := exec.Command(
+		"nvidia-smi",
+		"--query-gpu=utilization.gpu",
+		"--format=csv,noheader,nounits",
+	).Output()
+	if err != nil || len(out) == 0 {
+		return 0
+	}
+	val, err := strconv.Atoi(strings.TrimSpace(string(out)))
+	if err != nil {
+		return 0
+	}
+	return val
+}
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 func extractGPUModel(line string) string {

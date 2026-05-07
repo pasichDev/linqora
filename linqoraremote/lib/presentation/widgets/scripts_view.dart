@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:linqoraremote/presentation/controllers/script_controller.dart';
-import 'package:linqoraremote/presentation/widgets/loading_view.dart';
+import 'package:linqoraremote/core/themes/lx_theme.dart';
 import 'package:linqoraremote/data/models/script_item.dart';
-import '../../core/themes/theme.dart';
-import '../controllers/device_home_controller.dart';
+import 'package:linqoraremote/presentation/controllers/script_controller.dart';
+import 'package:linqoraremote/presentation/widgets/lx_glass.dart';
+import 'package:linqoraremote/presentation/widgets/lx_header.dart';
 
 class ScriptsView extends StatefulWidget {
   const ScriptsView({super.key});
@@ -14,47 +13,414 @@ class ScriptsView extends StatefulWidget {
   State<ScriptsView> createState() => _ScriptsViewState();
 }
 
-class _ScriptsViewState extends State<ScriptsView>
-    with SingleTickerProviderStateMixin {
+class _ScriptsViewState extends State<ScriptsView> {
   late final ScriptController _scriptController;
-  late final DeviceHomeController _homeController;
-  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _scriptController = Get.find<ScriptController>();
-    _homeController = Get.find<DeviceHomeController>();
-    
-    // Inject actions into Dashboard AppBar
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _homeController.appBarActions.addAll([
-        IconButton(
-          icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-          onPressed: _scriptController.fetchScripts,
-        ),
-        IconButton(
-          icon: const Icon(Icons.add_rounded, color: Colors.white),
-          onPressed: () => _showScriptDialog(),
-        ),
-      ]);
-      
-      _homeController.appBarTitleOverride.value = 'scripts'.tr;
-    });
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
     super.dispose();
   }
+
+  // ─── Build ────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // Header
+        Obx(
+          () => LxHeader(
+            title: 'Scripts',
+            eyebrow: '${_scriptController.scripts.length} saved',
+            showBack: false,
+            action: GestureDetector(
+              onTap: () => _showScriptDialog(),
+              child: LxGlass(
+                borderRadius: BorderRadius.circular(12),
+                child: const SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: Center(
+                    child: Icon(
+                      Icons.add_rounded,
+                      size: 14,
+                      color: lxTextDim,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // Script list + console
+        Expanded(
+          child: Obx(() {
+            if (_scriptController.isLoadingScripts.value &&
+                _scriptController.scripts.isEmpty) {
+              return const Center(
+                child: CircularProgressIndicator(
+                  color: lxAccent,
+                  strokeWidth: 2,
+                ),
+              );
+            }
+
+            if (_scriptController.filteredScripts.isEmpty) {
+              return Center(
+                child: Text(
+                  'No scripts saved',
+                  style: const TextStyle(color: lxTextFaint),
+                ),
+              );
+            }
+
+            return SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        top: BorderSide(color: lxHairline),
+                      ),
+                    ),
+                    child: Column(
+                      children: _scriptController.filteredScripts
+                          .map((s) => _buildScriptRow(s))
+                          .toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  _buildConsoleSection(),
+                  const SizedBox(height: 100),
+                ],
+              ),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
+  // ─── Script row ──────────────────────────────────────────────────────────
+
+  Widget _buildScriptRow(ScriptItem script) {
+    return Obx(() {
+      final isRunning =
+          _scriptController.executingScripts[script.id] ?? false;
+      final result = _scriptController.lastExecutionResults[script.id];
+
+      final Color dotColor;
+      if (isRunning) {
+        dotColor = lxAccent;
+      } else if (result == null) {
+        dotColor = lxTextFaint;
+      } else {
+        dotColor = result.exitCode == 0 ? lxGreen : lxRed;
+      }
+
+      final tag = _tagForScript(script.command);
+
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: const BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: lxHairline, width: 1),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Status dot
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: dotColor,
+                boxShadow: [
+                  BoxShadow(color: dotColor, blurRadius: 4),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+
+            // Name + tag + meta
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          script.name,
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: -0.1,
+                            color: lxText,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: lxHairline),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: Text(
+                          tag,
+                          style: const TextStyle(
+                            fontSize: 9,
+                            fontFamily: 'monospace',
+                            color: lxTextFaint,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    isRunning
+                        ? 'running…'
+                        : (result != null
+                            ? '${result.durationMs} ms'
+                            : 'not run'),
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      color: lxTextFaint,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+
+            // Run / Stop button
+            GestureDetector(
+              onTap: isRunning
+                  ? () => _scriptController.stopScript(script.id)
+                  : () => _scriptController.executeScript(script.id),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: isRunning
+                      ? lxGlass2
+                      : lxAccent.withValues(alpha: 0.08),
+                  border: Border.all(
+                    color: isRunning
+                        ? lxHairline
+                        : lxAccent.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Text(
+                  isRunning ? 'STOP' : '▶ RUN',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.2,
+                    color: isRunning ? lxTextDim : lxAccent,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  // ─── Console section ─────────────────────────────────────────────────────
+
+  Widget _buildConsoleSection() {
+    return Obx(() {
+      final runningId = _scriptController.executingScripts.entries
+          .where((e) => e.value)
+          .map((e) => e.key)
+          .firstOrNull;
+
+      final activeId = runningId ??
+          (_scriptController.lastExecutionResults.isNotEmpty
+              ? _scriptController.lastExecutionResults.keys.last
+              : null);
+
+      final script = activeId != null
+          ? _scriptController.scripts
+              .firstWhereOrNull((s) => s.id == activeId)
+          : null;
+
+      final output =
+          activeId != null ? (_scriptController.realTimeOutput[activeId] ?? '') : '';
+      final isLive = runningId != null;
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Eyebrow row
+          Row(
+            children: [
+              Text(
+                'Console${script != null ? ' · ${script.name}' : ''}',
+                style: const TextStyle(
+                  fontSize: 10,
+                  letterSpacing: 1.4,
+                  color: lxTextFaint,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const Spacer(),
+              if (isLive)
+                Row(
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: lxAccent,
+                        boxShadow: [
+                          BoxShadow(color: lxAccent, blurRadius: 4),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'live',
+                      style: TextStyle(fontSize: 10, color: lxAccent),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Glass console surface
+          LxGlass(
+            child: SizedBox(
+              height: 180,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: Stack(
+                  children: [
+                    // Output
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: SingleChildScrollView(
+                        reverse: true,
+                        child: output.isEmpty
+                            ? const Text(
+                                r'$ ',
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 11,
+                                  color: lxAccent,
+                                ),
+                              )
+                            : _renderConsoleOutput(output),
+                      ),
+                    ),
+
+                    // Bottom gradient fade
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: 30,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              lxSurface.withValues(alpha: 0.8),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    });
+  }
+
+  Widget _renderConsoleOutput(String output) {
+    final lines = output.split('\n');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: lines.map((line) {
+        Color c = lxTextDim;
+        if (line.startsWith(r'$')) {
+          c = lxAccent;
+        } else if (line.contains('✓') || line.contains('ok')) {
+          c = lxGreen;
+        } else if (line.contains('⟳') || line.contains('...')) {
+          c = lxAmber;
+        } else if (line.contains('error') || line.contains('Error')) {
+          c = lxRed;
+        }
+        return Text(
+          line,
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 11,
+            color: c,
+            height: 1.7,
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  // ─── Helpers ─────────────────────────────────────────────────────────────
+
+  String _tagForScript(String command) {
+    final cmd = command.toLowerCase();
+    if (cmd.contains('.py') || cmd.startsWith('python')) {
+      return 'PY';
+    }
+    if (cmd.contains('.js') || cmd.startsWith('node')) {
+      return 'JS';
+    }
+    if (cmd.contains('.sh') || cmd.startsWith('bash') || cmd.startsWith('./')) {
+      return 'BASH';
+    }
+    return 'CMD';
+  }
+
+  // ─── Script dialog ────────────────────────────────────────────────────────
 
   void _showScriptDialog([ScriptItem? script]) {
     final idController = TextEditingController(text: script?.id ?? '');
     final nameController = TextEditingController(text: script?.name ?? '');
-    final descController = TextEditingController(
-      text: script?.description ?? '',
-    );
+    final descController =
+        TextEditingController(text: script?.description ?? '');
     final cmdController = TextEditingController(text: script?.command ?? '');
     final argsController = TextEditingController(
       text: script?.args.join(', ') ?? '',
@@ -66,13 +432,13 @@ class _ScriptsViewState extends State<ScriptsView>
         child: Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.8),
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: Colors.white10),
+            color: lxSurface,
+            borderRadius: BorderRadius.circular(lxRadiusModal),
+            border: Border.all(color: lxHairline),
             boxShadow: [
               BoxShadow(
-                color: Colors.blueAccent.withOpacity(0.1),
-                blurRadius: 20,
+                color: lxAccent.withValues(alpha: 0.08),
+                blurRadius: 24,
               ),
             ],
           ),
@@ -84,7 +450,7 @@ class _ScriptsViewState extends State<ScriptsView>
                 Text(
                   script == null ? 'add_script'.tr : 'edit_script'.tr,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: lxText,
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
@@ -101,14 +467,14 @@ class _ScriptsViewState extends State<ScriptsView>
                   children: [
                     TextButton(
                       onPressed: () => Get.back(),
-                      child: Text(
-                        'cancel'.tr,
-                        style: const TextStyle(color: Colors.white60),
+                      child: const Text(
+                        'cancel',
+                        style: TextStyle(color: lxTextDim),
                       ),
                     ),
                     const SizedBox(width: 12),
-                    ElevatedButton(
-                      onPressed: () {
+                    GestureDetector(
+                      onTap: () {
                         final newScript = ScriptItem(
                           id: idController.text,
                           name: nameController.text,
@@ -127,13 +493,27 @@ class _ScriptsViewState extends State<ScriptsView>
                         }
                         Get.back();
                       },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blueAccent,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: lxAccent.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(lxRadiusTile),
+                          border: Border.all(
+                            color: lxAccent.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: const Text(
+                          'Save',
+                          style: TextStyle(
+                            color: lxAccent,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
-                      child: Text('save'.tr),
                     ),
                   ],
                 ),
@@ -155,322 +535,21 @@ class _ScriptsViewState extends State<ScriptsView>
       child: TextField(
         controller: controller,
         enabled: enabled,
-        style: const TextStyle(color: Colors.white, fontSize: 14),
+        style: const TextStyle(color: lxText, fontSize: 14),
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: const TextStyle(color: Colors.white38),
+          labelStyle: const TextStyle(color: lxTextFaint),
           enabledBorder: UnderlineInputBorder(
-            borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+            borderSide: BorderSide(color: lxHairline),
+          ),
+          disabledBorder: UnderlineInputBorder(
+            borderSide: BorderSide(color: lxHairline),
           ),
           focusedBorder: const UnderlineInputBorder(
-            borderSide: BorderSide(color: Colors.blueAccent),
+            borderSide: BorderSide(color: lxAccent),
           ),
         ),
       ),
     );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: TextField(
-            controller: _searchController,
-            onChanged: (v) => _scriptController.searchQuery.value = v,
-            style: const TextStyle(color: Colors.white, fontSize: 14),
-            decoration: InputDecoration(
-              hintText: 'search_scripts'.tr,
-              hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-              prefixIcon: Icon(
-                Icons.search_rounded,
-                color: Colors.white.withOpacity(0.3),
-                size: 20,
-              ),
-              filled: true,
-              fillColor: Colors.white.withOpacity(0.05),
-              contentPadding: const EdgeInsets.symmetric(vertical: 0),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(color: Colors.white.withOpacity(0.05)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(color: Colors.white.withOpacity(0.05)),
-              ),
-            ),
-          ),
-        ),
-        Expanded(
-            child: Obx(() {
-              if (_scriptController.isLoadingScripts.value &&
-                  _scriptController.scripts.isEmpty) {
-                return const LoadingView();
-              }
-
-              if (_scriptController.filteredScripts.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.description_outlined,
-                        size: 64,
-                        color: Colors.white.withOpacity(0.5),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'no_scripts_available'.tr,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.7),
-                          fontSize: 16,
-                        ),
-                      ),
-                    ],
-                  ).animate().fadeIn(),
-                );
-              }
-
-              return ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: _scriptController.filteredScripts.length,
-                itemBuilder: (context, index) {
-                  final script = _scriptController.filteredScripts[index];
-                  return _buildScriptCard(script, index);
-                },
-              );
-            }),
-          ),
-        ],
-      );
-  }
-
-  Widget _buildHeaderButton({
-    required IconData icon,
-    required VoidCallback onTap,
-    required Color color,
-  }) {
-    return Material(
-      color: color.withOpacity(0.1),
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withOpacity(0.2)),
-          ),
-          child: Icon(icon, color: Colors.white, size: 20),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildScriptCard(ScriptItem script, int index) {
-    return Obx(() {
-      final isExecuting =
-          _scriptController.executingScripts[script.id] ?? false;
-      final lastResult = _scriptController.lastExecutionResults[script.id];
-      final rtOutput = _scriptController.realTimeOutput[script.id] ?? '';
-
-      return Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Material(
-            color: Colors.transparent,
-            child: ExpansionTile(
-              leading:
-                  Icon(
-                        Icons.terminal,
-                        color: isExecuting ? Colors.orange : Colors.blueAccent,
-                      )
-                      .animate(target: isExecuting ? 1 : 0)
-                      .shimmer(duration: const Duration(seconds: 1)),
-              title: Text(
-                script.name,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              subtitle: Text(
-                script.description,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
-                  fontSize: 12,
-                ),
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(
-                      Icons.edit,
-                      size: 18,
-                      color: Colors.white38,
-                    ),
-                    onPressed: () => _showScriptDialog(script),
-                  ),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.delete_outline,
-                      size: 18,
-                      color: Colors.redAccent,
-                    ),
-                    onPressed: () => Get.defaultDialog(
-                      title: 'delete_script'.tr,
-                      middleText: 'confirm_delete'.tr,
-                      backgroundColor: Colors.grey[900],
-                      titleStyle: const TextStyle(color: Colors.white),
-                      middleTextStyle: const TextStyle(color: Colors.white70),
-                      textCancel: 'cancel'.tr,
-                      textConfirm: 'delete'.tr,
-                      confirmTextColor: Colors.white,
-                      onConfirm: () {
-                        _scriptController.deleteScript(script.id);
-                        Get.back();
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  isExecuting
-                      ? SizedBox(
-                          width: 80,
-                          child: ElevatedButton(
-                            onPressed: () =>
-                                _scriptController.stopScript(script.id),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red.withOpacity(0.2),
-                              foregroundColor: Colors.redAccent,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              padding: EdgeInsets.zero,
-                            ),
-                            child: Text(
-                              'stop'.tr,
-                              style: const TextStyle(fontSize: 10),
-                            ),
-                          ),
-                        )
-                      : ElevatedButton(
-                          onPressed: () =>
-                              _scriptController.executeScript(script.id),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blueAccent.withOpacity(0.2),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                          ),
-                          child: Text(
-                            'execute'.tr,
-                            style: const TextStyle(fontSize: 10),
-                          ),
-                        ),
-                ],
-              ),
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Divider(color: Colors.white10),
-                      if (isExecuting || rtOutput.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'OUTPUT:',
-                              style: TextStyle(
-                                color: Colors.blueAccent.withOpacity(0.5),
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            if (isExecuting)
-                              const SizedBox(
-                                width: 12,
-                                height: 12,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 1,
-                                  color: Colors.blueAccent,
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          width: double.infinity,
-                          constraints: const BoxConstraints(maxHeight: 200),
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: SingleChildScrollView(
-                            reverse: true,
-                            child: Text(
-                              rtOutput.isEmpty
-                                  ? 'Waiting for output...'.tr
-                                  : rtOutput,
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 10,
-                                fontFamily: 'monospace',
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                      if (!isExecuting && lastResult != null) ...[
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              '${'exit_code'.tr}: ${lastResult.exitCode}',
-                              style: TextStyle(
-                                color: lastResult.exitCode == 0
-                                    ? Colors.green
-                                    : Colors.red,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              '${lastResult.durationMs} ms',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.4),
-                                fontSize: 10,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ).animate().fadeIn(delay: (index * 100).ms).slideX(begin: 0.1);
-    });
   }
 }

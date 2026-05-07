@@ -16,6 +16,7 @@ const (
 	Shutdown Action = iota
 	Restart
 	Lock
+	Sleep
 )
 
 // ExecutePowerAction performs a power management action.

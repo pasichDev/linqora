@@ -115,6 +115,41 @@ class HostInfoCard extends StatelessWidget {
                 const SizedBox(height: 16),
                 _buildDisksInfo(context),
               ],
+              if (host.battery.isPresent) ...[
+                const SizedBox(height: 16),
+                _buildInfoRow(
+                  context,
+                  host.battery.isCharging
+                      ? Icons.battery_charging_full_rounded
+                      : Icons.battery_std_rounded,
+                  'BATTERY',
+                  '${host.battery.level}%',
+                  host.battery.status,
+                ),
+              ],
+              if (host.uptime > 0) ...[
+                const SizedBox(height: 16),
+                _buildInfoRow(
+                  context,
+                  Icons.timer_outlined,
+                  'UPTIME',
+                  _formatUptime(host.uptime),
+                  '',
+                ),
+              ],
+              if (host.architecture.isNotEmpty || host.kernelVersion.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _buildInfoRow(
+                  context,
+                  Icons.info_outline_rounded,
+                  'PLATFORM',
+                  host.architecture,
+                  host.kernelVersion +
+                      (host.platformVersion.isNotEmpty
+                          ? ' • ${host.platformVersion}'
+                          : ''),
+                ),
+              ],
             ],
           ],
         ),
@@ -148,6 +183,17 @@ class HostInfoCard extends StatelessWidget {
       return "${gpuMemoryGB.toStringAsFixed(1)} GB";
     }
     return "";
+  }
+
+  String _formatUptime(int seconds) {
+    final d = seconds ~/ 86400;
+    final h = (seconds % 86400) ~/ 3600;
+    final m = (seconds % 3600) ~/ 60;
+    final parts = <String>[];
+    if (d > 0) parts.add('${d}d');
+    if (h > 0) parts.add('${h}h');
+    if (m > 0 || parts.isEmpty) parts.add('${m}m');
+    return parts.join(' ');
   }
 
   Widget _buildDisksInfo(BuildContext context) {
