@@ -2,7 +2,7 @@ package ws
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 )
 
 // BroadcastMessage defines a common interface for messages distributed across rooms.
@@ -59,7 +59,7 @@ func NewBroadcaster(roomManager *RoomManager) *Broadcaster {
 func (b *Broadcaster) BroadcastMetrics(metricsData []byte) {
 	var payload interface{}
 	if err := json.Unmarshal(metricsData, &payload); err != nil {
-		log.Printf("Error unmarshaling metrics data: %v", err)
+		slog.Error("Error unmarshaling metrics data", "err", err)
 		return
 	}
 
@@ -70,7 +70,7 @@ func (b *Broadcaster) BroadcastMetrics(metricsData []byte) {
 func (b *Broadcaster) BroadcastMedia(mediaData []byte) {
 	var payload interface{}
 	if err := json.Unmarshal(mediaData, &payload); err != nil {
-		log.Printf("Error unmarshaling media data: %v", err)
+		slog.Error("Error unmarshaling media data", "err", err)
 		return
 	}
 	b.roomManager.SendToRoom("media", "media", payload, nil)

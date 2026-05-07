@@ -3,7 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 )
@@ -53,7 +53,7 @@ func getConfigPath() string {
 
 	linqoraDir := filepath.Join(configDir, "linqora")
 	if err := os.MkdirAll(linqoraDir, 0755); err != nil {
-		log.Printf("Failed to create config dir: %v", err)
+		slog.Error("Failed to create config dir", "err", err)
 		return filepath.Join(".", "linqora_config.json")
 	}
 
@@ -91,7 +91,7 @@ func LoadConfig() (*ServerConfig, error) {
 		}
 	} else {
 		if err := config.SaveConfig(); err != nil {
-			log.Printf("Failed to create initial config: %v", err)
+			slog.Error("Failed to create initial config", "err", err)
 		}
 	}
 

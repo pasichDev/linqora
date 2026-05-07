@@ -81,7 +81,7 @@ class AppBarHomePage extends StatelessWidget implements PreferredSizeWidget {
               onConfirm: () => {
                 controller.disconnectFromDevice(isCleaned: true),
               },
-              onCancel: () => {},
+              onCancel: () => Get.back(),
             );
           } else {
             controller.disconnectFromDevice(isCleaned: true);

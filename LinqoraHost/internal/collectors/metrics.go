@@ -4,7 +4,7 @@ import (
 	"LinqoraHost/internal/metrics"
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 )
@@ -47,7 +47,7 @@ func (mc *MetricsCollector) Start() {
 	mc.cancel = cancel
 	mc.isRunning = true
 
-	log.Println("Starting metrics collector")
+	slog.Info("Starting metrics collector")
 
 	go func() {
 		// Seed the CPU baseline before the first measurement so that
@@ -68,7 +68,7 @@ func (mc *MetricsCollector) Stop() {
 
 	mc.cancel()
 	mc.isRunning = false
-	log.Println("Stopped metrics collector")
+	slog.Info("Stopped metrics collector")
 }
 
 // IsRunning returns true if the collector is currently active.
@@ -100,13 +100,13 @@ func (mc *MetricsCollector) collectLoop(ctx context.Context) {
 func (mc *MetricsCollector) collectAndSend() {
 	metrics, err := mc.collectMetrics()
 	if err != nil {
-		log.Printf("Error collecting metrics: %v", err)
+		slog.Error("Error collecting metrics", "err", err)
 		return
 	}
 
 	metricsJSON, err := json.Marshal(metrics)
 	if err != nil {
-		log.Printf("Error marshaling metrics: %v", err)
+		slog.Error("Error marshaling metrics", "err", err)
 		return
 	}
 

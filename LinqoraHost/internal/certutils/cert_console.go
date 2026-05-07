@@ -1,12 +1,15 @@
 package certutils
 
-import "fmt"
+import (
+	"fmt"
+	"log/slog"
+)
 
 // IsValidCertificate checks the validity of the certificate and displays appropriate messages
 func IsValidCertificate(certFile string) bool {
 	isDev, certInfo, err := IsDevelopmentCertificate(certFile)
 	if err != nil {
-		fmt.Printf("Warning: Failed to analyze certificate: %v\n", err)
+		slog.Warn("Failed to analyze certificate", "err", err)
 		return false
 	}
 

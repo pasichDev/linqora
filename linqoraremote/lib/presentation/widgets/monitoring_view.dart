@@ -112,6 +112,7 @@ class _MonitoringViewState extends State<MonitoringView>
         MetricsCard(
           title: '${'load'.tr} CPU',
           value: '${cpuMetrics.loadPercent}%',
+          isWarning: cpuMetrics.loadPercent >= 90,
           widget: Column(
             children: [
               MetricChart(metricsData: _monitoringController.getCPULoads()),
@@ -147,7 +148,8 @@ class _MonitoringViewState extends State<MonitoringView>
 
         MetricsCard(
           title: '${'usage'.tr} RAM',
-          value: '${ramMetrics.loadPercent}% (${ramMetrics.usage} ГБ)',
+          value: '${ramMetrics.loadPercent}% (${ramMetrics.usage} GB)',
+          isWarning: ramMetrics.loadPercent >= 90,
           widget: MetricChart(
             metricsData: _monitoringController.getRAMUsagesPercent(),
           ),

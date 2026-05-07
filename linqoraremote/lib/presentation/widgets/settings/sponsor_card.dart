@@ -4,7 +4,7 @@ import 'package:linqoraremote/core/themes/lin_styles.dart';
 import 'package:linqoraremote/presentation/widgets/settings/section_header.dart';
 
 import '../../../core/constants/urls.dart';
-import '../../../core/utils/lauch_url.dart';
+import '../../../core/utils/launch_url.dart';
 
 class SponsorCard extends StatelessWidget {
   final VoidCallback? onClose;

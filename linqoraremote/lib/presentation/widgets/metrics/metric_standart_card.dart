@@ -6,11 +6,13 @@ class MetricsCard extends StatefulWidget {
   final String title;
   final String value;
   final Widget? widget;
+  final bool isWarning;
 
   const MetricsCard({
     required this.title,
     required this.value,
     this.widget,
+    this.isWarning = false,
     super.key,
   });
 
@@ -49,7 +51,9 @@ class _MetricsCardState extends State<MetricsCard> {
                       Text(
                         widget.value,
                         style: Get.theme.textTheme.titleMedium?.copyWith(
-                          color: Get.theme.colorScheme.onPrimaryContainer,
+                          color: widget.isWarning
+                              ? Theme.of(context).colorScheme.error
+                              : Get.theme.colorScheme.onPrimaryContainer,
                         ),
                       ),
                       if (widget.widget != null) ...[

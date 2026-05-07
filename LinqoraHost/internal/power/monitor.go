@@ -2,7 +2,7 @@ package power
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 )
@@ -27,11 +27,11 @@ func StartLockStateMonitor(ctx context.Context) {
 				if IsDeviceLocked() {
 					systemLocked, err := IsSystemLocked()
 					if err != nil {
-						log.Printf("Error checking system lock state: %v", err)
+						slog.Error("Error checking system lock state", "err", err)
 						continue
 					}
 					if !systemLocked {
-						log.Printf("System unlock detected, updating state")
+						slog.Info("System unlock detected, updating state")
 						SetDeviceLocked(false)
 					}
 				}

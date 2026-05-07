@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -73,7 +73,7 @@ func (m *Manager) load() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if err := json.Unmarshal(data, &m.scripts); err != nil {
-		log.Printf("scheduler: failed to parse scripts file %s: %v", m.path, err)
+		slog.Error("Failed to parse scripts file", "path", m.path, "err", err)
 	}
 }
 

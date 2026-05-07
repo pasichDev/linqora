@@ -9,7 +9,7 @@ import 'package:linqoraremote/core/themes/lin_styles.dart';
 import 'package:linqoraremote/presentation/widgets/animated_aurora_background.dart';
 
 import '../../core/constants/urls.dart';
-import '../../core/utils/lauch_url.dart';
+import '../../core/utils/launch_url.dart';
 import '../../generated/assets.dart';
 import '../widgets/settings/section_header.dart';
 
@@ -378,7 +378,9 @@ class SettingsPage extends GetView<SettingsController> {
                 context,
                 title: 'license'.tr,
                 icon: Icons.gavel_rounded,
-                onTap: () {},
+                onTap: () => launchUrlHandler(
+                  'https://github.com/pasichDev/linqora/blob/main/LICENSE',
+                ),
               ),
               const Divider(height: 1, color: Colors.white10),
               _buildListTile(

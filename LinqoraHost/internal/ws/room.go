@@ -2,7 +2,7 @@ package ws
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"sync"
 )
 
@@ -43,7 +43,7 @@ func (r *Room) SendToAllClients(messageType string, message interface{}, exclude
 	successResponse := NewSuccessResponse(messageType, message)
 	jsonMsg, err := json.Marshal(successResponse)
 	if err != nil {
-		log.Printf("Error marshaling broadcast message for room %s: %v", r.Name, err)
+		slog.Error("Error marshaling broadcast message", "room", r.Name, "err", err)
 		return
 	}
 

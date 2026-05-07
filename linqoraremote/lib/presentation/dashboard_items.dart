@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:linqoraremote/presentation/widgets/monitoring_view.dart';
-import 'package:linqoraremote/presentation/widgets/powermanagment_view.dart';
+import 'package:linqoraremote/presentation/widgets/powermanagement_view.dart';
 import 'package:linqoraremote/presentation/widgets/touchpad_view.dart';
 
+import 'widgets/filebrowser_view.dart';
 import 'widgets/media_view.dart';
+import 'widgets/monitor_view.dart';
 import 'widgets/scripts_view.dart';
 
 class MenuOption {
@@ -32,6 +34,11 @@ final menuOptions = [
     view: PowerManagementView(),
   ),
   MenuOption(
+    title: 'monitors'.tr,
+    icon: Icons.monitor_outlined,
+    view: const MonitorView(),
+  ),
+  MenuOption(
     title: 'touchpad'.tr,
     icon: Icons.mouse_outlined,
     view: TouchpadView(),
@@ -40,5 +47,10 @@ final menuOptions = [
     title: 'scripts'.tr,
     icon: Icons.code_rounded,
     view: const ScriptsView(),
+  ),
+  MenuOption(
+    title: 'files'.tr,
+    icon: Icons.folder_outlined,
+    view: const FileBrowserView(),
   ),
 ];

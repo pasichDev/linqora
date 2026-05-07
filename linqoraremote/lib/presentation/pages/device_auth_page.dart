@@ -10,7 +10,7 @@ import 'package:loading_animation_widget/loading_animation_widget.dart';
 import '../../core/constants/names.dart';
 import '../../core/constants/urls.dart';
 import '../../core/themes/styles.dart';
-import '../../core/utils/lauch_url.dart';
+import '../../core/utils/launch_url.dart';
 
 class DeviceAuthPage extends StatefulWidget {
   const DeviceAuthPage({super.key});

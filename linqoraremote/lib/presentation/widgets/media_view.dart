@@ -54,12 +54,29 @@ class _MediaScreenViewState extends State<MediaScreenView> {
                   _mediaController.nowPlaying.value == null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 20),
-                  child: MessageBanner(
-                    message: _mediaController.nowPlaying.value == null
-                        ? 'info_no_playing_remote'.tr
-                        : "error_control_remote".tr,
-                    isLoading: false,
-                  ),
+                  child: _mediaController.nowPlaying.value == null
+                      ? Column(
+                          children: [
+                            MessageBanner(
+                              message: 'info_no_playing_remote'.tr,
+                              isLoading: false,
+                            ),
+                            const SizedBox(height: 12),
+                            OutlinedButton.icon(
+                              onPressed: () async {
+                                final ws = _mediaController.webSocketProvider;
+                                await ws.leaveRoom('media');
+                                await ws.joinRoom('media');
+                              },
+                              icon: const Icon(Icons.refresh_rounded, size: 18),
+                              label: Text('retry'.tr),
+                            ),
+                          ],
+                        )
+                      : MessageBanner(
+                          message: 'error_control_remote'.tr,
+                          isLoading: false,
+                        ),
                 ),
               _volumeCard(),
               const SizedBox(height: 20),

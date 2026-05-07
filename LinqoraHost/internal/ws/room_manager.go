@@ -1,7 +1,7 @@
 package ws
 
 import (
-	"log"
+	"log/slog"
 	"sync"
 )
 
@@ -107,7 +107,7 @@ func (rm *RoomManager) AddClientToRoom(roomName string, client *Client) {
 	client.Rooms[roomName] = true
 	client.Unlock()
 
-	log.Printf("Client %s joined room: %s", client.DeviceName, roomName)
+	slog.Info("Client joined room", "device", client.DeviceName, "room", roomName)
 
 	// If first client, notify listeners
 	if isFirst {
@@ -133,14 +133,14 @@ func (rm *RoomManager) RemoveClientFromRoom(roomName string, client *Client) {
 		delete(client.Rooms, roomName)
 		client.Unlock()
 
-		log.Printf("Client %s left room: %s", client.DeviceName, roomName)
+		slog.Info("Client left room", "device", client.DeviceName, "room", roomName)
 
 		// Cleanup empty room
 		if room.ClientCount() == 0 {
 			rm.mu.Lock()
 			delete(rm.Rooms, roomName)
 			rm.mu.Unlock()
-			log.Printf("Room %s removed (empty)", roomName)
+			slog.Info("Room removed (empty)", "room", roomName)
 
 			if isLast {
 				rm.notifyLastClientLeft(roomName)

@@ -131,5 +131,11 @@
   "script_args": "Arguments (comma separated)",
   "save": "Save",
   "confirm_delete": "Are you sure you want to delete this script?",
-  "delete": "Delete"
+  "delete": "Delete",
+  "confirm": "Confirm",
+  "confirm_shutdown": "Are you sure you want to shut down the device?",
+  "confirm_restart": "Are you sure you want to restart the device?",
+  "reconnecting": "Reconnecting",
+  "connection_failed": "Connection failed",
+  "retry": "Retry"
 }
