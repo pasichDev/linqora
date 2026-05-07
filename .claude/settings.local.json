@@ -16,7 +16,11 @@
       "Bash(go test *)",
       "Bash(go get *)",
       "Bash(go version *)",
-      "Bash(go mod *)"
+      "Bash(go mod *)",
+      "Bash(git merge *)",
+      "Bash(git worktree *)",
+      "Bash(xargs git branch -D)",
+      "Bash(git add *)"
     ]
   }
 }
