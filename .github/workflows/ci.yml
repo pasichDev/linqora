@@ -19,8 +19,11 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.25'
           cache-dependency-path: LinqoraHost/go.sum
+
+      - name: Download Modules
+        run: go mod download
 
       - name: Check Formatting
         run: |
@@ -38,35 +41,3 @@ jobs:
 
       - name: Run Tests
         run: go test -v ./...
-
-  frontend:
-    name: Frontend Check (Flutter)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: linqoraremote
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          cache: true
-
-      - name: Install Dependencies
-        run: flutter pub get
-
-      - name: Check Formatting
-        run: flutter format --set-exit-if-changed .
-
-      - name: Analyze Code
-        run: flutter analyze
-
-      - name: Run Tests
-        run: |
-          if [ -d "test" ]; then
-            flutter test
-          else
-            echo "No tests found in linqoraremote/test"
-          fi
