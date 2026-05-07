@@ -20,7 +20,10 @@
       "Bash(git merge *)",
       "Bash(git worktree *)",
       "Bash(xargs git branch -D)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(echo \"BUILD_EXIT:$?\")",
+      "Bash(python -c \"import yaml; yaml.safe_load\\(open\\('.github/workflows/ci.yml'\\)\\)\")"
     ]
   }
 }

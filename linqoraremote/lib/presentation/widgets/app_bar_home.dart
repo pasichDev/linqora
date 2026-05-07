@@ -21,45 +21,54 @@ class AppBarHomePage extends StatelessWidget implements PreferredSizeWidget {
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       centerTitle: false,
-      title: Obx(
-        () => Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              controller.selectedMenuIndex.value == -1
-                  ? controller.hostInfo.value?.hostname ?? "LINQORA"
-                  : menuOptions[controller.selectedMenuIndex.value].title,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.5,
+      title: Obx(() {
+        final idx = controller.selectedMenuIndex.value;
+        if (idx == -1) {
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                controller.hostInfo.value?.hostname ?? "LINQORA",
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.5,
+                ),
               ),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.start,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                _buildTlsIndicator(context),
-                const SizedBox(width: 4),
-                Obx(() {
-                  final device = controller.authDevice.value;
-                  return Text(
-                    device != null
-                        ? "${device.address}:${device.port}"
-                        : 'connecting'.tr,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white.withOpacity(0.4),
-                    ),
-                  );
-                }),
-              ],
-            ),
-          ],
-        ),
-      ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  _buildTlsIndicator(context),
+                  const SizedBox(width: 4),
+                  Obx(() {
+                    final device = controller.authDevice.value;
+                    return Text(
+                      device != null
+                          ? "${device.address}:${device.port}"
+                          : 'connecting'.tr,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withOpacity(0.4),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ],
+          );
+        }
+        return Text(
+          controller.appBarTitleOverride.value ?? menuOptions[idx].title,
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0.5,
+          ),
+        );
+      }),
       leading: IconButton(
         icon: Obx(
           () => Icon(
@@ -72,11 +81,15 @@ class AppBarHomePage extends StatelessWidget implements PreferredSizeWidget {
         ),
         onPressed: () async {
           if (controller.selectedMenuIndex.value != -1) {
-            controller.selectMenuItem(-1);
+            final back = controller.onBackPressed.value;
+            if (back != null) {
+              back();
+            } else {
+              controller.selectMenuItem(-1);
+            }
             return;
           }
-          if (controller.webSocketProvider.isConnected &&
-              controller.selectedMenuIndex.value == -1) {
+          if (controller.webSocketProvider.isConnected) {
             await DisconnectConfirmationDialog.show(
               onConfirm: () => {
                 controller.disconnectFromDevice(isCleaned: true),
@@ -89,10 +102,16 @@ class AppBarHomePage extends StatelessWidget implements PreferredSizeWidget {
         },
       ),
       actions: [
-        IconButton(
-          onPressed: () => Get.toNamed(AppRoutes.SETTINGS),
-          icon: const Icon(Icons.tune_rounded),
-        ),
+        Obx(() {
+          final idx = controller.selectedMenuIndex.value;
+          if (idx >= 0 && controller.appBarActions.isNotEmpty) {
+            return Row(children: controller.appBarActions.toList());
+          }
+          return IconButton(
+            onPressed: () => Get.toNamed(AppRoutes.SETTINGS),
+            icon: const Icon(Icons.tune_rounded),
+          );
+        }),
         const SizedBox(width: 8),
       ],
     );

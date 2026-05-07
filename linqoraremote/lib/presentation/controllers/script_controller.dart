@@ -5,6 +5,7 @@ import 'package:linqoraremote/data/models/script_execute_response.dart';
 import 'package:linqoraremote/data/models/server_response.dart';
 import 'package:linqoraremote/data/models/ws_message.dart';
 import 'package:linqoraremote/data/providers/websocket_provider.dart';
+import 'package:linqoraremote/presentation/controllers/device_home_controller.dart';
 import '../../core/utils/app_logger.dart';
 
 class ScriptController extends GetxController {
@@ -13,6 +14,7 @@ class ScriptController extends GetxController {
   ScriptController({required this.webSocketProvider});
 
   final RxList<ScriptItem> scripts = <ScriptItem>[].obs;
+  final RxList<ScriptItem> demoScripts = <ScriptItem>[].obs;
   final RxList<ScriptItem> filteredScripts = <ScriptItem>[].obs;
   final RxMap<String, bool> executingScripts = <String, bool>{}.obs;
   final RxMap<String, ScriptExecuteResponse> lastExecutionResults =
@@ -27,7 +29,7 @@ class ScriptController extends GetxController {
     _setupWebSocketHandlers();
 
     // Auto-filter scripts when list or query changes
-    everAll([scripts, searchQuery], (_) => _filterScripts());
+    everAll([scripts, demoScripts, searchQuery], (_) => _filterScripts());
 
     fetchScripts();
   }
@@ -76,12 +78,13 @@ class ScriptController extends GetxController {
   }
 
   void _filterScripts() {
+    final allScripts = [...scripts, ...demoScripts];
     if (searchQuery.isEmpty) {
-      filteredScripts.assignAll(scripts);
+      filteredScripts.assignAll(allScripts);
     } else {
       final query = searchQuery.value.toLowerCase();
       filteredScripts.assignAll(
-        scripts.where(
+        allScripts.where(
           (s) =>
               s.name.toLowerCase().contains(query) ||
               s.description.toLowerCase().contains(query) ||
@@ -196,6 +199,7 @@ class ScriptController extends GetxController {
 
       if (!response.hasError && response.data != null) {
         scripts.assignAll(response.data!);
+        _checkAndAddDemoScripts();
       }
     } catch (e) {
       AppLogger.release(
@@ -264,6 +268,50 @@ class ScriptController extends GetxController {
         module: "ScriptController",
       );
       executingScripts.clear();
+    }
+  }
+
+  void _checkAndAddDemoScripts() {
+    try {
+      final deviceHome = Get.find<DeviceHomeController>();
+      final os = deviceHome.hostInfo.value?.os.toLowerCase() ?? '';
+
+      if (os.contains('windows')) {
+        demoScripts.assignAll([
+          ScriptItem(
+            id: 'demo-win-sysinfo',
+            name: 'Windows: System Info',
+            description: 'Display detailed Windows system information',
+            command: 'powershell.exe',
+            args: ['-Command', 'Get-ComputerInfo | Select-Object CsName, OsArchitecture, WindowsVersion | Format-List'],
+          ),
+          ScriptItem(
+            id: 'demo-win-procs',
+            name: 'Windows: Top Processes',
+            description: 'Show top 5 CPU consuming processes',
+            command: 'powershell.exe',
+            args: ['-Command', 'Get-Process | Sort-Object CPU -Descending | Select-Object -First 5 | Format-Table'],
+          ),
+        ]);
+      } else if (os.contains('linux') || os.contains('darwin')) {
+        demoScripts.assignAll([
+          ScriptItem(
+            id: 'demo-nix-sysinfo',
+            name: 'Unix: System Health',
+            description: 'Display system uptime and load average',
+            command: 'uptime',
+          ),
+          ScriptItem(
+            id: 'demo-nix-disk',
+            name: 'Unix: Disk Space',
+            description: 'Show formatted disk space usage',
+            command: 'df',
+            args: ['-h'],
+          ),
+        ]);
+      }
+    } catch (e) {
+      AppLogger.debug("Error adding demo scripts: $e");
     }
   }
 }

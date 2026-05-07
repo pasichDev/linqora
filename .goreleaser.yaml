@@ -2,18 +2,23 @@ version: 2
 project_name: linqora-host
 builds:
   - dir: LinqoraHost
-    main: ./cmd/linqora_cli.go
+    main: ./cmd
     id: "linqora-host"
     binary: linqora
     env:
-      - CGO_ENABLED=0
+      - CGO_ENABLED=1
+    overrides:
+      - goos: windows
+        goarch: amd64
+        env:
+          - CGO_ENABLED=1
+          - CC=x86_64-w64-mingw32-gcc
+          - CXX=x86_64-w64-mingw32-g++
     goos:
       - linux
       - windows
-      - darwin
     goarch:
       - amd64
-      - arm64
 archives:
   - format: tar.gz
     # use zip for windows archives

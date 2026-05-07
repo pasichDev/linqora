@@ -125,5 +125,14 @@
   "confirm_restart": "Sind Sie sicher, dass Sie das Gerät neu starten möchten?",
   "reconnecting": "Verbindung wird wiederhergestellt",
   "connection_failed": "Verbindung fehlgeschlagen",
-  "retry": "Erneut versuchen"
+  "retry": "Erneut versuchen",
+  "files": "Dateimanager",
+  "home": "Startseite",
+  "back": "Zurück",
+  "refresh": "Aktualisieren",
+  "upload": "Hochladen",
+  "download": "Herunterladen",
+  "empty_directory": "Verzeichnis ist leer",
+  "file_uploaded_success": "Datei erfolgreich hochgeladen",
+  "success": "Erfolg"
 }
