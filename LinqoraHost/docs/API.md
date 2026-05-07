@@ -53,8 +53,16 @@ The client must respond with HMAC-SHA256 (see below).
 
 **Server → Client (success)**
 ```json
-{ "type": "auth_response", "status": "success", "data": { "message": "Authorized" } }
+{ 
+  "type": "auth_response", 
+  "status": "success", 
+  "data": { 
+    "message": "Authorized",
+    "e2e_key": "<64-char hex key (AES-256)>" 
+  } 
+}
 ```
+*Note: `e2e_key` is only provided if E2EE is enabled in the server configuration. All subsequent messages must be encrypted using this key.*
 
 **Server → Client (failure)**
 ```json
@@ -263,6 +271,116 @@ Move events (`action: 0`) receive **no success reply** to minimise latency.
 ```
 
 Scripts are defined server-side only (`~/.config/linqora/scripts.json`). The client cannot inject commands — it only supplies a registered script ID.
+
+---
+
+## End-to-End Encryption (E2EE)
+
+When E2EE is enabled, every message (after authentication) must be wrapped in an encrypted envelope.
+
+### Encrypted Envelope Format
+
+**Client ↔ Server**
+```json
+{
+  "type": "encrypted",
+  "data": {
+    "payload": "<base64 encrypted data>",
+    "nonce": "<base64 12-byte nonce>"
+  }
+}
+```
+
+- **Algorithm**: AES-256-GCM
+- **Key**: 32-byte key provided in `auth_response` (hex-decoded).
+- **Nonce**: Must be unique for every message.
+- **Payload**: The original JSON message string, encrypted.
+
+---
+
+## Monitor Management
+
+### List Monitors
+
+**Client → Server**
+```json
+{ "type": "monitor_list" }
+```
+
+**Server → Client**
+```json
+{
+  "type": "monitor_list",
+  "status": "success",
+  "data": {
+    "monitors": [
+      { "id": 0, "name": "\\\\.\\DISPLAY1", "width": 1920, "height": 1080, "is_primary": true }
+    ]
+  }
+}
+```
+
+### Control Monitor
+
+**Client → Server**
+```json
+{ 
+  "type": "monitor_cmd", 
+  "data": { 
+    "monitor_id": 0, 
+    "action": "set_primary" | "set_resolution",
+    "width": 2560,
+    "height": 1440
+  } 
+}
+```
+
+---
+
+## File Browser
+
+### List Directory
+
+**Client → Server**
+```json
+{ "type": "file_list", "data": { "path": "C:\\Users" } }
+```
+
+**Server → Client**
+```json
+{
+  "type": "file_list",
+  "status": "success",
+  "data": {
+    "path": "C:\\Users",
+    "items": [
+      { "name": "Public", "is_dir": true, "size": 0, "mod_time": 1714000000 },
+      { "name": "notes.txt", "is_dir": false, "size": 1024, "mod_time": 1714000000 }
+    ]
+  }
+}
+```
+
+### Read File (Download)
+
+**Client → Server**
+```json
+{ "type": "file_read", "data": { "path": "C:\\Users\\notes.txt" } }
+```
+
+**Server → Client**
+```json
+{
+  "type": "file_read",
+  "status": "success",
+  "data": {
+    "path": "C:\\Users\\notes.txt",
+    "content": "<base64 encoded content>",
+    "size": 1024
+  }
+}
+```
+*Note: For security, path traversal (using `..`) is strictly prohibited and will return a 403 Forbidden error.*
 
 ---
 
