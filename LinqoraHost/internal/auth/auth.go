@@ -1,13 +1,24 @@
 package auth
 
 import (
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
 	"LinqoraHost/internal/config"
 	"LinqoraHost/internal/interfaces"
 )
+
+const (
+	// maxAuthAttemptsPerMinute is the maximum number of auth attempts allowed per IP per minute.
+	maxAuthAttemptsPerMinute = 5
+)
+
+// authAttemptRecord tracks the number of auth attempts from a single IP.
+type authAttemptRecord struct {
+	Count        int
+	FirstAttempt time.Time
+}
 
 // AuthManager coordinates device authorization requests and maintains the trusted device registry.
 type AuthManager struct {
@@ -16,6 +27,7 @@ type AuthManager struct {
 	pendingChan   chan<- interfaces.PendingAuthRequest
 	pendingResult map[string]bool
 	challenges    *ChallengeStore
+	authAttempts  map[string]*authAttemptRecord
 	mu            sync.Mutex
 }
 
@@ -27,6 +39,18 @@ func NewAuthManager(cfg *config.ServerConfig, authChan chan<- interfaces.Pending
 		pendingChan:   authChan,
 		pendingResult: make(map[string]bool),
 		challenges:    NewChallengeStore(),
+		authAttempts:  make(map[string]*authAttemptRecord),
+	}
+}
+
+// cleanupAttempts removes attempt records older than 2 minutes.
+// Must be called with am.mu held.
+func (am *AuthManager) cleanupAttempts() {
+	cutoff := time.Now().Add(-2 * time.Minute)
+	for ip, record := range am.authAttempts {
+		if record.FirstAttempt.Before(cutoff) {
+			delete(am.authAttempts, ip)
+		}
 	}
 }
 
@@ -36,16 +60,35 @@ func (am *AuthManager) RequestAuthorization(deviceName, deviceID, ip string) boo
 	am.mu.Lock()
 	defer am.mu.Unlock()
 
+	// Clean up stale entries first
+	am.cleanupAttempts()
+
+	// Check per-IP rate limit
+	record, exists := am.authAttempts[ip]
+	if exists && time.Since(record.FirstAttempt) < time.Minute {
+		if record.Count >= maxAuthAttemptsPerMinute {
+			slog.Warn("Auth rate limit exceeded", "ip", ip, "device", deviceName, "attempts", record.Count)
+			return false
+		}
+	}
+
 	// Check if device is already authorized
 	if _, exists := am.config.AuthorizedDevs[deviceID]; exists {
-		log.Printf("Device %s already authorized", deviceName)
+		slog.Info("Device already authorized", "device", deviceName)
 		return true
 	}
 
 	// Check if there is already a pending request
 	if _, exists := am.pendingAuth[deviceID]; exists {
-		log.Printf("Authorization request for device %s already pending", deviceName)
+		slog.Info("Authorization request already pending", "device", deviceName)
 		return true
+	}
+
+	// Increment attempt counter
+	if record == nil || time.Since(record.FirstAttempt) >= time.Minute {
+		am.authAttempts[ip] = &authAttemptRecord{Count: 1, FirstAttempt: time.Now()}
+	} else {
+		record.Count++
 	}
 
 	// Create new authorization request
@@ -59,7 +102,7 @@ func (am *AuthManager) RequestAuthorization(deviceName, deviceID, ip string) boo
 	am.pendingAuth[deviceID] = request
 
 	if am.pendingChan == nil {
-		log.Printf("ERROR: pendingChan is nil, cannot send auth request for %s", deviceName)
+		slog.Error("pendingChan is nil, cannot send auth request", "device", deviceName)
 		return false
 	}
 
@@ -67,9 +110,9 @@ func (am *AuthManager) RequestAuthorization(deviceName, deviceID, ip string) boo
 	go func() {
 		select {
 		case am.pendingChan <- *request:
-			log.Printf("Auth request sent to console for device %s", deviceName)
+			slog.Info("Auth request sent to console", "device", deviceName)
 		case <-time.After(1 * time.Second):
-			log.Printf("Failed to send auth request to console (timeout) for device %s", deviceName)
+			slog.Warn("Failed to send auth request to console (timeout)", "device", deviceName)
 		}
 	}()
 
@@ -83,7 +126,7 @@ func (am *AuthManager) RespondToAuthRequest(deviceID string, approved bool) {
 
 	request, exists := am.pendingAuth[deviceID]
 	if !exists {
-		log.Printf("No pending auth request for device ID: %s", deviceID)
+		slog.Warn("No pending auth request", "device_id", deviceID)
 		return
 	}
 
@@ -99,7 +142,7 @@ func (am *AuthManager) RespondToAuthRequest(deviceID string, approved bool) {
 		}
 
 		if err := am.config.SaveConfig(); err != nil {
-			log.Printf("Error saving config: %v", err)
+			slog.Error("Error saving config", "err", err)
 		}
 	}
 }
@@ -132,10 +175,10 @@ func (am *AuthManager) RevokeAuth(deviceID string) {
 
 	if _, exists := am.config.AuthorizedDevs[deviceID]; exists {
 		delete(am.config.AuthorizedDevs, deviceID)
-		log.Printf("Authorization revoked for device ID: %s", deviceID)
+		slog.Info("Authorization revoked", "device_id", deviceID)
 
 		if err := am.config.SaveConfig(); err != nil {
-			log.Printf("Error saving config: %v", err)
+			slog.Error("Error saving config", "err", err)
 		}
 	}
 }

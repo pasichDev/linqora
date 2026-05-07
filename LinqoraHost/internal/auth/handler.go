@@ -2,7 +2,7 @@ package auth
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"time"
 
 	"LinqoraHost/internal/interfaces"
@@ -43,31 +43,30 @@ func (am *AuthManager) IsVersionClientSupported(version string) bool {
 
 // HandleAuthRequest processes an incoming authorization request from a client.
 func (am *AuthManager) HandleAuthRequest(client interfaces.WSClient, msg interfaces.WSMessage) {
-	log.Printf("Processing auth request from %s", client.GetIP())
+	slog.Info("Processing auth request", "ip", client.GetIP())
 
 	var authData AuthRequestData
 	if err := json.Unmarshal(msg.GetData(), &authData); err != nil {
-		log.Printf("Error unmarshaling auth data: %v", err)
+		slog.Error("Error unmarshaling auth data", "err", err)
 		sendResponse(client, AuthStatusInvalidFormat, false, MessageTypeAuthResponse)
 		return
 	}
 
 	deviceID := authData.DeviceID
 	if deviceID == "" {
-		log.Printf("Empty device ID in auth request")
+		slog.Warn("Empty device ID in auth request")
 		sendResponse(client, AuthStatusMissingDeviceID, false, MessageTypeAuthResponse)
 		return
 	}
 
 	// Verify client compatibility.
 	if !am.IsVersionClientSupported(authData.VersionClient) {
-		log.Printf("Unsupported client version: %s", authData.VersionClient)
+		slog.Warn("Unsupported client version", "version", authData.VersionClient)
 		sendResponse(client, AuthStatusUnsupportedVersion, false, MessageTypeAuthResponse)
 		return
 	}
 
-	log.Printf("Auth request from device %s (%s) at IP %s",
-		authData.DeviceName, deviceID, client.GetIP())
+	slog.Info("Auth request received", "device", authData.DeviceName, "device_id", deviceID, "ip", client.GetIP())
 
 	client.SetDeviceID(deviceID)
 	client.SetDeviceName(authData.DeviceName)
@@ -77,18 +76,18 @@ func (am *AuthManager) HandleAuthRequest(client interfaces.WSClient, msg interfa
 	if am.config.SharedSecret != "" {
 		token, err := am.challenges.Generate(deviceID)
 		if err != nil {
-			log.Printf("Failed to generate challenge for %s: %v", authData.DeviceName, err)
+			slog.Error("Failed to generate challenge", "device", authData.DeviceName, "err", err)
 			sendResponse(client, AuthStatusRequestFailed, false, MessageTypeAuthResponse)
 			return
 		}
 		client.SendSuccess(MessageTypeAuthChallenge, map[string]interface{}{"token": token})
-		log.Printf("Challenge issued to device %s (%s)", authData.DeviceName, deviceID)
+		slog.Info("Challenge issued", "device", authData.DeviceName, "device_id", deviceID)
 		return
 	}
 
 	// Check if the device is already authorized (no shared secret path).
 	if am.IsAuthorized(deviceID) {
-		log.Printf("Device %s already authorized", authData.DeviceName)
+		slog.Info("Device already authorized", "device", authData.DeviceName)
 		sendResponse(client, AuthStatusAuthorized, true, MessageTypeAuthResponse)
 		return
 	}
@@ -103,10 +102,10 @@ func (am *AuthManager) HandleAuthRequest(client interfaces.WSClient, msg interfa
 
 		// Start background monitoring for the user's decision.
 		go am.checkAuthResultPeriodically(client)
-		log.Printf("Auth request for %s is pending", authData.DeviceName)
+		slog.Info("Auth request pending", "device", authData.DeviceName)
 	} else {
 		sendResponse(client, AuthStatusRequestFailed, false, MessageTypeAuthResponse)
-		log.Printf("Failed to request auth for %s", authData.DeviceName)
+		slog.Warn("Failed to request auth", "device", authData.DeviceName)
 	}
 }
 
@@ -177,7 +176,7 @@ func (am *AuthManager) HandleChallengeResponse(client interfaces.WSClient, msg i
 		HMAC  string `json:"hmac"`
 	}
 	if err := json.Unmarshal(msg.GetData(), &data); err != nil {
-		log.Printf("Error parsing challenge response: %v", err)
+		slog.Error("Error parsing challenge response", "err", err)
 		sendResponse(client, AuthStatusInvalidFormat, false, MessageTypeAuthResponse)
 		return
 	}
@@ -189,12 +188,12 @@ func (am *AuthManager) HandleChallengeResponse(client interfaces.WSClient, msg i
 	}
 
 	if !am.challenges.Verify(deviceID, data.Token, data.HMAC, am.config.SharedSecret) {
-		log.Printf("Challenge HMAC mismatch for device %s", client.GetDeviceName())
+		slog.Warn("Challenge HMAC mismatch", "device", client.GetDeviceName())
 		sendResponse(client, AuthStatusChallengeInvalid, false, MessageTypeAuthResponse)
 		return
 	}
 
-	log.Printf("Challenge verified for device %s (%s)", client.GetDeviceName(), deviceID)
+	slog.Info("Challenge verified", "device", client.GetDeviceName(), "device_id", deviceID)
 
 	if am.IsAuthorized(deviceID) {
 		sendResponse(client, AuthStatusAuthorized, true, MessageTypeAuthResponse)

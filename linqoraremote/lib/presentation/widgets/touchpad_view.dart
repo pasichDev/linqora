@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:linqoraremote/data/providers/websocket_provider.dart';
 
@@ -86,11 +87,20 @@ class _TouchpadViewState extends State<TouchpadView> {
           // pan → move
           onPanUpdate: (d) => _mouse.moveMouse(d.delta.dx, d.delta.dy),
           // tap → left click
-          onTap: _mouse.leftClick,
+          onTap: () {
+            HapticFeedback.lightImpact();
+            _mouse.leftClick();
+          },
           // double-tap → double click
-          onDoubleTap: _mouse.doubleClick,
+          onDoubleTap: () {
+            HapticFeedback.lightImpact();
+            _mouse.doubleClick();
+          },
           // long press → right click
-          onLongPress: _mouse.rightClick,
+          onLongPress: () {
+            HapticFeedback.mediumImpact();
+            _mouse.rightClick();
+          },
           child: Container(
             width: double.infinity,
             height: double.infinity,
@@ -143,10 +153,12 @@ class _TouchpadViewState extends State<TouchpadView> {
             onVerticalDragUpdate: (d) {
               _scrollAccum += d.delta.dy;
               while (_scrollAccum >= notchThreshold) {
+                HapticFeedback.selectionClick();
                 _mouse.scroll(-1); // drag down = scroll down
                 _scrollAccum -= notchThreshold;
               }
               while (_scrollAccum <= -notchThreshold) {
+                HapticFeedback.selectionClick();
                 _mouse.scroll(1); // drag up = scroll up
                 _scrollAccum += notchThreshold;
               }
@@ -213,7 +225,10 @@ class _TouchpadViewState extends State<TouchpadView> {
     required VoidCallback onPressed,
   }) {
     return ElevatedButton.icon(
-      onPressed: onPressed,
+      onPressed: () {
+        HapticFeedback.lightImpact();
+        onPressed();
+      },
       icon: Icon(icon, size: 20),
       label: Text(label),
       style: ElevatedButton.styleFrom(

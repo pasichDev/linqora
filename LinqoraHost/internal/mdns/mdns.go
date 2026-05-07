@@ -2,7 +2,7 @@ package mdns
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -29,7 +29,7 @@ func NewMDNSServer(cfg *config.ServerConfig) *MDNSServer {
 	hostname, err := os.Hostname()
 	if err != nil {
 		hostname = "linqora-host"
-		log.Printf("Failed to get hostname: %v, using default 'linqora-host'", err)
+		slog.Warn("Failed to get hostname, using default", "err", err, "default", "linqora-host")
 	}
 
 	cleanHostname := strings.ToLower(strings.ReplaceAll(hostname, " ", "_"))
@@ -66,14 +66,13 @@ func (s *MDNSServer) Start() error {
 	}
 
 	s.server = server
-	log.Printf("mDNS server started as '%s.%s.%s' on port %d",
-		s.mdnsName, s.mdnsType, s.mdnsDomain, s.config.Port)
+	slog.Info("mDNS server started", "name", s.mdnsName, "type", s.mdnsType, "domain", s.mdnsDomain, "port", s.config.Port)
 	return nil
 }
 
 func (s *MDNSServer) Stop() {
 	if s.server != nil {
-		log.Printf("Shutting down mDNS server")
+		slog.Info("Shutting down mDNS server")
 		s.server.Shutdown()
 	}
 }

@@ -38,7 +38,7 @@ class PowerController extends GetxController {
     final String indicator = data['data']['status'];
 
     if (indicator.contains("locked")) {
-      showErrorSnackbar('device_locked'.tr, 'ban_commands.tr');
+      showErrorSnackbar('device_locked'.tr, 'ban_commands'.tr);
     } else {
       final int action = data['data']['action'];
       _messageSnack(action);

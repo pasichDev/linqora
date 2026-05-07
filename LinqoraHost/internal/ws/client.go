@@ -3,7 +3,7 @@ package ws
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -18,7 +18,7 @@ const (
 	// pingPeriod is the interval to send pings to the peer. Must be less than pongWait.
 	pingPeriod = (pongWait * 9) / 10
 	// maxMessageSize is the maximum message size allowed from the peer.
-	maxMessageSize = 512
+	maxMessageSize = 4 * 1024 * 1024
 )
 
 // Client represents a connected WebSocket client.
@@ -111,14 +111,14 @@ func (c *Client) StartReadPump(handleMessage func(*ClientMessage), onDisconnect 
 
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("Panic recovered in ReadPump: %v", r)
+			slog.Error("Panic recovered in ReadPump", "err", r)
 		}
 
 		if onDisconnect != nil {
 			onDisconnect()
 		}
 
-		log.Printf("Client %s disconnected", c.DeviceName)
+		slog.Info("Client disconnected", "device", c.DeviceName)
 	}()
 
 	for {
@@ -127,7 +127,7 @@ func (c *Client) StartReadPump(handleMessage func(*ClientMessage), onDisconnect 
 			if websocket.IsUnexpectedCloseError(err,
 				websocket.CloseGoingAway, websocket.CloseAbnormalClosure,
 				websocket.CloseNoStatusReceived) {
-				log.Printf("WebSocket read error: %v", err)
+				slog.Error("WebSocket read error", "err", err)
 			}
 			break
 		}
@@ -138,7 +138,7 @@ func (c *Client) StartReadPump(handleMessage func(*ClientMessage), onDisconnect 
 
 		var clientMsg ClientMessage
 		if err := json.Unmarshal(message, &clientMsg); err != nil {
-			log.Printf("Error unmarshaling message: %v", err)
+			slog.Error("Error unmarshaling message", "err", err)
 			continue
 		}
 
@@ -161,7 +161,7 @@ func (c *Client) StartReadPump(handleMessage func(*ClientMessage), onDisconnect 
 
 		// Rate limiting protection
 		if clientMsg.Type != "ping" && !c.limiter.Allow() {
-			log.Printf("Rate limit exceeded for client %s, dropping %q", c.DeviceName, clientMsg.Type)
+			slog.Warn("Rate limit exceeded for client", "device", c.DeviceName, "type", clientMsg.Type)
 			c.SendError(clientMsg.Type, "Rate limit exceeded, slow down", 429)
 			continue
 		}
@@ -170,7 +170,7 @@ func (c *Client) StartReadPump(handleMessage func(*ClientMessage), onDisconnect 
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
-					log.Printf("Panic recovered in message handling: %v", r)
+					slog.Error("Panic recovered in message handling", "err", r)
 				}
 			}()
 
@@ -184,11 +184,11 @@ func (c *Client) StartWritePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("Panic recovered in WritePump: %v", r)
+			slog.Error("Panic recovered in WritePump", "err", r)
 		}
 
 		ticker.Stop()
-		log.Printf("WritePump for client %s stopped", c.DeviceName)
+		slog.Info("WritePump stopped", "device", c.DeviceName)
 	}()
 
 	for {
@@ -200,7 +200,7 @@ func (c *Client) StartWritePump() {
 		case message, ok := <-c.SendChannel:
 			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
-				log.Printf("SendChannel closed for client %s, exiting WritePump", c.DeviceName)
+				slog.Info("SendChannel closed, exiting WritePump", "device", c.DeviceName)
 				c.Conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(
 					websocket.CloseNormalClosure, "channel closed"))
 				return
@@ -208,24 +208,24 @@ func (c *Client) StartWritePump() {
 
 			w, err := c.Conn.NextWriter(websocket.TextMessage)
 			if err != nil {
-				log.Printf("Error getting writer for client %s: %v", c.DeviceName, err)
+				slog.Error("Error getting writer", "device", c.DeviceName, "err", err)
 				return
 			}
 
 			_, err = w.Write(message)
 			if err != nil {
-				log.Printf("Error writing message to client %s: %v", c.DeviceName, err)
+				slog.Error("Error writing message", "device", c.DeviceName, "err", err)
 				return
 			}
 
 			if err := w.Close(); err != nil {
-				log.Printf("Error closing writer for client %s: %v", c.DeviceName, err)
+				slog.Error("Error closing writer", "device", c.DeviceName, "err", err)
 				return
 			}
 		case <-ticker.C:
 			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				log.Printf("Error sending ping to client %s: %v", c.DeviceName, err)
+				slog.Error("Error sending ping", "device", c.DeviceName, "err", err)
 				return
 			}
 		}
@@ -286,7 +286,7 @@ func (c *Client) SendError(requestType string, message string, errorCode ...int)
 	if jsonMsg, err := json.Marshal(errorResponse); err == nil {
 		return c.sendMessage(jsonMsg)
 	} else {
-		log.Printf("Error marshaling error message: %v", err)
+		slog.Error("Error marshaling error message", "err", err)
 		return err
 	}
 }
@@ -297,7 +297,7 @@ func (c *Client) SendSuccess(responseType string, data interface{}) error {
 	if jsonMsg, err := json.Marshal(successResponse); err == nil {
 		return c.sendMessage(jsonMsg)
 	} else {
-		log.Printf("Error marshaling success message: %v", err)
+		slog.Error("Error marshaling success message", "err", err)
 		return err
 	}
 }
@@ -322,7 +322,7 @@ func (c *Client) Close() {
 		c.SendChannel = nil
 	}
 
-	log.Printf("Client %s closed gracefully", c.DeviceName)
+	slog.Info("Client closed gracefully", "device", c.DeviceName)
 }
 
 // Lock acquires the client's mutex.

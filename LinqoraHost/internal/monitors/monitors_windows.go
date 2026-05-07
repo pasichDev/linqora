@@ -96,11 +96,124 @@ func platformGetMonitors() ([]MonitorInfo, error) {
 }
 
 func platformSetResolution(monitorID string, width, height, refreshRate int) error {
-	// Implementation requires more complex devModeW filling and ChangeDisplaySettingsEx calls
-	// For now, return not implemented error or a simplified version
-	return fmt.Errorf("setting resolution is not yet implemented for Windows in this version")
+	// Convert monitorID to UTF-16 pointer
+	devicePtr, err := syscall.UTF16PtrFromString(monitorID)
+	if err != nil {
+		return fmt.Errorf("invalid monitor ID: %w", err)
+	}
+
+	var dm devModeW
+	dm.Size = uint16(unsafe.Sizeof(dm))
+
+	// Query current settings first
+	ret, _, _ := procEnumDisplaySettings.Call(
+		uintptr(unsafe.Pointer(devicePtr)), 0xFFFFFFFF,
+		uintptr(unsafe.Pointer(&dm)),
+	)
+	if ret == 0 {
+		return fmt.Errorf("failed to query display settings for %s", monitorID)
+	}
+
+	// DEVMODE field flags for resolution + refresh rate
+	const (
+		DM_PELSWIDTH           = 0x00080000
+		DM_PELSHEIGHT          = 0x00100000
+		DM_DISPLAYFREQUENCY    = 0x00400000
+		CDS_UPDATEREGISTRY     = 0x00000001
+		DISP_CHANGE_SUCCESSFUL = 0
+	)
+
+	dm.PelsWidth = uint32(width)
+	dm.PelsHeight = uint32(height)
+	if refreshRate > 0 {
+		dm.DisplayFrequency = uint32(refreshRate)
+		dm.Fields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_DISPLAYFREQUENCY
+	} else {
+		dm.Fields = DM_PELSWIDTH | DM_PELSHEIGHT
+	}
+
+	ret, _, _ = procChangeDisplaySettingsEx.Call(
+		uintptr(unsafe.Pointer(devicePtr)),
+		uintptr(unsafe.Pointer(&dm)),
+		0,
+		CDS_UPDATEREGISTRY,
+		0,
+	)
+	if int32(ret) != DISP_CHANGE_SUCCESSFUL {
+		return fmt.Errorf("ChangeDisplaySettingsExW failed with code %d", int32(ret))
+	}
+	return nil
 }
 
 func platformSetPrimary(monitorID string) error {
-	return fmt.Errorf("setting primary monitor is not yet implemented for Windows")
+	monitors, err := platformGetMonitors()
+	if err != nil {
+		return fmt.Errorf("failed to enumerate monitors: %w", err)
+	}
+
+	// Find the target monitor's position
+	var targetX, targetY int
+	found := false
+	for _, m := range monitors {
+		if m.ID == monitorID {
+			targetX, targetY = m.X, m.Y
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("monitor %s not found", monitorID)
+	}
+
+	const (
+		DM_POSITION            = 0x00000020
+		CDS_SET_PRIMARY        = 0x00000010
+		CDS_UPDATEREGISTRY     = 0x00000001
+		CDS_NORESET            = 0x10000000
+		DISP_CHANGE_SUCCESSFUL = 0
+	)
+
+	// Shift all monitors so the target becomes (0,0)
+	for _, m := range monitors {
+		devicePtr, err := syscall.UTF16PtrFromString(m.ID)
+		if err != nil {
+			continue
+		}
+
+		var dm devModeW
+		dm.Size = uint16(unsafe.Sizeof(dm))
+		procEnumDisplaySettings.Call(
+			uintptr(unsafe.Pointer(devicePtr)), 0xFFFFFFFF,
+			uintptr(unsafe.Pointer(&dm)),
+		)
+
+		// Reposition relative to new primary
+		// Position union starts at byte 28 in DEVMODEW (dmPosition)
+		// We encode X,Y into the struct via the union offset manually
+		newX := int32(m.X - targetX)
+		newY := int32(m.Y - targetY)
+		// Write position via unsafe pointer arithmetic into devModeW union
+		// The union for display settings starts at offset of Orientation field
+		// DEVMODEW: dmPosition is at offset 28 bytes after dmDeviceName+dmSpecVersion+...
+		// Simpler: re-query and set fields
+		dm.Fields = DM_POSITION
+		// Set position bits in the struct union (bytes 28-35 in the display-device union)
+		*(*int32)(unsafe.Pointer(uintptr(unsafe.Pointer(&dm)) + 28)) = newX
+		*(*int32)(unsafe.Pointer(uintptr(unsafe.Pointer(&dm)) + 32)) = newY
+
+		flags := uint32(CDS_UPDATEREGISTRY | CDS_NORESET)
+		if m.ID == monitorID {
+			flags |= CDS_SET_PRIMARY
+		}
+
+		procChangeDisplaySettingsEx.Call(
+			uintptr(unsafe.Pointer(devicePtr)),
+			uintptr(unsafe.Pointer(&dm)),
+			0, uintptr(flags), 0,
+		)
+	}
+
+	// Apply all changes
+	procChangeDisplaySettingsEx.Call(0, 0, 0, 0, 0)
+	return nil
 }

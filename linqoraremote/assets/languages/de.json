@@ -119,5 +119,11 @@
   "scripts": "Skripte",
   "no_scripts_available": "Keine Skripte auf dem Host verfügbar",
   "execute": "Ausführen",
-  "exit_code": "Exit-Code"
+  "exit_code": "Exit-Code",
+  "confirm": "Bestätigen",
+  "confirm_shutdown": "Sind Sie sicher, dass Sie das Gerät herunterfahren möchten?",
+  "confirm_restart": "Sind Sie sicher, dass Sie das Gerät neu starten möchten?",
+  "reconnecting": "Verbindung wird wiederhergestellt",
+  "connection_failed": "Verbindung fehlgeschlagen",
+  "retry": "Erneut versuchen"
 }

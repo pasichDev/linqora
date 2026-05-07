@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -101,7 +101,7 @@ func (s *WSServer) Start(parentCtx context.Context) error {
 
 	go func() {
 		var err error
-		log.Printf("WebSocket server started at :%d", s.config.Port)
+		slog.Info("WebSocket server started", "port", s.config.Port)
 
 		if s.config.EnableTLS {
 			err = s.httpServer.ListenAndServeTLS(
@@ -113,17 +113,17 @@ func (s *WSServer) Start(parentCtx context.Context) error {
 		}
 
 		if err != nil && err != http.ErrServerClosed {
-			log.Printf("WebSocket server failed: %v", err)
+			slog.Error("WebSocket server failed", "err", err)
 			serverErr <- err
 		}
 	}()
 
 	select {
 	case <-parentCtx.Done():
-		log.Println("Parent context cancelled, shutting down...")
+		slog.Info("Parent context cancelled, shutting down...")
 		return s.Shutdown()
 	case <-s.ctx.Done():
-		log.Println("Server context cancelled, shutting down...")
+		slog.Info("Server context cancelled, shutting down...")
 		return s.Shutdown()
 	case err := <-serverErr:
 		return err
@@ -132,18 +132,18 @@ func (s *WSServer) Start(parentCtx context.Context) error {
 
 // Shutdown gracefully stops the server and disconnects all clients.
 func (s *WSServer) Shutdown() error {
-	log.Println("Shutting down WebSocket server...")
+	slog.Info("Shutting down WebSocket server...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	s.clientsMutex.Lock()
-	log.Printf("Closing %d client connections...", len(s.clients))
+	slog.Info("Closing client connections", "count", len(s.clients))
 	for client := range s.clients {
 		if err := client.Conn.WriteControl(websocket.CloseMessage,
 			websocket.FormatCloseMessage(websocket.CloseGoingAway, "server shutdown"),
 			time.Now().Add(time.Second)); err != nil {
-			log.Printf("Error sending close message to client: %v", err)
+			slog.Error("Error sending close message to client", "err", err)
 		}
 		client.Conn.Close()
 		delete(s.clients, client)
@@ -151,12 +151,12 @@ func (s *WSServer) Shutdown() error {
 	s.clientsMutex.Unlock()
 
 	if err := s.httpServer.Shutdown(ctx); err != nil {
-		log.Printf("HTTP server shutdown error: %v", err)
+		slog.Error("HTTP server shutdown error", "err", err)
 		return err
 	}
 
 	s.cancel()
-	log.Println("WebSocket server stopped successfully")
+	slog.Info("WebSocket server stopped successfully")
 	return nil
 }
 
@@ -168,11 +168,11 @@ func (s *WSServer) StopServer() error {
 
 // handleWSConnection upgrades an HTTP connection to a WebSocket connection.
 func (s *WSServer) handleWSConnection(w http.ResponseWriter, r *http.Request) {
-	log.Println("WebSocket connection attempt from", r.RemoteAddr)
+	slog.Info("WebSocket connection attempt", "remote_addr", r.RemoteAddr)
 
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println("Upgrade error:", err)
+		slog.Error("Upgrade error", "err", err)
 		return
 	}
 
@@ -206,7 +206,7 @@ func (s *WSServer) removeClient(client *Client) {
 	if _, exists := s.clients[client]; exists {
 		delete(s.clients, client)
 		client.Close()
-		log.Printf("Client %s removed from active clients list", client.DeviceName)
+		slog.Info("Client removed from active clients list", "device", client.DeviceName)
 	}
 }
 
@@ -240,7 +240,7 @@ func (s *WSServer) checkInactiveClients() {
 	s.clientsMutex.Unlock()
 
 	for _, client := range inactiveClients {
-		log.Printf("Disconnecting inactive client %s (no PING for over 2 minutes)", client.DeviceName)
+		slog.Info("Disconnecting inactive client (no PING for over 2 minutes)", "device", client.DeviceName)
 
 		closeMsg := websocket.FormatCloseMessage(
 			websocket.CloseGoingAway,
@@ -307,6 +307,10 @@ func (s *WSServer) handleClientMessage(client *Client, msg *ClientMessage) {
 		s.handleMonitorList(client)
 	case "monitor_cmd":
 		s.handleMonitorCommand(client, msg)
+	case "monitor_set_resolution":
+		s.handleMonitorSetResolution(client, msg)
+	case "monitor_set_primary":
+		s.handleMonitorSetPrimary(client, msg)
 	case "file_list":
 		s.handleFileList(client, msg)
 	case "file_read":
@@ -317,7 +321,7 @@ func (s *WSServer) handleClientMessage(client *Client, msg *ClientMessage) {
 		if s.authManager != nil {
 			s.authManager.HandleAuthRequest(client, msg)
 		} else {
-			log.Printf("ERROR: authManager is nil")
+			slog.Error("authManager is nil")
 			client.SendError("auth_request", "Internal server error", 500)
 		}
 	case "auth_check":
@@ -333,7 +337,7 @@ func (s *WSServer) handleClientMessage(client *Client, msg *ClientMessage) {
 			client.SendError("auth_challenge_response", "Internal server error", 500)
 		}
 	default:
-		log.Printf("Unknown message type: %s", msg.Type)
+		slog.Warn("Unknown message type", "type", msg.Type)
 	}
 }
 
@@ -561,6 +565,41 @@ func (s *WSServer) handleMonitorCommand(client *Client, msg *ClientMessage) {
 	client.SendSuccess("monitor_cmd", map[string]interface{}{"status": "ok"})
 }
 
+// handleMonitorSetResolution sets the resolution of a specific monitor.
+func (s *WSServer) handleMonitorSetResolution(client *Client, msg *ClientMessage) {
+	var data struct {
+		MonitorID   string `json:"monitor_id"`
+		Width       int    `json:"width"`
+		Height      int    `json:"height"`
+		RefreshRate int    `json:"refresh_rate"`
+	}
+	if err := json.Unmarshal(msg.Data, &data); err != nil {
+		client.SendError("monitor_set_resolution", "Invalid format", 400)
+		return
+	}
+	if err := monitors.SetResolution(data.MonitorID, data.Width, data.Height, data.RefreshRate); err != nil {
+		client.SendError("monitor_set_resolution", err.Error(), 500)
+		return
+	}
+	client.SendSuccess("monitor_set_resolution", map[string]any{"status": "ok"})
+}
+
+// handleMonitorSetPrimary designates the specified monitor as the primary display.
+func (s *WSServer) handleMonitorSetPrimary(client *Client, msg *ClientMessage) {
+	var data struct {
+		MonitorID string `json:"monitor_id"`
+	}
+	if err := json.Unmarshal(msg.Data, &data); err != nil {
+		client.SendError("monitor_set_primary", "Invalid format", 400)
+		return
+	}
+	if err := monitors.SetPrimary(data.MonitorID); err != nil {
+		client.SendError("monitor_set_primary", err.Error(), 500)
+		return
+	}
+	client.SendSuccess("monitor_set_primary", map[string]any{"status": "ok"})
+}
+
 // handleFileList lists directory contents.
 func (s *WSServer) handleFileList(client *Client, msg *ClientMessage) {
 	var data struct {
@@ -660,12 +699,12 @@ func (s *WSServer) handlePowerCommand(client *Client, msg *ClientMessage) {
 			"status": "executing",
 		})
 		go func() {
-			log.Printf("Executing lock requested by %s", client.DeviceName)
+			slog.Info("Executing lock", "requested_by", client.DeviceName)
 			if err := power.ExecutePowerAction(powerCmd.Action); err != nil {
-				log.Printf("Lock failed: %v", err)
+				slog.Error("Lock failed", "err", err)
 			} else {
 				power.SetDeviceLocked(true)
-				log.Printf("Device locked")
+				slog.Info("Device locked")
 			}
 		}()
 		return
@@ -673,7 +712,7 @@ func (s *WSServer) handlePowerCommand(client *Client, msg *ClientMessage) {
 
 	locked, err := power.IsSystemLocked()
 	if err != nil {
-		log.Printf("Warning: system lock check failed: %v", err)
+		slog.Warn("System lock check failed", "err", err)
 		locked = power.IsDeviceLocked()
 	}
 
@@ -689,9 +728,9 @@ func (s *WSServer) handlePowerCommand(client *Client, msg *ClientMessage) {
 	})
 
 	go func() {
-		log.Printf("Executing power action %d requested by %s", powerCmd.Action, client.DeviceName)
+		slog.Info("Executing power action", "action", powerCmd.Action, "requested_by", client.DeviceName)
 		if err := power.ExecutePowerAction(powerCmd.Action); err != nil {
-			log.Printf("Power action failed: %v", err)
+			slog.Error("Power action failed", "err", err)
 		}
 	}()
 }

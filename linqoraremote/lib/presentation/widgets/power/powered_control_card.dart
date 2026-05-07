@@ -21,14 +21,52 @@ class PowerControlCard extends StatelessWidget {
               context,
               Icons.power_settings_new,
               'shut_down'.tr,
-              () => fetchAction(PowerActions.shutDown),
+              () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: Text('confirm'.tr),
+                    content: Text('confirm_shutdown'.tr),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: Text('cancel'.tr),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: Text('confirm'.tr),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed == true) fetchAction(PowerActions.shutDown);
+              },
               Colors.red.shade300,
             ),
             _buildControlButton(
               context,
               Icons.restart_alt,
               'restart'.tr,
-              () => fetchAction(PowerActions.restart),
+              () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: Text('confirm'.tr),
+                    content: Text('confirm_restart'.tr),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: Text('cancel'.tr),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: Text('confirm'.tr),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed == true) fetchAction(PowerActions.restart);
+              },
               Get.theme.colorScheme.secondary,
             ),
             _buildControlButton(
@@ -48,7 +86,7 @@ class PowerControlCard extends StatelessWidget {
     BuildContext context,
     IconData iconData,
     String label,
-    VoidCallback onPressed,
+    Function() onPressed,
     Color iconColor,
   ) {
     return InkWell(

@@ -1,7 +1,7 @@
 package collectors
 
 import (
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 )
@@ -42,12 +42,12 @@ func (cm *CollectorManager) OnFirstClientJoined(roomName string) {
 	switch roomName {
 	case "metrics":
 		if !cm.metricsCollector.IsRunning() {
-			log.Println("Starting metrics collector because first client joined metrics room")
+			slog.Info("Starting metrics collector because first client joined metrics room")
 			cm.metricsCollector.Start()
 		}
 	case "media":
 		if !cm.mediaCollector.IsRunning() {
-			log.Println("Starting media collector because first client joined media room")
+			slog.Info("Starting media collector because first client joined media room")
 			cm.mediaCollector.Start()
 		}
 	}
@@ -64,12 +64,12 @@ func (cm *CollectorManager) OnLastClientLeft(roomName string) {
 	switch roomName {
 	case "metrics":
 		if cm.metricsCollector.IsRunning() {
-			log.Println("Stopping metrics collector because last client left metrics room")
+			slog.Info("Stopping metrics collector because last client left metrics room")
 			cm.metricsCollector.Stop()
 		}
 	case "media":
 		if cm.mediaCollector.IsRunning() {
-			log.Println("Stopping media collector because last client left media room")
+			slog.Info("Stopping media collector because last client left media room")
 			cm.mediaCollector.Stop()
 		}
 	}

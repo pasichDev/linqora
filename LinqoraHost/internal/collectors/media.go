@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 )
@@ -48,7 +48,7 @@ func (mc *MediaCollector) Start() {
 	mc.cancel = cancel
 	mc.isRunning = true
 
-	log.Println("Starting media collector")
+	slog.Info("Starting media collector")
 
 	go mc.collectLoop(ctx)
 }
@@ -64,7 +64,7 @@ func (mc *MediaCollector) Stop() {
 
 	mc.cancel()
 	mc.isRunning = false
-	log.Println("Stopped media collector")
+	slog.Info("Stopped media collector")
 }
 
 // IsRunning returns true if the collector is active.
@@ -96,12 +96,12 @@ func (mc *MediaCollector) collectLoop(ctx context.Context) {
 func (mc *MediaCollector) collectAndSend() {
 	nowPlaying, err := mc.collectMediaInfo()
 	if err != nil {
-		log.Printf("Error collecting media info: %v", err)
+		slog.Error("Error collecting media info", "err", err)
 	}
 
 	mediaCapabilities, err := mc.collectAudioCapabilities()
 	if err != nil {
-		log.Printf("Error collecting audio settings: %v", err)
+		slog.Error("Error collecting audio settings", "err", err)
 	}
 
 	if mediaCapabilities == nil && nowPlaying == nil {
@@ -109,7 +109,7 @@ func (mc *MediaCollector) collectAndSend() {
 	}
 
 	if mc.broadcaster == nil {
-		log.Printf("Warning: broadcaster not initialized")
+		slog.Warn("Broadcaster not initialized")
 		return
 	}
 
@@ -125,7 +125,7 @@ func (mc *MediaCollector) collectAndSend() {
 
 	metricsJSON, err := json.Marshal(response)
 	if err != nil {
-		log.Printf("Error marshaling media info: %v", err)
+		slog.Error("Error marshaling media info", "err", err)
 		return
 	}
 

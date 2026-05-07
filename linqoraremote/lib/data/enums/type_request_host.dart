@@ -65,6 +65,27 @@ enum TypeMessageWs {
 
   /// Real-time output line from a running script.
   script_output,
+
+  /// List files/directories at a path.
+  file_list,
+
+  /// Read a file's content (base64 encoded).
+  file_read,
+
+  /// Write/create a file (content base64 encoded).
+  file_write,
+
+  /// Delete a file or directory.
+  file_delete,
+
+  /// List all connected monitors.
+  monitor_list,
+
+  /// Set monitor resolution and refresh rate.
+  monitor_set_resolution,
+
+  /// Set a monitor as the primary display.
+  monitor_set_primary,
 }
 
 /// An extension on the `TypeMessageWs` enum to provide additional functionality.

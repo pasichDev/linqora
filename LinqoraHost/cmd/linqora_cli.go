@@ -14,7 +14,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"strings"
@@ -348,7 +348,7 @@ func runServer(cmd *cobra.Command, args []string) {
 	// Start the WebSocket server
 	go func() {
 		if err := server.Start(ctx); err != nil {
-			log.Printf("WebSocket server error: %v", err)
+			slog.Error("WebSocket server error", "err", err)
 			// Use safeCloseStop so that gracefulShutdown won't panic
 			// if it also tries to close the channel.
 			safeCloseStop()
@@ -371,6 +371,8 @@ func runServer(cmd *cobra.Command, args []string) {
 }
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)

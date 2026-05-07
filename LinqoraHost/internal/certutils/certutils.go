@@ -2,7 +2,7 @@ package certutils
 
 import (
 	"embed"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 )
@@ -13,29 +13,29 @@ var embeddedCerts embed.FS
 // Extracts certificates embedded by the developer
 func EnsureCertsExist() (bool, error) {
 
-	log.Println("TLS certificates not found at specified paths, extracting embedded certificates...")
+	slog.Info("TLS certificates not found at specified paths, extracting embedded certificates...")
 
 	// Create a directory for certificates
 	certDir := filepath.Dir("./certificates/")
 	if err := os.MkdirAll(certDir, 0755); err != nil {
-		log.Printf("Failed to create certificates directory: %v", err)
+		slog.Error("Failed to create certificates directory", "err", err)
 		return false, err
 	}
 
 	// Retrieve the certificate
 	if err := extractEmbeddedFile("certificates/dev_cert.pem", "./certificates/dev_cert.pem"); err != nil {
-		log.Printf("Failed to extract certificate: %v", err)
+		slog.Error("Failed to extract certificate", "err", err)
 
 		return false, err
 	}
 
 	// Retrieve the key
 	if err := extractEmbeddedFile("certificates/dev_key.pem", "./certificates/dev_key.pem"); err != nil {
-		log.Printf("Failed to extract key: %v", err)
+		slog.Error("Failed to extract key", "err", err)
 		return false, err
 	}
 
-	log.Println("TLS certificates successfully extracted, TLS enabled")
+	slog.Info("TLS certificates successfully extracted, TLS enabled")
 	return true, nil
 }
 
