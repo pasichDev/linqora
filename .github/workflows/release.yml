@@ -34,7 +34,7 @@ jobs:
         uses: mathieudutour/github-tag-action@v6.2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          default_bump: minor
+          default_bump: patch
 
       # Fetch the newly created tag so goreleaser can find it in git history
       - name: Fetch tags
