@@ -4,45 +4,44 @@ This document outlines the development plan and key tasks for the **Linqora** pr
 
 ---
 
-## ✅ Pre-Release Tasks for v0.1.0
+## ✅ Completed Milestones
 
-- [x] Review the codebase of `LinqoraHost` (Standardized documentation and audited internal modules)
-- [x] Review and optimize collectors for metrics and media data
-- [x] Add **Windows** support for `LinqoraHost` (Cross-platform implementation completed)
-- [x] Add support for GPU statistics collection
-- [x] Investigate and implement mouse emulation capabilities
-- [x] Integrate battery/power status into the host information
+### 🛡️ Security & Reliability (v0.2.0)
+- [x] **End-to-End Encryption (E2EE)**: Implemented AES-256-GCM for all WebSocket communication.
+- [x] **Comprehensive Testing**: Added unit and integration tests for all core modules.
+- [x] **CI/CD Pipeline**: Automated cross-platform builds and releases via GitHub Actions and GoReleaser.
+- [x] **Documentation Standard**: All internal code and comments refactored to professional English.
+
+### 🖥️ Remote Management Tools
+- [x] **Multi-monitor Management**: Switching, primary monitor control, and enumeration.
+- [x] **Remote File Browser**: Secure browsing, reading, and writing files remotely.
+- [x] **Modular CLI**: New command-line tool with subcommands for serve, config, and auth management.
+
+### 🚀 Initial Foundation (v0.1.0)
+- [x] **Windows Support**: Full cross-platform implementation.
+- [x] **System Monitoring**: GPU, CPU, and RAM metrics collection.
+- [x] **Media & Power**: Volume control and remote power management (shutdown/restart).
 
 ---
 
-## 🚀 Post-Release Tasks (after v0.1.0)
+## 🚀 Current Focus & TODO
 
-- [x] Implement a **task and script scheduler**:
-  - [x] Register scripts on the host
-  - [x] Execute scripts via the client with real-time output streaming
-- [/] Create documentation for `LinqoraHost` API (Internal GoDoc completed, external docs pending)
-- [ ] Develop an official website for the project
-- [ ] Write a detailed usage guide, including:
-  - [ ] Setup instructions
-  - [ ] Certificate usage and configuration
-- [x] Implement a separate CLI command for:
-  - [x] Managing configuration
-  - [x] Managing the list of authorized devices
+### 📖 Documentation & UX
+- [/] **Host API Documentation**: Internal GoDoc complete. Need to export to external wiki/site.
+- [ ] **Usage Guide**: Detailed instructions for setup, certificates, and E2EE configuration.
+- [ ] **Official Website**: Project landing page and documentation hub.
 
 ---
 
 ## 🔮 Future Tasks (Backlog)
 
-- [ ] Develop a GUI version of `LinqoraHost` (System tray integration and settings window)
-- [x] Explore further improvements to security (e.g., end-to-end encryption for specific data)
-- [x] Add support for multi-monitor management (switching, resolution control)
-- [x] Implement remote file browser/transfer capabilities
+- [ ] **GUI for Linqora Host**: System tray integration and settings window.
+- [ ] **Linux/macOS Advanced Features**: Extend monitor/file logic to other platforms.
+- [ ] **Plugin System**: Allow third-party extensions for custom metrics/commands.
 
 ---
 
 ## 🏷 Suggested Labels
-
-You may use labels in the repository to categorize tasks:
 
 - `enhancement` – Feature improvements and optimizations
 - `security` – Security-related improvements
