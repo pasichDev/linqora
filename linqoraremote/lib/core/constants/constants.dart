@@ -1,26 +1,25 @@
 import 'package:flutter/foundation.dart';
+import 'package:get_storage/get_storage.dart';
 
-/// A constant that determines whether self-signed certificates are allowed for SSL connections.
-///
-/// - **Purpose**: This is useful for development or testing environments where self-signed certificates
-///   might be used.
-/// - **Security Note**: It is strongly recommended to set this to `false` in production environments
-///   to avoid potential security vulnerabilities.
-///
-/// **Default Value**: `true`
-const bool allowSelfSigned = true;
+import 'settings.dart';
 
-/// A constant that controls whether to display error messages for superuser (SU) operations.
+/// Returns whether self-signed TLS certificates are allowed.
 ///
-/// - **Behavior**:
-///   - When the app is in debug mode (`kDebugMode` is `true`), this constant is set to `false`,
-///     meaning error messages for SU operations are not shown.
-///   - In non-debug (release) mode, this constant is set to `true`, enabling error messages.
+/// This is a runtime value stored in [GetStorage] (default: **false**).
+/// Unlike the previous compile-time `const bool allowSelfSigned = true`,
+/// this can be toggled from the Settings screen without recompiling the app.
 ///
-/// **Default Value**: `!kDebugMode`
+/// SECURITY: Keep this false in production. Only enable for development/testing
+/// environments where a trusted CA certificate cannot be deployed.
+bool get allowSelfSigned =>
+    GetStorage(SettingsConst.kSettings)
+        .read<bool>(SettingsConst.kAllowSelfSigned) ??
+    false;
+
+/// Controls whether to display error messages for superuser (SU) operations.
+///
+/// In debug mode errors are suppressed; in release mode they are shown.
 const bool showErrorSu = !kDebugMode;
 
-/// The maximum number of missed pings allowed before considering the connection lost.
-///
-/// **Default Value**: `2`
+/// Maximum number of missed pings before the connection is considered lost.
 const int maxMissedPings = 4;

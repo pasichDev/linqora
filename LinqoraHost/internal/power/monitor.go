@@ -1,6 +1,7 @@
 package power
 
 import (
+	"context"
 	"log"
 	"sync"
 	"time"
@@ -12,34 +13,43 @@ var (
 	lockMutex        sync.RWMutex
 )
 
-// Start monitoring the lock state of the device
-func StartLockStateMonitor() {
+// StartLockStateMonitor watches the OS lock state and synchronises the internal
+// flag. The goroutine exits when ctx is cancelled, so it stops cleanly on
+// server shutdown (previously it leaked forever with time.Sleep).
+func StartLockStateMonitor(ctx context.Context) {
 	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+
 		for {
-			if IsDeviceLocked() {
-				// If the internal state is locked, check the system state
-				systemLocked, err := IsSystemLocked()
-				if err != nil {
-					log.Printf("Error checking system lock state: %v", err)
-				} else if !systemLocked {
-					// System unlocked, update internal state
-					log.Printf("System unlock detected, updating state")
-					SetDeviceLocked(false)
+			select {
+			case <-ticker.C:
+				if IsDeviceLocked() {
+					systemLocked, err := IsSystemLocked()
+					if err != nil {
+						log.Printf("Error checking system lock state: %v", err)
+						continue
+					}
+					if !systemLocked {
+						log.Printf("System unlock detected, updating state")
+						SetDeviceLocked(false)
+					}
 				}
+			case <-ctx.Done():
+				return
 			}
-			time.Sleep(5 * time.Second)
 		}
 	}()
 }
 
-// Checks if the device is locked
+// IsDeviceLocked checks if the device is locked (internal state).
 func IsDeviceLocked() bool {
 	lockMutex.RLock()
 	defer lockMutex.RUnlock()
 	return deviceLocked
 }
 
-// Sets the locking status of the device
+// SetDeviceLocked updates the internal lock state.
 func SetDeviceLocked(locked bool) {
 	lockMutex.Lock()
 	defer lockMutex.Unlock()
@@ -49,7 +59,7 @@ func SetDeviceLocked(locked bool) {
 	}
 }
 
-// Returns the time when the device was locked
+// GetLockTime returns the time the device was locked.
 func GetLockTime() time.Time {
 	lockMutex.RLock()
 	defer lockMutex.RUnlock()

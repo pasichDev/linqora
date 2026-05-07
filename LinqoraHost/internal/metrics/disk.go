@@ -6,17 +6,17 @@ import (
 	"github.com/shirou/gopsutil/disk"
 )
 
-// DiskInfo содержит информацию о диске
+// DiskInfo provides metrics for a specific storage volume.
 type DiskInfo struct {
-	Name       string  `json:"name"`       // Имя/путь диска
-	Total      float64 `json:"total"`      // Общий размер в ГБ
-	Free       float64 `json:"free"`       // Свободное место в ГБ
-	Used       float64 `json:"used"`       // Использовано в ГБ
-	MountPath  string  `json:"mountPath"`  // Точка монтирования
-	FileSystem string  `json:"fileSystem"` // Файловая система
+	Name       string  `json:"name"`       // Device name or path
+	Total      float64 `json:"total"`      // Total size in GB
+	Free       float64 `json:"free"`       // Free space in GB
+	Used       float64 `json:"used"`       // Used space in GB
+	MountPath  string  `json:"mountPath"`  // Mount point location
+	FileSystem string  `json:"fileSystem"` // Type of filesystem
 }
 
-// GetDiskInfo возвращает информацию обо всех дисках
+// GetDiskInfo retrieves information for all mounted physical disks.
 func GetDiskInfo() ([]DiskInfo, error) {
 	partitions, err := disk.Partitions(false)
 	if err != nil {
@@ -26,7 +26,7 @@ func GetDiskInfo() ([]DiskInfo, error) {
 	var result []DiskInfo
 
 	for _, partition := range partitions {
-		// Пропускаем специальные файловые системы, которые не являются физическими дисками
+		// Skip virtual or pseudo filesystems.
 		if isSpecialFileSystem(partition.Fstype) {
 			continue
 		}
@@ -36,7 +36,7 @@ func GetDiskInfo() ([]DiskInfo, error) {
 			continue
 		}
 
-		// Пропускаем слишком маленькие разделы (меньше 100 МБ)
+		// Ignore partitions smaller than 100 MB.
 		if usage.Total < 100*1024*1024 {
 			continue
 		}
@@ -56,7 +56,7 @@ func GetDiskInfo() ([]DiskInfo, error) {
 	return result, nil
 }
 
-// Проверяет, является ли файловая система специальной (не физической)
+// isSpecialFileSystem checks if the filesystem type belongs to virtual or system categories.
 func isSpecialFileSystem(fstype string) bool {
 	specialTypes := []string{
 		"tmpfs", "devtmpfs", "devfs", "iso9660",
@@ -73,7 +73,7 @@ func isSpecialFileSystem(fstype string) bool {
 	return false
 }
 
-// Округляет байты до гигабайт с двумя знаками после запятой
+// roundToGB converts bytes to gigabytes, rounded to two decimal places.
 func roundToGB(bytes uint64) float64 {
 	return math.Round((float64(bytes)/1_000_000_000)*100) / 100
 }

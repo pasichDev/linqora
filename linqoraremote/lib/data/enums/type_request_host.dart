@@ -35,6 +35,36 @@ enum TypeMessageWs {
 
   /// Message type for power-related actions.
   power,
+
+  /// Challenge issued by the server for HMAC verification.
+  auth_challenge,
+
+  /// Client's HMAC response to a server challenge.
+  auth_challenge_response,
+
+  /// Mouse / touchpad control command.
+  mouse,
+
+  /// List all server-registered scripts.
+  script_list,
+
+  /// Add a new script.
+  script_add,
+
+  /// Update an existing script.
+  script_update,
+
+  /// Delete a script by id.
+  script_delete,
+
+  /// Execute a server-registered script by id.
+  script_execute,
+
+  /// Stop a running script by id.
+  script_stop,
+
+  /// Real-time output line from a running script.
+  script_output,
 }
 
 /// An extension on the `TypeMessageWs` enum to provide additional functionality.

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:get/get.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:linqoraremote/core/constants/names.dart';
 import 'package:linqoraremote/presentation/controllers/settings_controller.dart';
 import 'package:linqoraremote/presentation/widgets/settings/sponsor_card.dart';
+import 'package:linqoraremote/core/themes/lin_styles.dart';
+import 'package:linqoraremote/presentation/widgets/animated_aurora_background.dart';
 
 import '../../core/constants/urls.dart';
 import '../../core/utils/lauch_url.dart';
@@ -15,41 +18,45 @@ class SettingsPage extends GetView<SettingsController> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          "settings".tr,
-          style: TextStyle(fontWeight: FontWeight.bold),
+    return AnimatedAuroraBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: Text(
+            "settings".tr,
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 24),
+          ),
+          centerTitle: false,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded),
+            onPressed: () => Get.back(),
+          ),
         ),
-        elevation: 8,
-        centerTitle: false,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Get.back(),
+        body: ListView(
+          padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 20.0),
+          children: [
+            const SponsorCard().animate().fadeIn(duration: 400.ms).slideX(begin: -0.1),
+            const SizedBox(height: 24),
+            _buildThemeSection(context).animate().fadeIn(delay: 100.ms, duration: 400.ms).slideY(begin: 0.1),
+            const SizedBox(height: 24),
+            _buildConnectionSection(context).animate().fadeIn(delay: 200.ms, duration: 400.ms).slideY(begin: 0.1),
+            const SizedBox(height: 24),
+            _buildAboutSection(context).animate().fadeIn(delay: 300.ms, duration: 400.ms).slideY(begin: 0.1),
+            const SizedBox(height: 40),
+          ],
         ),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
-        children: [
-          SponsorCard(),
-          const SizedBox(height: 16),
-          _buildThemeSection(context),
-          const SizedBox(height: 16),
-          _buildConnectionSection(context),
-          const SizedBox(height: 16),
-          _buildAboutSection(context),
-        ],
       ),
     );
   }
 
-  Widget _buildCard(BuildContext context, Widget child) {
-    return Card(
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceContainer,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      child: Padding(padding: const EdgeInsets.all(16.0), child: child),
+  Widget _buildGlassSection(BuildContext context, {required Widget child}) {
+    return LinStyles.glassMorphism(
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: child,
+      ),
     );
   }
 
@@ -57,14 +64,22 @@ class SettingsPage extends GetView<SettingsController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader(title: 'design'.tr, icon: Icons.palette_outlined),
-        _buildCard(
+        SectionHeader(title: 'design'.tr, icon: Icons.palette_rounded),
+        const SizedBox(height: 12),
+        _buildGlassSection(
           context,
-          Column(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('app_theme'.tr, style: Get.textTheme.titleMedium),
-              const SizedBox(height: 16),
+              Text(
+                'app_theme'.tr,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 20),
               Obx(() => _buildThemeSelector(context)),
             ],
           ),
@@ -80,21 +95,21 @@ class SettingsPage extends GetView<SettingsController> {
         _buildThemeOption(
           context,
           'theme_set_system'.tr,
-          Icons.settings_suggest_outlined,
+          Icons.settings_suggest_rounded,
           controller.themeMode.value == ThemeMode.system,
           () => controller.saveThemeMode(ThemeMode.system),
         ),
         _buildThemeOption(
           context,
           'theme_set_light'.tr,
-          Icons.light_mode_outlined,
+          Icons.light_mode_rounded,
           controller.themeMode.value == ThemeMode.light,
           () => controller.saveThemeMode(ThemeMode.light),
         ),
         _buildThemeOption(
           context,
           'theme_set_dark'.tr,
-          Icons.dark_mode_outlined,
+          Icons.dark_mode_rounded,
           controller.themeMode.value == ThemeMode.dark,
           () => controller.saveThemeMode(ThemeMode.dark),
         ),
@@ -109,44 +124,46 @@ class SettingsPage extends GetView<SettingsController> {
     bool isSelected,
     VoidCallback onTap,
   ) {
-    return InkWell(
+    final colorScheme = Theme.of(context).colorScheme;
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 90,
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        width: MediaQuery.of(context).size.width * 0.25,
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          color: isSelected ? Get.theme.colorScheme.primaryContainer : null,
+          borderRadius: BorderRadius.circular(20),
+          color: isSelected ? colorScheme.primary.withOpacity(0.15) : Colors.white.withOpacity(0.05),
           border: Border.all(
-            color:
-                isSelected
-                    ? Get.theme.colorScheme.primary
-                    : Get.theme.colorScheme.outline,
-            width: 1.5,
+            color: isSelected ? colorScheme.primary : Colors.white.withOpacity(0.1),
+            width: 2,
           ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: colorScheme.primary.withOpacity(0.3),
+                    blurRadius: 15,
+                    spreadRadius: -5,
+                  )
+                ]
+              : [],
         ),
         child: Column(
           children: [
             Icon(
               icon,
-              size: 24,
-              color:
-                  isSelected
-                      ? Get.theme.colorScheme.primary
-                      : Get.theme.colorScheme.onSurface,
+              size: 28,
+              color: isSelected ? colorScheme.primary : Colors.white.withOpacity(0.5),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Text(
               label,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color:
-                    isSelected
-                        ? Get.theme.colorScheme.primary
-                        : Get.theme.colorScheme.onSurface,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                color: isSelected ? colorScheme.primary : Colors.white.withOpacity(0.7),
               ),
             ),
           ],
@@ -159,52 +176,41 @@ class SettingsPage extends GetView<SettingsController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader(title: 'connecting'.tr, icon: Icons.link_outlined),
-        _buildCard(
+        SectionHeader(title: 'connecting'.tr, icon: Icons.bolt_rounded),
+        const SizedBox(height: 12),
+        _buildGlassSection(
           context,
-          Column(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Obx(
-                () => SwitchListTile(
-                  title: Row(
-                    children: [
-                      Text('notification'.tr, style: Get.textTheme.titleMedium),
-                      const SizedBox(width: 8),
-                      if (!controller.notificationPermissionGranted.value &&
-                          controller.enableNotifications.value)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.orange,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            'required_permission'.tr,
-                            style: TextStyle(fontSize: 10, color: Colors.white),
-                          ),
-                        ),
-                    ],
-                  ),
-                  subtitle: Text('notification_description'.tr),
+                () => _buildSwitchTile(
+                  context,
+                  title: 'notification'.tr,
+                  subtitle: 'notification_description'.tr,
                   value: controller.enableNotifications.value,
                   onChanged: (value) => controller.toggleNotifications(value),
-                  contentPadding: EdgeInsets.zero,
+                  showBadge: !controller.notificationPermissionGranted.value && controller.enableNotifications.value,
                 ),
               ),
+              const Divider(height: 32, color: Colors.white10),
               Obx(
-                () => SwitchListTile(
-                  title: Text(
-                    'auto_connect'.tr,
-                    style: Get.textTheme.titleMedium,
-                  ),
-                  subtitle: Text('auto_connect_description'.tr),
+                () => _buildSwitchTile(
+                  context,
+                  title: 'auto_connect'.tr,
+                  subtitle: 'auto_connect_description'.tr,
                   value: controller.enableAutoConnect.value,
                   onChanged: (value) => controller.toggleAutoConnect(value),
-                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              const Divider(height: 32, color: Colors.white10),
+              Obx(
+                () => _buildSwitchTile(
+                  context,
+                  title: 'allow_self_signed'.tr,
+                  subtitle: 'allow_self_signed_description'.tr,
+                  value: controller.allowSelfSigned.value,
+                  onChanged: (value) => controller.toggleAllowSelfSigned(value),
                 ),
               ),
             ],
@@ -214,72 +220,150 @@ class SettingsPage extends GetView<SettingsController> {
     );
   }
 
+  Widget _buildSwitchTile(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+    bool showBadge = false,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  if (showBadge) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange.withOpacity(0.5)),
+                      ),
+                      child: Text(
+                        'required_permission'.tr,
+                        style: const TextStyle(fontSize: 10, color: Colors.orange, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.5)),
+              ),
+            ],
+          ),
+        ),
+        Switch.adaptive(
+          value: value,
+          onChanged: onChanged,
+          activeColor: Theme.of(context).colorScheme.primary,
+        ),
+      ],
+    );
+  }
+
   Widget _buildAboutSection(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader(title: 'about_app'.tr, icon: Icons.info_outline),
-        _buildCard(
+        SectionHeader(title: 'about_app'.tr, icon: Icons.auto_awesome_rounded),
+        const SizedBox(height: 12),
+        _buildGlassSection(
           context,
-          Column(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Get.theme.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: SvgPicture.asset(
-                    Assets.imagesLogoWhite,
-                    colorFilter: ColorFilter.mode(
-                      Get.theme.colorScheme.primary,
-                      BlendMode.srcIn,
+              Row(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    semanticsLabel: 'Linqora logo',
+                    child: SvgPicture.asset(
+                      Assets.imagesLogoWhite,
+                      colorFilter: ColorFilter.mode(
+                        Theme.of(context).colorScheme.primary,
+                        BlendMode.srcIn,
+                      ),
+                    ),
                   ),
-                ),
-                title: const Text(
-                  appName,
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                subtitle: Text(
-                  'app_version_text'.trParams({
-                    'version': controller.appVersion.value,
-                  }),
-                ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          appName,
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 1),
+                        ),
+                        Text(
+                          'app_version_text'.trParams({'version': controller.appVersion.value}),
+                          style: TextStyle(color: Colors.white.withOpacity(0.5), fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text('docs'.tr, style: Get.textTheme.titleMedium),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              const SizedBox(height: 24),
+              _buildListTile(
+                context,
+                title: 'docs'.tr,
+                icon: Icons.description_rounded,
                 onTap: () => launchUrlHandler(docs),
               ),
-
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text('license'.tr, style: Get.textTheme.titleMedium),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                onTap: () => {},
+              const Divider(height: 1, color: Colors.white10),
+              _buildListTile(
+                context,
+                title: 'license'.tr,
+                icon: Icons.gavel_rounded,
+                onTap: () {},
               ),
-
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  'privacy_police'.tr,
-                  style: Get.textTheme.titleMedium,
-                ),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              const Divider(height: 1, color: Colors.white10),
+              _buildListTile(
+                context,
+                title: 'privacy_police'.tr,
+                icon: Icons.privacy_tip_rounded,
                 onTap: () => launchUrlHandler(privacy),
               ),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildListTile(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon, color: Colors.white.withOpacity(0.7), size: 22),
+      title: Text(
+        title,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+      ),
+      trailing: Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.white.withOpacity(0.3)),
+      onTap: onTap,
     );
   }
 }

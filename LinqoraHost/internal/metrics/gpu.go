@@ -1,161 +1,176 @@
 package metrics
 
 import (
-	"fmt"
-	"io/ioutil"
+	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
 )
 
-// GPUInfo содержит информацию о графическом процессоре
+// GPUInfo holds basic GPU identification and memory data.
 type GPUInfo struct {
-	Model  string // Модель GPU
-	Memory int    // Объем памяти в МБ
+	Model  string `json:"model"`
+	Memory int    `json:"memory"` // MiB
 }
 
-// GetGPUInfo возвращает информацию о GPU
+// GetGPUInfo returns GPU information for the current platform.
 func GetGPUInfo() (GPUInfo, error) {
-	info := GPUInfo{
-		Model:  "Unknown",
-		Memory: 0,
-	}
-
 	switch runtime.GOOS {
 	case "linux":
-		// Пробуем получить информацию через nvidia-smi (для NVIDIA GPU)
-		cmd := exec.Command("nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader")
-		output, err := cmd.Output()
-		if err == nil && len(output) > 0 {
-			outputStr := string(output)
-			parts := strings.Split(strings.TrimSpace(outputStr), ", ")
-			if len(parts) >= 2 {
-				info.Model = parts[0]
-				memStr := strings.TrimSuffix(parts[1], " MiB")
-				if mem, err := parseInt(memStr); err == nil {
-					info.Memory = mem
-				}
-			}
-		} else {
-			// Проверяем наличие AMD/Intel GPU через lspci
-			cmd := exec.Command("lspci", "-v")
-			output, err := cmd.Output()
-			if err == nil {
-				outputStr := string(output)
-				lines := strings.Split(outputStr, "\n")
-
-				for _, line := range lines {
-					if strings.Contains(line, "VGA") || strings.Contains(line, "3D controller") {
-						if strings.Contains(line, "AMD") || strings.Contains(line, "ATI") {
-							info.Model = extractAMDGPUModel(line)
-							// Пытаемся получить память AMD GPU через файловую систему
-							getAMDMemoryInfo(&info)
-						} else if strings.Contains(line, "Intel") {
-							info.Model = extractGPUModel(line)
-							// Для Intel обычно сложно получить информацию о памяти через файлы
-						} else {
-							info.Model = extractGPUModel(line)
-						}
-						break
-					}
-				}
-			}
-		}
-
+		return getLinuxGPUInfo()
 	case "windows":
-		// Для Windows используем WMI запрос
-		cmd := exec.Command("powershell", "-Command", "Get-WmiObject Win32_VideoController | Select-Object Name, AdapterRAM | Format-List")
-		output, err := cmd.Output()
-		if err == nil {
-			outputStr := string(output)
+		return getWindowsGPUInfo()
+	case "darwin":
+		return getMacOSGPUInfo()
+	default:
+		return GPUInfo{Model: "Unknown"}, nil
+	}
+}
 
-			if nameLines := strings.Split(outputStr, "Name : "); len(nameLines) > 1 {
-				info.Model = strings.TrimSpace(strings.Split(nameLines[1], "\n")[0])
-			}
+// ── Linux ────────────────────────────────────────────────────────────────────
 
-			if memLines := strings.Split(outputStr, "AdapterRAM : "); len(memLines) > 1 {
-				memStr := strings.TrimSpace(strings.Split(memLines[1], "\n")[0])
-				if memVal, err := strconv.ParseInt(memStr, 10, 64); err == nil {
-					info.Memory = int(memVal / (1024 * 1024)) // Переводим в МБ
-				}
-			}
+func getLinuxGPUInfo() (GPUInfo, error) {
+	// NVIDIA: fastest path.
+	if info, ok := nvidiaGPUInfo(); ok {
+		return info, nil
+	}
+
+	// AMD / Intel: parse lspci.
+	out, err := exec.Command("lspci", "-v").Output()
+	if err != nil {
+		return GPUInfo{Model: "Unknown"}, nil
+	}
+
+	for _, line := range strings.Split(string(out), "\n") {
+		if !strings.Contains(line, "VGA") && !strings.Contains(line, "3D controller") {
+			continue
 		}
+		info := GPUInfo{Model: extractGPUModel(line)}
+		if strings.Contains(line, "AMD") || strings.Contains(line, "ATI") {
+			info.Model = cleanAMDModel(line)
+			info.Memory = amdVRAMMiB()
+		}
+		return info, nil
 	}
 
-	return info, nil
+	return GPUInfo{Model: "Unknown"}, nil
 }
 
-// Получаем информацию о памяти AMD GPU
-func getAMDMemoryInfo(info *GPUInfo) {
-	cardPath := "/sys/class/drm/card0/device/"
-
-	// Пытаемся прочитать объем памяти из файловой системы
-	if memData, err := ioutil.ReadFile(cardPath + "mem_info_vram_total"); err == nil {
-		memBytes, _ := strconv.ParseInt(strings.TrimSpace(string(memData)), 10, 64)
-		info.Memory = int(memBytes / (1024 * 1024)) // Переводим байты в МБ
+func nvidiaGPUInfo() (GPUInfo, bool) {
+	out, err := exec.Command(
+		"nvidia-smi",
+		"--query-gpu=name,memory.total",
+		"--format=csv,noheader",
+	).Output()
+	if err != nil || len(out) == 0 {
+		return GPUInfo{}, false
 	}
+	parts := strings.SplitN(strings.TrimSpace(string(out)), ", ", 2)
+	if len(parts) < 2 {
+		return GPUInfo{}, false
+	}
+	memStr := strings.TrimSuffix(strings.TrimSpace(parts[1]), " MiB")
+	mem, _ := strconv.Atoi(memStr)
+	return GPUInfo{Model: strings.TrimSpace(parts[0]), Memory: mem}, true
 }
 
-// Улучшенный экстрактор модели AMD GPU
-func extractAMDGPUModel(line string) string {
-	parts := strings.Split(line, ": ")
+func amdVRAMMiB() int {
+	data, err := os.ReadFile("/sys/class/drm/card0/device/mem_info_vram_total")
+	if err != nil {
+		return 0
+	}
+	bytes, _ := strconv.ParseInt(strings.TrimSpace(string(data)), 10, 64)
+	return int(bytes / (1024 * 1024))
+}
+
+func cleanAMDModel(line string) string {
+	parts := strings.SplitN(line, ": ", 2)
 	if len(parts) < 2 {
 		return "Unknown AMD GPU"
 	}
+	m := parts[1]
+	m = strings.TrimPrefix(m, "Advanced Micro Devices, Inc. [AMD/ATI] ")
+	m = strings.TrimPrefix(m, "Advanced Micro Devices [AMD/ATI] ")
+	m = strings.TrimPrefix(m, "AMD ")
 
-	model := parts[1]
-
-	// Очищаем строку от лишних идентификаторов для лучшей читаемости
-	model = strings.TrimPrefix(model, "Advanced Micro Devices, Inc. [AMD/ATI] ")
-	model = strings.TrimPrefix(model, "Advanced Micro Devices [AMD/ATI] ")
-	model = strings.TrimPrefix(model, "AMD ")
-
-	// Проверяем наличие кодового имени архитектуры и добавляем маркетинговое название
-	cardType := determineCardType()
-	if cardType != "" {
-		model = cardType
-	}
-
-	return model
-}
-
-// Определяет тип карты на основе строки модели
-func determineCardType() string {
-	// Пытаемся получить информацию из другого источника - более надежный метод
-	cmd := exec.Command("glxinfo", "-B")
-	output, err := cmd.Output()
-	if err == nil {
-		outputStr := string(output)
-
-		// Проверяем строку с открытым драйвером Mesa
-		if strings.Contains(outputStr, "Device: ") {
-			deviceLines := strings.Split(outputStr, "Device: ")
-			if len(deviceLines) > 1 {
-				deviceName := strings.Split(deviceLines[1], " (")[0]
-				if deviceName != "" {
-					return deviceName
+	// Prefer glxinfo device name when available.
+	if out, err := exec.Command("glxinfo", "-B").Output(); err == nil {
+		for _, l := range strings.Split(string(out), "\n") {
+			if strings.HasPrefix(l, "Device: ") {
+				if name := strings.TrimPrefix(l, "Device: "); name != "" {
+					return strings.SplitN(name, " (", 2)[0]
 				}
 			}
 		}
 	}
-
-	return "" // Если не удалось определить маркетинговое название
+	return m
 }
 
-// Вспомогательная функция для извлечения модели GPU
+// ── Windows ──────────────────────────────────────────────────────────────────
+
+func getWindowsGPUInfo() (GPUInfo, error) {
+	out, err := exec.Command(
+		"powershell", "-NoProfile", "-Command",
+		"Get-WmiObject Win32_VideoController | Select-Object Name, AdapterRAM | Format-List",
+	).Output()
+	if err != nil {
+		return GPUInfo{Model: "Unknown"}, nil
+	}
+
+	info := GPUInfo{Model: "Unknown"}
+	s := string(out)
+
+	if parts := strings.SplitN(s, "Name : ", 2); len(parts) == 2 {
+		info.Model = strings.TrimSpace(strings.SplitN(parts[1], "\n", 2)[0])
+	}
+	if parts := strings.SplitN(s, "AdapterRAM : ", 2); len(parts) == 2 {
+		memStr := strings.TrimSpace(strings.SplitN(parts[1], "\n", 2)[0])
+		if v, err := strconv.ParseInt(memStr, 10, 64); err == nil {
+			info.Memory = int(v / (1024 * 1024))
+		}
+	}
+	return info, nil
+}
+
+// ── macOS ────────────────────────────────────────────────────────────────────
+
+func getMacOSGPUInfo() (GPUInfo, error) {
+	out, err := exec.Command(
+		"system_profiler", "SPDisplaysDataType", "-detailLevel", "mini",
+	).Output()
+	if err != nil {
+		return GPUInfo{Model: "Unknown"}, nil
+	}
+
+	info := GPUInfo{Model: "Unknown"}
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "Chipset Model: ") {
+			info.Model = strings.TrimPrefix(line, "Chipset Model: ")
+		}
+		if strings.HasPrefix(line, "VRAM (Total): ") {
+			v := strings.TrimPrefix(line, "VRAM (Total): ")
+			v = strings.TrimSuffix(v, " MB")
+			v = strings.TrimSuffix(v, " GB")
+			if strings.HasSuffix(line, " GB") {
+				if gb, err := strconv.Atoi(strings.TrimSpace(v)); err == nil {
+					info.Memory = gb * 1024
+				}
+			} else {
+				info.Memory, _ = strconv.Atoi(strings.TrimSpace(v))
+			}
+		}
+	}
+	return info, nil
+}
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+
 func extractGPUModel(line string) string {
-	parts := strings.Split(line, ": ")
+	parts := strings.SplitN(line, ": ", 2)
 	if len(parts) < 2 {
 		return "Unknown"
 	}
-
-	return parts[1]
-}
-
-// Вспомогательная функция для парсинга строки в int
-func parseInt(s string) (int, error) {
-	var result int
-	_, err := fmt.Sscanf(s, "%d", &result)
-	return result, err
+	return strings.TrimSpace(parts[1])
 }

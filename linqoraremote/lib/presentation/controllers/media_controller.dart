@@ -65,9 +65,14 @@ class MediaController extends GetxController {
   void _handleNowPlayingData(Map<String, dynamic> mediaData) {
     final nowPlayingData = mediaData['nowPlaying'] as Map<String, dynamic>?;
     if (nowPlayingData != null) {
+      // Use (as num?)?.toInt() to handle both int and double from JSON,
+      // and fall back to 0 when the key is absent.
+      final duration = (nowPlayingData['duration'] as num?)?.toInt() ?? 0;
+      final position = (nowPlayingData['position'] as num?)?.toInt() ?? 0;
+
       nowPlaying.value = NowPlaying.fromJson(nowPlayingData).copyWith(
-        stringDuration: formatTimeTrack(nowPlayingData['duration'] as int),
-        stringPosition: formatTimeTrack(nowPlayingData['position'] as int),
+        stringDuration: formatTimeTrack(duration),
+        stringPosition: formatTimeTrack(position),
       );
     }
   }

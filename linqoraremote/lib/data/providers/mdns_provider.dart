@@ -303,19 +303,27 @@ class MDnsProvider {
   IPAddressResourceRecord _selectBestIpAddress(
     List<IPAddressResourceRecord> addresses,
   ) {
-    /// Filter out unwanted addresses
+    if (addresses.isEmpty) return addresses.first;
+
+    /// Filter out unwanted addresses (loopback, link-local, docker)
     final filteredAddresses =
         addresses.where((record) {
           final ip = record.address.address;
-          return !ip.startsWith('172.17.') && // Docker
-              !ip.startsWith('127.') && // Localhost
-              !ip.startsWith('10.') && // Private
-              !ip.startsWith('169.254.'); // Link-local
+          return !ip.startsWith('127.') && // Localhost
+              !ip.startsWith('169.254.') && // Link-local
+              !ip.startsWith('172.17.'); // Docker default
         }).toList();
 
-    return filteredAddresses.isNotEmpty
-        ? filteredAddresses.first
-        : addresses.first;
+    if (filteredAddresses.isEmpty) return addresses.first;
+
+    /// Prefer typical LAN addresses (192.168.x.x or 10.x.x.x)
+    final lanAddresses =
+        filteredAddresses.where((record) {
+          final ip = record.address.address;
+          return ip.startsWith('192.168.') || ip.startsWith('10.');
+        }).toList();
+
+    return lanAddresses.isNotEmpty ? lanAddresses.first : filteredAddresses.first;
   }
 
   /// Parses TXT records for a given service name

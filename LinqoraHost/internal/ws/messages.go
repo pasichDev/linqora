@@ -4,27 +4,27 @@ import (
 	"encoding/json"
 )
 
-// ClientMessage представляє повідомлення від клієнта
+// ClientMessage represents a message received from a client.
 type ClientMessage struct {
 	Type string          `json:"type"`
 	Room string          `json:"room,omitempty"`
 	Data json.RawMessage `json:"data,omitempty"`
 }
 
-// ServerResponse представляет унифицированный формат ответов сервера
+// ServerResponse represents the unified format for all server responses.
 type ServerResponse struct {
 	Type  string      `json:"type"`
 	Data  interface{} `json:"data,omitempty"`
 	Error *ErrorInfo  `json:"error,omitempty"`
 }
 
-// ErrorInfo представляет структуру информации об ошибке
+// ErrorInfo contains structured information about an error.
 type ErrorInfo struct {
 	Code    *int   `json:"code"`
 	Message string `json:"message"`
 }
 
-// NewSuccessResponse создает успешный ответ сервера
+// NewSuccessResponse creates a successful server response.
 func NewSuccessResponse(responseType string, data interface{}) ServerResponse {
 	return ServerResponse{
 		Type:  responseType,
@@ -33,13 +33,13 @@ func NewSuccessResponse(responseType string, data interface{}) ServerResponse {
 	}
 }
 
-// NewErrorResponse создает ответ сервера с ошибкой
+// NewErrorResponse creates a server response containing an error.
 func NewErrorResponse(responseType string, message string, code ...int) ServerResponse {
 	errorInfo := ErrorInfo{
 		Message: message,
 	}
 
-	// Устанавливаем код ошибки, если он предоставлен
+	// Set error code if provided and non-zero
 	if len(code) > 0 && code[0] != 0 {
 		errorCode := code[0]
 		errorInfo.Code = &errorCode

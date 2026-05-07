@@ -5,20 +5,20 @@ import (
 	"sync"
 )
 
-// RoomListener определяет интерфейс для слушателей событий комнаты
+// RoomListener defines an interface for listening to room events.
 type RoomListener interface {
 	OnFirstClientJoined(roomName string)
 	OnLastClientLeft(roomName string)
 }
 
-// RoomManager управляет комнатами
+// RoomManager manages all communication rooms and their client subscriptions.
 type RoomManager struct {
 	Rooms     map[string]*Room
 	mu        sync.Mutex
 	listeners []RoomListener
 }
 
-// NewRoomManager создает новый менеджер комнат
+// NewRoomManager creates a new RoomManager instance.
 func NewRoomManager() *RoomManager {
 	return &RoomManager{
 		Rooms:     make(map[string]*Room),
@@ -26,27 +26,28 @@ func NewRoomManager() *RoomManager {
 	}
 }
 
-// AddRoomListener добавляет слушателя событий комнаты
+// AddRoomListener registers a new listener for room events.
 func (rm *RoomManager) AddRoomListener(listener RoomListener) {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 	rm.listeners = append(rm.listeners, listener)
 }
 
-// notifyFirstClientJoined уведомляет слушателей о подключении первого клиента
+// notifyFirstClientJoined alerts listeners that a room has gained its first client.
 func (rm *RoomManager) notifyFirstClientJoined(roomName string) {
 	for _, listener := range rm.listeners {
 		listener.OnFirstClientJoined(roomName)
 	}
 }
 
-// notifyLastClientLeft уведомляет слушателей о отключении последнего клиента
+// notifyLastClientLeft alerts listeners that a room has become empty.
 func (rm *RoomManager) notifyLastClientLeft(roomName string) {
 	for _, listener := range rm.listeners {
 		listener.OnLastClientLeft(roomName)
 	}
 }
 
+// GetOrCreateRoom returns the specified room, creating it if it doesn't exist.
 func (rm *RoomManager) GetOrCreateRoom(roomName string) *Room {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
@@ -60,7 +61,7 @@ func (rm *RoomManager) GetOrCreateRoom(roomName string) *Room {
 	return room
 }
 
-// IsClientInRoom проверяет, находится ли клиент в указанной комнате
+// IsClientInRoom checks if the given client is a member of the specified room.
 func (rm *RoomManager) IsClientInRoom(roomName string, client *Client) bool {
 	rm.mu.Lock()
 	room, exists := rm.Rooms[roomName]
@@ -73,14 +74,14 @@ func (rm *RoomManager) IsClientInRoom(roomName string, client *Client) bool {
 	return room.HasClient(client)
 }
 
-// GetRoom получает комнату по имени (только для чтения)
+// GetRoom retrieves a room by name. Returns nil if not found.
 func (rm *RoomManager) GetRoom(roomName string) *Room {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 	return rm.Rooms[roomName]
 }
 
-// SendToRoom отправляет сообщение всем клиентам в комнате
+// SendToRoom broadcasts a message to all clients in the room except excludeClient.
 func (rm *RoomManager) SendToRoom(roomName string, messageType string, message interface{}, excludeClient *Client) {
 	rm.mu.Lock()
 	room, exists := rm.Rooms[roomName]
@@ -91,50 +92,50 @@ func (rm *RoomManager) SendToRoom(roomName string, messageType string, message i
 	}
 }
 
-// AddClientToRoom добавляет клиента в комнату
+// AddClientToRoom subscribes a client to the specified room.
 func (rm *RoomManager) AddClientToRoom(roomName string, client *Client) {
 	room := rm.GetOrCreateRoom(roomName)
 
-	// Проверяем, был ли это первый клиент
+	// Check if this is the first client
 	isFirst := room.ClientCount() == 0
 
-	// Добавляем клиента в комнату
+	// Add client to room
 	room.AddClient(client)
 
-	// Обновляем состояние клиента
+	// Update client state
 	client.Lock()
 	client.Rooms[roomName] = true
 	client.Unlock()
 
 	log.Printf("Client %s joined room: %s", client.DeviceName, roomName)
 
-	// Если это первый клиент, уведомляем слушателей
+	// If first client, notify listeners
 	if isFirst {
 		rm.notifyFirstClientJoined(roomName)
 	}
 }
 
-// RemoveClientFromRoom удаляет клиента из комнаты
+// RemoveClientFromRoom unsubscribes a client from the specified room.
 func (rm *RoomManager) RemoveClientFromRoom(roomName string, client *Client) {
 	rm.mu.Lock()
 	room, exists := rm.Rooms[roomName]
 	rm.mu.Unlock()
 
 	if exists {
-		// Проверяем, является ли клиент последним в комнате
+		// Check if this was the last client
 		isLast := room.ClientCount() == 1 && room.HasClient(client)
 
-		// Удаляем клиента из комнаты
+		// Remove client from room
 		room.RemoveClient(client)
 
-		// Обновляем состояние клиента
+		// Update client state
 		client.Lock()
 		delete(client.Rooms, roomName)
 		client.Unlock()
 
 		log.Printf("Client %s left room: %s", client.DeviceName, roomName)
 
-		// Удаляем пустую комнату и уведомляем, если это был последний клиент
+		// Cleanup empty room
 		if room.ClientCount() == 0 {
 			rm.mu.Lock()
 			delete(rm.Rooms, roomName)
@@ -148,9 +149,8 @@ func (rm *RoomManager) RemoveClientFromRoom(roomName string, client *Client) {
 	}
 }
 
-// RemoveClientFromAllRooms удаляет клиента из всех комнат
+// RemoveClientFromAllRooms unsubscribes a client from every room it belongs to.
 func (rm *RoomManager) RemoveClientFromAllRooms(client *Client) {
-	// Получаем список комнат без долгой блокировки
 	rm.mu.Lock()
 	clientRooms := make([]string, 0)
 	for roomName, room := range rm.Rooms {
@@ -160,13 +160,12 @@ func (rm *RoomManager) RemoveClientFromAllRooms(client *Client) {
 	}
 	rm.mu.Unlock()
 
-	// Теперь удаляем клиента из каждой комнаты
 	for _, roomName := range clientRooms {
 		rm.RemoveClientFromRoom(roomName, client)
 	}
 }
 
-// BroadcastToRoom отправляет сообщение всем клиентам в комнате
+// BroadcastToRoom sends a message to all clients in a room.
 func (rm *RoomManager) BroadcastToRoom(roomName string, messageType string, message interface{}, excludeClient *Client) {
 	room := rm.GetRoom(roomName)
 	if room != nil {

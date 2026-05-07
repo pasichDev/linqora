@@ -9,14 +9,14 @@ import (
 	"time"
 )
 
-// SystemMetrics представляє метрики системи
+// SystemMetrics represents a snapshot of the system's performance metrics.
 type SystemMetrics struct {
 	CPUUMetrics metrics.CPUMetrics `json:"cpuMetrics"`
 	RamMetrics  metrics.RamMetrics `json:"ramMetrics"`
 	Timestamp   int64              `json:"timestamp"`
 }
 
-// MetricsCollector збирає системні метрики
+// MetricsCollector periodically gathers and broadcasts system performance data.
 type MetricsCollector struct {
 	broadcaster func([]byte)
 	ctx         context.Context
@@ -25,7 +25,7 @@ type MetricsCollector struct {
 	mu          sync.Mutex
 }
 
-// NewMetricsCollector створює новий колектор метрик
+// NewMetricsCollector creates a new collector instance with the specified broadcast function.
 func NewMetricsCollector(broadcaster func([]byte)) *MetricsCollector {
 	return &MetricsCollector{
 		broadcaster: broadcaster,
@@ -33,7 +33,7 @@ func NewMetricsCollector(broadcaster func([]byte)) *MetricsCollector {
 	}
 }
 
-// Start запускає збір метрик
+// Start initiates the metrics collection loop in a separate goroutine.
 func (mc *MetricsCollector) Start() {
 	mc.mu.Lock()
 	defer mc.mu.Unlock()
@@ -42,7 +42,6 @@ func (mc *MetricsCollector) Start() {
 		return
 	}
 
-	// Создаем новый контекст с возможностью отмены
 	ctx, cancel := context.WithCancel(context.Background())
 	mc.ctx = ctx
 	mc.cancel = cancel
@@ -50,38 +49,41 @@ func (mc *MetricsCollector) Start() {
 
 	log.Println("Starting metrics collector")
 
-	// Запускаем сбор в отдельной горутине
-	go mc.collectLoop(ctx)
+	go func() {
+		// Seed the CPU baseline before the first measurement so that
+		// Percent(0,...) returns a real value instead of 0.
+		metrics.InitCPUBaseline()
+		mc.collectLoop(ctx)
+	}()
 }
 
-// Stop останавливает сбор метрик
+// Stop terminates the metrics collection loop and releases resources.
 func (mc *MetricsCollector) Stop() {
 	mc.mu.Lock()
 	defer mc.mu.Unlock()
 
 	if !mc.isRunning {
-		return // Коллектор уже остановлен
+		return
 	}
 
-	// Отмена контекста останавливает цикл сбора
 	mc.cancel()
 	mc.isRunning = false
 	log.Println("Stopped metrics collector")
 }
 
-// IsRunning возвращает статус активности коллектора
+// IsRunning returns true if the collector is currently active.
 func (mc *MetricsCollector) IsRunning() bool {
 	mc.mu.Lock()
 	defer mc.mu.Unlock()
 	return mc.isRunning
 }
 
-// collectLoop выполняет цикл сбора метрик
+// collectLoop runs the ticker-based collection cycle.
 func (mc *MetricsCollector) collectLoop(ctx context.Context) {
 	ticker := time.NewTicker(CollectorInterval)
 	defer ticker.Stop()
 
-	// Собираем метрики сразу при запуске
+	// Initial collection on startup.
 	mc.collectAndSend()
 
 	for {
@@ -94,7 +96,7 @@ func (mc *MetricsCollector) collectLoop(ctx context.Context) {
 	}
 }
 
-// collectAndSend собирает и отправляет метрики
+// collectAndSend gathers current metrics and broadcasts them to subscribers.
 func (mc *MetricsCollector) collectAndSend() {
 	metrics, err := mc.collectMetrics()
 	if err != nil {
@@ -108,11 +110,10 @@ func (mc *MetricsCollector) collectAndSend() {
 		return
 	}
 
-	// Отправляем метрики через функцию отправки
 	mc.broadcaster(metricsJSON)
 }
 
-// collectMetrics збирає системні метрики
+// collectMetrics retrieves CPU and RAM performance data.
 func (mc *MetricsCollector) collectMetrics() (*SystemMetrics, error) {
 	cpuMetrics, err := metrics.GetCPUMetrics()
 	if err != nil {
@@ -124,7 +125,6 @@ func (mc *MetricsCollector) collectMetrics() (*SystemMetrics, error) {
 		return nil, err
 	}
 
-	// Формуємо структуру метрик
 	metrics := &SystemMetrics{
 		CPUUMetrics: cpuMetrics,
 		RamMetrics:  ramMetrics,

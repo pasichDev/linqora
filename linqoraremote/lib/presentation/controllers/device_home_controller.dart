@@ -14,7 +14,8 @@ import '../../core/constants/settings.dart';
 import '../../core/utils/app_logger.dart';
 import '../../core/utils/error_handler.dart';
 import '../../data/models/server_response.dart';
-import '../../data/providers/websocket_provider.dart';
+import '../../data/providers/websocket_provider.dart'
+    show WebSocketProvider, ReconnectState;
 import '../../services/permissions_service.dart';
 
 class DeviceHomeController extends GetxController with WidgetsBindingObserver {
@@ -33,6 +34,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
   @override
   Future<void> onInit() async {
     super.onInit();
+    WidgetsBinding.instance.addObserver(this);
 
     /// Get the device information from the arguments
     await _setupFromArguments();
@@ -52,11 +54,20 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
 
   @override
   void onClose() {
+    WidgetsBinding.instance.removeObserver(this);
     webSocketProvider.removeHandler(TypeMessageWs.host_info.value);
     BackgroundConnectionService.removeMessageHandler(
       _handleBackgroundServiceMessage,
     );
     super.onClose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        webSocketProvider.reconnectState.value == ReconnectState.failed) {
+      webSocketProvider.retryReconnect();
+    }
   }
 
   /// Get settings from storage

@@ -12,22 +12,28 @@ class AppBarHomePage extends StatelessWidget implements PreferredSizeWidget {
   AppBarHomePage({super.key});
 
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight + 10);
 
   @override
   Widget build(BuildContext context) {
     return AppBar(
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      centerTitle: false,
       title: Obx(
         () => Column(
-          mainAxisAlignment: MainAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               controller.selectedMenuIndex.value == -1
-                  ? controller.hostInfo.value?.hostname ?? ""
+                  ? controller.hostInfo.value?.hostname ?? "LINQORA"
                   : menuOptions[controller.selectedMenuIndex.value].title,
-              style: Get.textTheme.titleMedium!.copyWith(
-                color: Get.theme.colorScheme.onPrimaryContainer,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.5,
               ),
             ),
             Row(
@@ -35,18 +41,15 @@ class AppBarHomePage extends StatelessWidget implements PreferredSizeWidget {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 _buildTlsIndicator(context),
-
+                const SizedBox(width: 4),
                 Obx(() {
                   final device = controller.authDevice.value;
                   return Text(
-                    device != null
-                        ? "${device.address}:${device.port}"
-                        : 'connecting'.tr,
+                    device != null ? "${device.address}:${device.port}" : 'connecting'.tr,
                     style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withAlpha(204),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white.withOpacity(0.4),
                     ),
                   );
                 }),
@@ -55,14 +58,11 @@ class AppBarHomePage extends StatelessWidget implements PreferredSizeWidget {
           ],
         ),
       ),
-      elevation: 7,
       leading: IconButton(
         icon: Obx(
           () => Icon(
-            controller.webSocketProvider.isConnected &&
-                    controller.selectedMenuIndex.value == -1
-                ? Icons.close
-                : Icons.arrow_back,
+            controller.webSocketProvider.isConnected && controller.selectedMenuIndex.value == -1 ? Icons.power_settings_new_rounded : Icons.arrow_back_ios_new_rounded,
+            size: 20,
           ),
         ),
         onPressed: () async {
@@ -70,11 +70,9 @@ class AppBarHomePage extends StatelessWidget implements PreferredSizeWidget {
             controller.selectMenuItem(-1);
             return;
           }
-          if (controller.webSocketProvider.isConnected &&
-              controller.selectedMenuIndex.value == -1) {
+          if (controller.webSocketProvider.isConnected && controller.selectedMenuIndex.value == -1) {
             await DisconnectConfirmationDialog.show(
-              onConfirm:
-                  () => {controller.disconnectFromDevice(isCleaned: true)},
+              onConfirm: () => {controller.disconnectFromDevice(isCleaned: true)},
               onCancel: () => {},
             );
           } else {
@@ -85,36 +83,45 @@ class AppBarHomePage extends StatelessWidget implements PreferredSizeWidget {
       actions: [
         IconButton(
           onPressed: () => Get.toNamed(AppRoutes.SETTINGS),
-          icon: Icon(Icons.settings),
+          icon: const Icon(Icons.tune_rounded),
         ),
+        const SizedBox(width: 8),
       ],
     );
   }
 
   Widget _buildTlsIndicator(BuildContext context) {
-    var isTLS = controller.authDevice.value!.supportsTLS;
-    return Row(
-      children: [
-        Icon(
-          isTLS ? Icons.lock_outlined : Icons.block_sharp,
-          size: 12,
-          color:
-              isTLS
-                  ? Get.theme.colorScheme.primary
-                  : Get.theme.colorScheme.errorContainer,
+    final device = controller.authDevice.value;
+    if (device == null) return const SizedBox.shrink();
+    var isTLS = device.supportsTLS;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: (isTLS ? Colors.green : Colors.orange).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: (isTLS ? Colors.green : Colors.orange).withOpacity(0.3),
         ),
-        SizedBox(width: 2),
-        Text(
-          isTLS ? "(TSL)" : "(Non-TSL)",
-          style: Get.textTheme.labelSmall!.copyWith(
-            color:
-                isTLS
-                    ? Get.theme.colorScheme.primary
-                    : Get.theme.colorScheme.errorContainer,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isTLS ? Icons.lock_rounded : Icons.lock_open_rounded,
+            size: 10,
+            color: isTLS ? Colors.green : Colors.orange,
           ),
-        ),
-        SizedBox(width: 2),
-      ],
+          const SizedBox(width: 4),
+          Text(
+            isTLS ? "SECURE" : "UNSECURE",
+            style: TextStyle(
+              fontSize: 8,
+              fontWeight: FontWeight.w900,
+              color: isTLS ? Colors.green : Colors.orange,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

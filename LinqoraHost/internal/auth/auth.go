@@ -9,42 +9,46 @@ import (
 	"LinqoraHost/internal/interfaces"
 )
 
-// Mange authorization requests and device authentication
+// AuthManager coordinates device authorization requests and maintains the trusted device registry.
 type AuthManager struct {
 	config        *config.ServerConfig
 	pendingAuth   map[string]*interfaces.PendingAuthRequest
 	pendingChan   chan<- interfaces.PendingAuthRequest
 	pendingResult map[string]bool
+	challenges    *ChallengeStore
 	mu            sync.Mutex
 }
 
+// NewAuthManager initialises a new AuthManager with the provided server configuration and output channel.
 func NewAuthManager(cfg *config.ServerConfig, authChan chan<- interfaces.PendingAuthRequest) *AuthManager {
 	return &AuthManager{
 		config:        cfg,
 		pendingAuth:   make(map[string]*interfaces.PendingAuthRequest),
 		pendingChan:   authChan,
 		pendingResult: make(map[string]bool),
+		challenges:    NewChallengeStore(),
 	}
 }
 
-// RequestAuthorization запрашивает авторизацию устройства
+// RequestAuthorization initiates a new authorization flow for a device.
+// It returns true if the request was successfully queued or if the device is already trusted.
 func (am *AuthManager) RequestAuthorization(deviceName, deviceID, ip string) bool {
 	am.mu.Lock()
 	defer am.mu.Unlock()
 
-	// Проверяем, есть ли устройство в списке авторизованных
+	// Check if device is already authorized
 	if _, exists := am.config.AuthorizedDevs[deviceID]; exists {
 		log.Printf("Device %s already authorized", deviceName)
 		return true
 	}
 
-	// Проверяем, нет ли уже ожидающего запроса
+	// Check if there is already a pending request
 	if _, exists := am.pendingAuth[deviceID]; exists {
 		log.Printf("Authorization request for device %s already pending", deviceName)
 		return true
 	}
 
-	// Создаем новый запрос авторизации
+	// Create new authorization request
 	request := &interfaces.PendingAuthRequest{
 		DeviceName:  deviceName,
 		DeviceID:    deviceID,
@@ -54,13 +58,12 @@ func (am *AuthManager) RequestAuthorization(deviceName, deviceID, ip string) boo
 
 	am.pendingAuth[deviceID] = request
 
-	// ВАЖНО: проверка канала
 	if am.pendingChan == nil {
 		log.Printf("ERROR: pendingChan is nil, cannot send auth request for %s", deviceName)
 		return false
 	}
 
-	// Отправляем запрос в канал (неблокирующим способом)
+	// Send request to channel asynchronously
 	go func() {
 		select {
 		case am.pendingChan <- *request:
@@ -73,7 +76,7 @@ func (am *AuthManager) RequestAuthorization(deviceName, deviceID, ip string) boo
 	return true
 }
 
-// RespondToAuthRequest обрабатывает ответ на запрос авторизации
+// RespondToAuthRequest records the user's decision (approve/reject) for a pending request.
 func (am *AuthManager) RespondToAuthRequest(deviceID string, approved bool) {
 	am.mu.Lock()
 	defer am.mu.Unlock()
@@ -88,7 +91,7 @@ func (am *AuthManager) RespondToAuthRequest(deviceID string, approved bool) {
 	am.pendingResult[deviceID] = approved
 
 	if approved {
-		// Добавляем устройство в список авторизованных
+		// Persist authorized device in configuration
 		am.config.AuthorizedDevs[deviceID] = config.DeviceAuth{
 			DeviceName: request.DeviceName,
 			DeviceID:   deviceID,
@@ -101,7 +104,7 @@ func (am *AuthManager) RespondToAuthRequest(deviceID string, approved bool) {
 	}
 }
 
-// IsAuthorized проверяет, авторизовано ли устройство
+// IsAuthorized checks if the given device ID is in the trusted devices list.
 func (am *AuthManager) IsAuthorized(deviceID string) bool {
 	am.mu.Lock()
 	defer am.mu.Unlock()
@@ -110,7 +113,7 @@ func (am *AuthManager) IsAuthorized(deviceID string) bool {
 	return exists
 }
 
-// CheckPendingResult проверяет результат ожидающего запроса авторизации
+// CheckPendingResult retrieves and clears the result of a recently completed authorization request.
 func (am *AuthManager) CheckPendingResult(deviceID string) (bool, bool) {
 	am.mu.Lock()
 	defer am.mu.Unlock()
@@ -122,7 +125,7 @@ func (am *AuthManager) CheckPendingResult(deviceID string) (bool, bool) {
 	return result, exists
 }
 
-// Delete authorization for a device
+// RevokeAuth removes a device from the trusted devices list.
 func (am *AuthManager) RevokeAuth(deviceID string) {
 	am.mu.Lock()
 	defer am.mu.Unlock()
@@ -137,7 +140,7 @@ func (am *AuthManager) RevokeAuth(deviceID string) {
 	}
 }
 
-// Get ListDevices returns a list of all authorized devices
+// ListDevices returns a list of all currently authorized devices.
 func (am *AuthManager) ListDevices() []config.DeviceAuth {
 	am.mu.Lock()
 	defer am.mu.Unlock()

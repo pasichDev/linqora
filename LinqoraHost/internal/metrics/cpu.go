@@ -33,10 +33,7 @@ func GetCPUInfo() (CPUInfo, error) {
 		Frequency:     0.0,
 	}
 
-	// Отримуємо кількість логічних ядер (потоків)
 	logicalCores, logErr := cpu.Counts(true)
-
-	// Отримуємо кількість фізичних ядер
 	physicalCores, psyhErr := cpu.Counts(false)
 
 	if logErr == nil && psyhErr == nil {
@@ -44,10 +41,8 @@ func GetCPUInfo() (CPUInfo, error) {
 		info.PhysicalCores = physicalCores
 	}
 
-	// Отримуємо інформацію про процесор
 	cpuArray, cpuError := cpu.Info()
 	if cpuError == nil {
-		// Якщо є хоча б один процесор, заповнюємо модель, кількість ядер і потоків
 		if len(cpuArray) > 0 {
 			c := cpuArray[0]
 			info.Model = c.ModelName
@@ -79,20 +74,31 @@ func GetCPUMetrics() (CPUMetrics, error) {
 	return cpu, nil
 }
 
-// GetCPULoad повертає відсоток завантаження CPU
+// InitCPUBaseline seeds the gopsutil CPU counter so that the first call to
+// GetCPULoad() returns a meaningful value instead of 0.
+// Call once when the metrics collector starts.
+func InitCPUBaseline() {
+	cpu.Percent(0, false) //nolint:errcheck — baseline seed, result discarded
+	// Small sleep so the OS has time to record a non-zero interval
+	time.Sleep(200 * time.Millisecond)
+	cpu.Percent(0, false) //nolint:errcheck
+}
+
+// GetCPULoad returns overall CPU usage percent.
+// Uses interval=0 which measures since the previous call — non-blocking.
+// InitCPUBaseline must be called once before the first call to this function.
 func GetCPULoad() (float64, error) {
-	percentages, err := cpu.Percent(1*time.Second, false)
+	percentages, err := cpu.Percent(0, false)
 	if err != nil {
 		return 0, err
 	}
 	if len(percentages) > 0 {
-		// Округляем до 2 знаков после запятой
 		return math.Round(percentages[0]), nil
 	}
 	return 0, nil
 }
 
-// GetCPUTemperature знаходить найрелевантнішу температуру CPU
+// GetCPUTemperature finds the most relevant CPU temperature sensor.
 func GetCPUTemperature() (float64, error) {
 	temps, err := sensors.SensorsTemperatures()
 	if err != nil {
@@ -102,16 +108,14 @@ func GetCPUTemperature() (float64, error) {
 	var cpuTemp float64
 	var found bool
 
-	// Пріоритетність за сенсорами
 	for _, t := range temps {
 		key := strings.ToLower(t.SensorKey)
 
-		if strings.Contains(key, "tctl") || // AMD Tctl
-			strings.Contains(key, "package") || // Intel Package
-			strings.Contains(key, "core") || // Intel Core
-			strings.Contains(key, "cpu") { // універсально
+		if strings.Contains(key, "tctl") ||
+			strings.Contains(key, "package") ||
+			strings.Contains(key, "core") ||
+			strings.Contains(key, "cpu") {
 
-			// Винятки — ігноруємо "acpitz" як менш точне джерело
 			if strings.Contains(key, "acpitz") {
 				continue
 			}
@@ -129,6 +133,9 @@ func GetCPUTemperature() (float64, error) {
 	return cpuTemp, nil
 }
 
+// GetProcessesAndThreads returns the total number of processes and threads.
+// A process that exits between the snapshot and the NumThreads call is skipped
+// rather than aborting the whole collection.
 func GetProcessesAndThreads() (int, int, error) {
 	procs, err := process.Processes()
 	if err != nil {
@@ -141,7 +148,9 @@ func GetProcessesAndThreads() (int, int, error) {
 	for _, p := range procs {
 		threads, err := p.NumThreads()
 		if err != nil {
-			return 0, 0, err
+			// The process likely exited between Processes() and NumThreads().
+			// Skip it instead of failing the entire collection.
+			continue
 		}
 		totalThreads += int(threads)
 	}

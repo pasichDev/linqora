@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-// PendingAuthRequest представляет ожидающий запрос авторизации
+// PendingAuthRequest represents an authorization request waiting for manual approval.
 type PendingAuthRequest struct {
 	DeviceName  string
 	DeviceID    string
@@ -12,7 +12,7 @@ type PendingAuthRequest struct {
 	RequestTime time.Time
 }
 
-// WSClient определяет интерфейс для работы с WebSocket клиентом
+// WSClient defines the required behavior for a WebSocket client in the auth subsystem.
 type WSClient interface {
 	SendError(requestType string, message string, errorCode ...int) error
 	SendSuccess(responseType string, data interface{}) error
@@ -24,13 +24,13 @@ type WSClient interface {
 	IsClosed() bool
 }
 
-// WSMessage определяет интерфейс для сообщений WebSocket
+// WSMessage defines a generic interface for raw WebSocket messages.
 type WSMessage interface {
 	GetType() string
 	GetData() []byte
 }
 
-// AuthManagerInterface определяет интерфейс для менеджера авторизации
+// AuthManagerInterface defines the contract for authorization management services.
 type AuthManagerInterface interface {
 	RequestAuthorization(deviceName, deviceID, ip string) bool
 	RespondToAuthRequest(deviceID string, approved bool)
@@ -38,7 +38,7 @@ type AuthManagerInterface interface {
 	CheckPendingResult(deviceID string) (bool, bool)
 	RevokeAuth(deviceID string)
 
-	// Методы теперь используют интерфейсы вместо конкретных типов
 	HandleAuthRequest(client WSClient, msg WSMessage)
 	HandleAuthCheck(client WSClient)
+	HandleChallengeResponse(client WSClient, msg WSMessage)
 }

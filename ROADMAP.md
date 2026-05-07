@@ -6,35 +6,37 @@ This document outlines the development plan and key tasks for the **Linqora** pr
 
 ## ✅ Pre-Release Tasks for v0.1.0
 
-- [ ] Review the codebase of `LinqoraHost` #3
+- [x] Review the codebase of `LinqoraHost` (Standardized documentation and audited internal modules)
 - [x] Review and optimize collectors for metrics and media data
-- [ ] Add **Windows** support for `LinqoraHost`
+- [x] Add **Windows** support for `LinqoraHost` (Cross-platform implementation completed)
+- [x] Add support for GPU statistics collection
+- [x] Investigate and implement mouse emulation capabilities
+- [x] Integrate battery/power status into the host information
 
 ---
 
 ## 🚀 Post-Release Tasks (after v0.1.0)
 
-- [ ] Create documentation for `LinqoraHost` API
+- [x] Implement a **task and script scheduler**:
+  - [x] Register scripts on the host
+  - [x] Execute scripts via the client with real-time output streaming
+- [/] Create documentation for `LinqoraHost` API (Internal GoDoc completed, external docs pending)
 - [ ] Develop an official website for the project
 - [ ] Write a detailed usage guide, including:
   - [ ] Setup instructions
   - [ ] Certificate usage and configuration
+- [x] Implement a separate CLI command for:
+  - [x] Managing configuration
+  - [x] Managing the list of authorized devices
 
 ---
 
 ## 🔮 Future Tasks (Backlog)
 
-- [ ] Develop a GUI version of `LinqoraHost`
-- [ ] Add support for GPU statistics collection
-- [ ] Investigate mouse emulation capabilities
-- [ ] In the power menu, display battery/power status if the device is portable
-- [ ] Implement a **task and script scheduler**:
-  - [ ] Register scripts on the host
-  - [ ] Execute or schedule them via the client
-- [ ] Explore improvements to security
-- [ ] Implement a separate CLI command for:
-  - [ ] Managing configuration
-  - [ ] Managing the list of authorized devices
+- [ ] Develop a GUI version of `LinqoraHost` (System tray integration and settings window)
+- [x] Explore further improvements to security (e.g., end-to-end encryption for specific data)
+- [x] Add support for multi-monitor management (switching, resolution control)
+- [x] Implement remote file browser/transfer capabilities
 
 ---
 

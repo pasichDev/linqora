@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\pasichdev\\\\AndroidStudioProjects\\\\linqora\" -Recurse -Force)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Sort-Object)",
+      "Bash(go build *)",
+      "Bash(dart analyze *)",
+      "Bash(flutter pub *)",
+      "Bash(go vet *)",
+      "Bash(dir C:\\\\Users\\\\pasichdev\\\\AndroidStudioProjects\\\\linqora\\\\LinqoraHost\\\\internal *)",
+      "Bash(dir C:\\\\Users\\\\pasichdev\\\\AndroidStudioProjects\\\\linqora\\\\linqoraremote\\\\lib *)",
+      "Bash(xargs grep -l \"monitoring\\\\|power\\\\|media\")",
+      "Bash(xargs grep -l \"'monitoring'\")",
+      "Bash(xargs grep -l \"GetMaterialApp\\\\|translations\\\\|Translations\")",
+      "Bash(go test *)",
+      "Bash(go get *)",
+      "Bash(go version *)",
+      "Bash(go mod *)"
+    ]
+  }
+}

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:linqoraremote/presentation/controllers/auth_controller.dart';
 import 'package:linqoraremote/presentation/widgets/app_bar.dart';
-import 'package:linqoraremote/presentation/widgets/default_card.dart';
+import 'package:linqoraremote/presentation/widgets/animated_aurora_background.dart';
+import 'package:linqoraremote/core/themes/lin_styles.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 
 import '../../core/constants/names.dart';
@@ -28,48 +30,62 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: const AppBarCustom(),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Column(
-            children: [
-              SizedBox(height: 10),
-              Obx(() {
-                return authController.authStatus.value !=
-                            AuthStatus.pendingAuth &&
-                        authController.authStatus.value != AuthStatus.connecting
-                    ? _buildFAQ()
-                    : SizedBox.shrink();
-              }),
-
-              SizedBox(height: 10),
-              Expanded(
-                child: Obx(() {
-                  switch (authController.authStatus.value) {
-                    case AuthStatus.noWifi:
-                      return _buildNoWifi();
-                    case AuthStatus.pendingAuth:
-                      return _buildAuthPendingView();
-                    case AuthStatus.connecting:
-                      return _buildConnectingView();
-                    case AuthStatus.scanning:
-                      if (authController.discoveredDevices.isEmpty) {
-                        return _buildScanningView();
-                      }
-                      return _buildDeviceList();
-                    case AuthStatus.listDevices:
-                      return _buildDeviceList();
+    return AnimatedAuroraBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: const AppBarCustom(),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0),
+            child: Column(
+              children: [
+                const SizedBox(height: 20),
+                Obx(() {
+                  if (authController.authStatus.value != AuthStatus.pendingAuth &&
+                      authController.authStatus.value != AuthStatus.connecting) {
+                    return _buildFAQ().animate().fadeIn(duration: 400.ms).slideY(begin: -0.2);
                   }
+                  return const SizedBox.shrink();
                 }),
-              ),
-              Obx(() {
-                return authController.isWifiConnections.value
-                    ? _buildActionButton()
-                    : SizedBox.shrink();
-              }),
-            ],
+                const SizedBox(height: 20),
+                Expanded(
+                  child: Obx(() {
+                    Widget content;
+                    switch (authController.authStatus.value) {
+                      case AuthStatus.noWifi:
+                        content = _buildNoWifi();
+                        break;
+                      case AuthStatus.pendingAuth:
+                        content = _buildAuthPendingView();
+                        break;
+                      case AuthStatus.connecting:
+                        content = _buildConnectingView();
+                        break;
+                      case AuthStatus.scanning:
+                        if (authController.discoveredDevices.isEmpty) {
+                          content = _buildScanningView();
+                        } else {
+                          content = _buildDeviceList();
+                        }
+                        break;
+                      case AuthStatus.listDevices:
+                        content = _buildDeviceList();
+                        break;
+                    }
+                    return AnimatedSwitcher(
+                      duration: 500.ms,
+                      child: content,
+                    );
+                  }),
+                ),
+                Obx(() {
+                  if (authController.isWifiConnections.value) {
+                    return _buildActionButton().animate().fadeIn(delay: 300.ms).slideY(begin: 0.2);
+                  }
+                  return const SizedBox.shrink();
+                }),
+              ],
+            ),
           ),
         ),
       ),
@@ -78,23 +94,32 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
 
   Widget _buildNoWifi() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.wifi_off,
-            size: 60,
-            color: Theme.of(context).colorScheme.error,
+      child: LinStyles.glassMorphism(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.wifi_off_rounded,
+                size: 80,
+                color: Theme.of(context).colorScheme.error,
+              ).animate(onPlay: (c) => c.repeat()).shimmer(duration: const Duration(seconds: 2)),
+              const SizedBox(height: 24),
+              Text(
+                'wifi_no_connection'.tr,
+                style: Get.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'reconnect_to_wifi_please'.tr,
+                style: Get.textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
-          Text('wifi_no_connection'.tr, style: Get.textTheme.titleMedium),
-          const SizedBox(height: 8),
-          Text(
-            'reconnect_to_wifi_please'.tr,
-            style: Get.textTheme.bodyMedium,
-            textAlign: TextAlign.center,
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -102,24 +127,49 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
   Widget _buildFAQ() {
     return Row(
       children: [
-        ElevatedButton.icon(
-          onPressed: () {
-            launchUrlHandler(howItWorks);
-          },
-          style: AppButtonStyle.elevatedButtonStyle(context),
-          icon: const Icon(Icons.remove_from_queue_rounded),
-          label: Text('how_does_work'.tr),
+        Expanded(
+          child: _buildGlassButton(
+            onPressed: () => launchUrlHandler(howItWorks),
+            icon: Icons.help_outline_rounded,
+            label: 'how_does_work'.tr,
+          ),
         ),
-        SizedBox(width: 10),
-        ElevatedButton.icon(
-          onPressed: () {
-            launchUrlHandler(getLinqoraHost);
-          },
-          style: AppButtonStyle.elevatedButtonStyle(context),
-          icon: const Icon(Icons.ac_unit),
-          label: Text(appNameHost),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildGlassButton(
+            onPressed: () => launchUrlHandler(getLinqoraHost),
+            icon: Icons.computer_rounded,
+            label: appNameHost,
+          ),
         ),
       ],
+    );
+  }
+
+  Widget _buildGlassButton({required VoidCallback onPressed, required IconData icon, required String label}) {
+    return LinStyles.glassMorphism(
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  label,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -128,12 +178,15 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          LoadingAnimationWidget.fourRotatingDots(
-            color: Theme.of(context).colorScheme.onSurface,
-            size: 60,
+          LoadingAnimationWidget.staggeredDotsWave(
+            color: Theme.of(context).colorScheme.primary,
+            size: 80,
           ),
-          const SizedBox(height: 24),
-          Text('search_devices_mdns'.tr, style: Get.textTheme.titleMedium),
+          const SizedBox(height: 32),
+          Text(
+            'search_devices_mdns'.tr,
+            style: Get.textTheme.titleMedium?.copyWith(letterSpacing: 1.2),
+          ).animate(onPlay: (c) => c.repeat()).shimmer(duration: const Duration(milliseconds: 1500)),
         ],
       ),
     );
@@ -141,67 +194,94 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
 
   Widget _buildConnectingView() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          LoadingAnimationWidget.fourRotatingDots(
-            color: Theme.of(context).colorScheme.primary,
-            size: 60,
+      child: LinStyles.glassMorphism(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              LoadingAnimationWidget.inkDrop(
+                color: Theme.of(context).colorScheme.primary,
+                size: 60,
+              ),
+              const SizedBox(height: 24),
+              Obx(() => Text(
+                "${'connecting_for'.tr}\n${authController.authDevice.value?.name ?? '...'}".toUpperCase(),
+                style: Get.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900, letterSpacing: 2),
+                textAlign: TextAlign.center,
+              )),
+              const SizedBox(height: 32),
+              OutlinedButton(
+                onPressed: () {
+                  authController.cancelAuth('cancel_aut_for_user'.tr);
+                  authController.authStatus.value = AuthStatus.scanning;
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.error,
+                  side: BorderSide(color: Theme.of(context).colorScheme.error.withOpacity(0.5)),
+                ),
+                child: Text('cancel'.tr),
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
-          Obx(
-            () => Text(
-              "${'connecting_for'.tr} ${authController.authDevice.value!.name}...",
-              style: Get.textTheme.titleMedium,
-            ),
-          ),
-          const SizedBox(height: 32),
-          OutlinedButton(
-            onPressed: () {
-              authController.cancelAuth('cancel_aut_for_user'.tr);
-              setState(() {
-                authController.authStatus.value = AuthStatus.scanning;
-              });
-            },
-            style: AppButtonStyle.errorButtonStyle(context),
-            child: Text('cancel'.tr),
-          ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildAuthPendingView() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.security,
-            size: 60,
-            color: Theme.of(context).colorScheme.primary,
+      child: LinStyles.glassMorphism(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.security_rounded,
+                size: 80,
+                color: Theme.of(context).colorScheme.primary,
+              ).animate(onPlay: (c) => c.repeat()).scale(duration: const Duration(seconds: 1), begin: const Offset(0.9, 0.9), end: const Offset(1.1, 1.1), curve: Curves.easeInOut),
+              const SizedBox(height: 24),
+              Text(
+                'auth_request_sending'.tr,
+                style: Get.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'auth_request_description'.tr,
+                style: Get.textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              Obx(() => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Text(
+                  authController.authTimeoutSeconds.value.toString(),
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              )),
+              const SizedBox(height: 32),
+              OutlinedButton(
+                onPressed: () => authController.cancelAuth('cancel_aut_for_user'.tr),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.error,
+                  side: BorderSide(color: Theme.of(context).colorScheme.error.withOpacity(0.5)),
+                ),
+                child: Text('cancel'.tr),
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
-          Text('auth_request_sending'.tr, style: Get.textTheme.titleMedium),
-          const SizedBox(height: 8),
-          Text('auth_request_description'.tr, style: Get.textTheme.bodyMedium),
-          const SizedBox(height: 25),
-          Obx(
-            () => Text(
-              'auth_request_time_pending'.trParams({
-                's': authController.authTimeoutSeconds.value.toString(),
-              }),
-              style: Get.textTheme.bodyMedium,
-            ),
-          ),
-          const SizedBox(height: 32),
-          OutlinedButton(
-            onPressed:
-                () => authController.cancelAuth('cancel_aut_for_user'.tr),
-            style: AppButtonStyle.errorButtonStyle(context),
-            child: Text('cancel'.tr),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -214,21 +294,19 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                Icons.devices_other,
-                size: 60,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.5),
+                Icons.devices_other_rounded,
+                size: 80,
+                color: Colors.white24,
               ),
               const SizedBox(height: 24),
               Text(
                 'empty_devices_linqora'.tr,
-                style: Get.textTheme.titleMedium,
+                style: Get.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               Text(
                 'empty_devices_linqora_descriptions'.tr,
-                style: Get.textTheme.bodyMedium,
+                style: Get.textTheme.bodyMedium?.copyWith(color: Colors.white54),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -238,39 +316,42 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
 
       return ListView.builder(
         itemCount: authController.discoveredDevices.length,
+        padding: const EdgeInsets.symmetric(vertical: 10),
         itemBuilder: (context, index) {
           final device = authController.discoveredDevices[index];
-          return DefaultCard(
-            child: ListTile(
-              leading: Icon(
-                Icons.computer,
-                color:
-                    device.supportsTLS
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.errorContainer,
-              ),
-              title: Text(
-                device.name,
-                style: Get.theme.textTheme.titleMedium?.copyWith(
-                  color: Get.theme.colorScheme.onPrimaryContainer,
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: LinStyles.glassMorphism(
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: (device.supportsTLS ? Theme.of(context).colorScheme.primary : Colors.orange).withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    device.supportsTLS ? Icons.computer_rounded : Icons.warning_amber_rounded,
+                    color: device.supportsTLS ? Theme.of(context).colorScheme.primary : Colors.orange,
+                  ),
                 ),
-              ),
-              subtitle: Text(
-                '${device.address}:${device.port}',
-                style: Get.theme.textTheme.labelMedium?.copyWith(
-                  color: Get.theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                title: Text(
+                  device.name,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
                 ),
-              ),
-              trailing: IconButton(
-                icon: Icon(
-                  Icons.arrow_forward,
-                  color: Get.theme.colorScheme.onPrimaryContainer,
+                subtitle: Text(
+                  '${device.address}:${device.port}',
+                  style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13),
                 ),
-                onPressed: () => authController.connectToDevice(device),
+                trailing: Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 16,
+                  color: Colors.white.withOpacity(0.3),
+                ),
+                onTap: () => authController.connectToDevice(device),
               ),
-              onTap: () => authController.connectToDevice(device),
             ),
-          );
+          ).animate().fadeIn(delay: (index * 100).ms).slideX(begin: 0.2);
         },
       );
     });
@@ -278,7 +359,7 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
 
   Widget _buildActionButton() {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.only(bottom: 24, top: 16),
       child: Obx(() {
         if (authController.authStatus.value == AuthStatus.scanning ||
             authController.authStatus.value == AuthStatus.connecting ||
@@ -286,24 +367,10 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
           return const SizedBox.shrink();
         }
 
-        return SizedBox(
-          height: 48,
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: authController.startDiscovery,
-            style: ElevatedButton.styleFrom(
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            icon: const Icon(Icons.refresh),
-            label: Text(
-              'update'.tr,
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-          ),
+        return ElevatedButton.icon(
+          onPressed: authController.startDiscovery,
+          icon: const Icon(Icons.refresh_rounded),
+          label: Text('update'.tr.toUpperCase()),
         );
       }),
     );

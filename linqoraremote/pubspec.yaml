@@ -6,7 +6,7 @@ publish_to: 'https://github.com/pasichDev/linqora'
 version: 0.1.0+1
 
 environment:
-  sdk: ^3.7.2
+  sdk: ^3.11.0
 
 
 dependencies:
@@ -30,6 +30,11 @@ dependencies:
   connectivity_plus: ^6.1.4
   getx_multilanguage_helper: ^0.0.2
   flutter_svg: ^2.1.0
+  flutter_secure_storage: ^9.2.2
+  crypto: ^3.0.6
+  flutter_animate: ^4.5.2
+  flutter_blurhash: ^0.9.1
+  google_fonts: ^8.1.0
 dev_dependencies:
   flutter_lints: ^5.0.0
   build_runner: ^2.4.0

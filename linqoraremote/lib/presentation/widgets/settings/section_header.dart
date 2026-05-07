@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 
 class SectionHeader extends StatelessWidget {
   final String title;
@@ -11,12 +10,19 @@ class SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, color: Get.theme.colorScheme.primary, size: 16),
-        const SizedBox(width: 8),
+        Icon(
+          icon,
+          color: Theme.of(context).colorScheme.primary,
+          size: 20,
+        ),
+        const SizedBox(width: 10),
         Text(
-          title,
-          style: Get.textTheme.titleMedium!.copyWith(
-            color: Get.theme.colorScheme.primary,
+          title.toUpperCase(),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.primary,
+            fontSize: 13,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.5,
           ),
         ),
       ],

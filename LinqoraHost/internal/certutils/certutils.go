@@ -46,7 +46,9 @@ func extractEmbeddedFile(embedPath, outputPath string) error {
 		return err
 	}
 
-	return os.WriteFile(outputPath, data, 0644)
+	// Use 0600 so that private key files are readable only by the owner.
+	// 0644 would allow any local user to read the key and perform MITM attacks.
+	return os.WriteFile(outputPath, data, 0600)
 }
 
 // Check if certificates are available at the paths specified in the configuration

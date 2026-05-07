@@ -7,11 +7,12 @@ import (
 	"strings"
 )
 
-// Checks if is running with administrator rights (sudo/admin)
+// CheckAdminPrivileges determines if the process is running with elevated
+// administrative rights (root on Unix, Administrator on Windows).
 func CheckAdminPrivileges() bool {
 	switch runtime.GOOS {
 	case "linux", "darwin":
-		// In Linux/macOS, we check if we are the root user (ID = 0)
+		// In Linux/macOS, we check if the current user ID is 0 (root).
 		currentUser, err := user.Current()
 		if err != nil {
 			return false
@@ -19,7 +20,7 @@ func CheckAdminPrivileges() bool {
 		return currentUser.Uid == "0"
 
 	case "windows":
-		// In Windows, run the PowerShell cmdlet to verify administrator privileges
+		// In Windows, we query the current identity's membership in the Administrator role.
 		cmd := exec.Command("powershell", "-Command",
 			"([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)")
 
@@ -28,7 +29,6 @@ func CheckAdminPrivileges() bool {
 			return false
 		}
 
-		// If the command returns ‘True’, then we have administrator privileges
 		return strings.TrimSpace(string(output)) == "True"
 
 	default:
@@ -36,19 +36,18 @@ func CheckAdminPrivileges() bool {
 	}
 }
 
-// CanExecuteSudo checks whether the current user can execute commands with sudo
-// This is useful for deciding whether to try to use sudo in commands
+// CanExecuteSudo checks whether the current user has non-interactive sudo permissions.
 func CanExecuteSudo() bool {
 	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
 		return false
 	}
 
-	// Если мы уже root, нам не нужен sudo
+	// If already running as root, sudo is not required.
 	if CheckAdminPrivileges() {
 		return true
 	}
 
-	// Проверяем sudo без запроса пароля
+	// Check sudo accessibility without prompting for a password (-n flag).
 	cmd := exec.Command("sudo", "-n", "true")
 	err := cmd.Run()
 

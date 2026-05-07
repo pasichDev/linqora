@@ -5,6 +5,7 @@ import 'package:linqoraremote/presentation/widgets/banner.dart';
 import 'package:linqoraremote/presentation/widgets/loading_view.dart';
 import 'package:linqoraremote/presentation/widgets/shimmer_effect.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
+import 'package:linqoraremote/core/themes/lin_styles.dart';
 
 import '../../data/media_commands.dart';
 import '../controllers/media_controller.dart';
@@ -41,113 +42,111 @@ class _MediaScreenViewState extends State<MediaScreenView> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Expanded(
-            child: Obx(() {
-              if (_mediaController.capabilities.value == null) {
-                return LoadingView();
-              } else {
-                return Column(
-                  children: [
-                    if (!_mediaController
-                            .capabilities
-                            .value!
-                            .isControlledByRemote ||
-                        _mediaController.nowPlaying.value == null)
-                      MessageBanner(
-                        message:
-                            _mediaController.nowPlaying.value == null
-                                ? 'info_no_playing_remote'.tr
-                                : "error_control_remote".tr,
-                        isLoading: false,
-                      ),
-                    _volumeCard(),
-                    const SizedBox(height: 20),
-                    if (_mediaController
-                            .capabilities
-                            .value!
-                            .isControlledByRemote &&
-                        _mediaController.nowPlaying.value != null)
-                      _mediaCard(),
-                  ],
-                );
-              }
-            }),
-          ),
-        ],
-      ),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Obx(() {
+        if (_mediaController.capabilities.value == null) {
+          return const LoadingView();
+        } else {
+          return Column(
+            children: [
+              if (!_mediaController.capabilities.value!.isControlledByRemote || _mediaController.nowPlaying.value == null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 20),
+                  child: MessageBanner(
+                    message: _mediaController.nowPlaying.value == null ? 'info_no_playing_remote'.tr : "error_control_remote".tr,
+                    isLoading: false,
+                  ),
+                ),
+              _volumeCard(),
+              const SizedBox(height: 20),
+              if (_mediaController.capabilities.value!.isControlledByRemote && _mediaController.nowPlaying.value != null) _mediaCard(),
+            ],
+          );
+        }
+      }),
     );
   }
 
   Widget _volumeCard() {
-    return Card(
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceContainer,
-
+    return LinStyles.glassMorphism(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'control_sound'.tr,
-              style: Get.theme.textTheme.titleMedium?.copyWith(
-                color: Get.theme.colorScheme.onPrimaryContainer,
-                fontSize: 18,
-              ),
+            Row(
+              children: [
+                Icon(
+                  Icons.volume_up_rounded,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'control_sound'.tr.toUpperCase(),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
             Row(
               children: [
                 Obx(
                   () => IconButton(
                     icon: Icon(
-                      _mediaController.isMuted.value
-                          ? Icons.volume_off
-                          : Icons.volume_up,
-                      size: 24,
+                      _mediaController.isMuted.value ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                      size: 28,
+                      color: _mediaController.isMuted.value ? Colors.redAccent : Colors.white,
                     ),
                     onPressed: _mediaController.setMuted,
                   ),
                 ),
-                const SizedBox(width: 5),
-
-                IconButton(
-                  icon: const Icon(Icons.remove, size: 24),
-                  onPressed: _mediaController.minusVolume,
-                ),
-
                 Expanded(
                   child: Obx(
-                    () => Slider(
-                      value: _mediaController.volume.value,
-                      min: 0,
-                      max: 100,
-                      divisions: 20,
-                      label: '${_mediaController.volume.value.toInt()}%',
-                      onChanged: (newValue) {
-                        _mediaController.volume.value = newValue;
-                      },
-                      onChangeEnd: (newValue) {
-                        _mediaController.slideVolume(newValue);
-                      },
+                    () => SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 8,
+                        activeTrackColor: Theme.of(context).colorScheme.primary,
+                        inactiveTrackColor: Colors.white.withOpacity(0.1),
+                        thumbColor: Colors.white,
+                        overlayColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10, elevation: 5),
+                      ),
+                      child: Slider(
+                        value: _mediaController.volume.value,
+                        min: 0,
+                        max: 100,
+                        onChanged: (newValue) {
+                          _mediaController.volume.value = newValue;
+                        },
+                        onChangeEnd: (newValue) {
+                          _mediaController.slideVolume(newValue);
+                        },
+                      ),
                     ),
                   ),
                 ),
-
-                IconButton(
-                  icon: const Icon(Icons.add, size: 24),
-                  onPressed: _mediaController.plusVolume,
+                Obx(
+                  () => SizedBox(
+                    width: 45,
+                    child: Text(
+                      '${_mediaController.volume.value.toInt()}%',
+                      textAlign: TextAlign.end,
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+                    ),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-
+            const SizedBox(height: 24),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 _buildVolumePresetButton('10%', 10),
                 _buildVolumePresetButton('30%', 30),
@@ -163,12 +162,9 @@ class _MediaScreenViewState extends State<MediaScreenView> {
   }
 
   Widget _mediaCard() {
-    return Card(
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceContainer,
-
+    return LinStyles.glassMorphism(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(24),
         child: Obx(() {
           if (!_mediaController.capabilities.value!.canControlMedia) {
             return Center(
@@ -185,35 +181,33 @@ class _MediaScreenViewState extends State<MediaScreenView> {
             children: [
               Row(
                 children: [
+                  Icon(
+                    Icons.music_note_rounded,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
                   Text(
-                    'now_playing'.tr,
-                    style: Get.theme.textTheme.titleMedium?.copyWith(
-                      color: Get.theme.colorScheme.onPrimaryContainer,
-                      fontSize: 18,
+                    'now_playing'.tr.toUpperCase(),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.2,
                     ),
                   ),
                   const Spacer(),
                   Obx(
-                    () =>
-                        !_mediaController.isLoadingMedia.value
-                            ? Icon(
-                              _mediaController.nowPlaying.value?.isPlaying ??
-                                      false
-                                  ? Icons.music_note
-                                  : Icons.music_off,
-                              color:
-                                  _mediaController
-                                              .nowPlaying
-                                              .value
-                                              ?.isPlaying ??
-                                          false
-                                      ? Colors.green
-                                      : Colors.grey,
-                            )
-                            : LoadingAnimationWidget.fourRotatingDots(
-                              color: Theme.of(context).colorScheme.onPrimary,
-                              size: 22,
-                            ),
+                    () => !_mediaController.isLoadingMedia.value
+                        ? Icon(
+                            _mediaController.nowPlaying.value?.isPlaying ?? false ? Icons.graphic_eq_rounded : Icons.pause_rounded,
+                            color: _mediaController.nowPlaying.value?.isPlaying ?? false ? Colors.greenAccent : Colors.white24,
+                            size: 20,
+                          )
+                        : LoadingAnimationWidget.staggeredDotsWave(
+                            color: Theme.of(context).colorScheme.primary,
+                            size: 20,
+                          ),
                   ),
                 ],
               ),
@@ -234,16 +228,19 @@ class _MediaScreenViewState extends State<MediaScreenView> {
   }
 
   Widget _buildVolumePresetButton(String label, int volumeValue) {
-    return TextButton(
-      onPressed: () => _mediaController.setVolume(volumeValue),
-      style: ElevatedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        minimumSize: const Size(0, 0),
-      ),
-      child: Text(
-        label,
-        style: Get.theme.textTheme.labelLarge?.copyWith(
-          color: Get.theme.colorScheme.onPrimaryContainer,
+    return InkWell(
+      onTap: () => _mediaController.setVolume(volumeValue),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white70),
         ),
       ),
     );
@@ -251,73 +248,72 @@ class _MediaScreenViewState extends State<MediaScreenView> {
 
   Widget _buildMediaInfoSection() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Obx(
-          () =>
-              _mediaController.isLoadingMedia.value
-                  ? ShimmerEffect(height: 16, width: 160)
-                  : Text(
-                    "${_mediaController.nowPlaying.value!.title} - ${_mediaController.nowPlaying.value!.artist}",
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+          () => _mediaController.isLoadingMedia.value
+              ? const ShimmerEffect(height: 24, width: 200)
+              : Text(
+                  _mediaController.nowPlaying.value!.title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
         ),
+        const SizedBox(height: 8),
         Obx(
-          () =>
-              _mediaController.isLoadingMedia.value
-                  ? SizedBox(height: 5)
-                  : SizedBox(),
+          () => _mediaController.isLoadingMedia.value
+              ? const ShimmerEffect(height: 16, width: 140)
+              : Text(
+                  _mediaController.nowPlaying.value!.artist,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white.withOpacity(0.5),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
         ),
-
+        const SizedBox(height: 32),
         Obx(() {
-          final app = _mediaController.nowPlaying.value!.application;
-          if (!_mediaController.isLoadingMedia.value) {
-            return Text(
-              app.isEmpty ? 'unknown_app'.tr : app,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-            );
-          } else {
-            return ShimmerEffect(height: 12, width: 110);
-          }
-        }),
-
-        const SizedBox(height: 20),
-        Obx(() {
-          if (_mediaController.nowPlaying.value!.duration > 0 &&
-              !_mediaController.isLoadingMedia.value) {
+          final nowPlaying = _mediaController.nowPlaying.value!;
+          if (nowPlaying.duration > 0 && !_mediaController.isLoadingMedia.value) {
             return Column(
               children: [
-                LinearProgressIndicator(
-                  value: _mediaController.nowPlaying.value!.progress.toDouble(),
-                  backgroundColor: Colors.grey.shade300.withAlpha(60),
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-                  minHeight: 6,
-                  borderRadius: BorderRadius.circular(8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: nowPlaying.progress.toDouble(),
+                    backgroundColor: Colors.white.withOpacity(0.05),
+                    valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.primary),
+                    minHeight: 6,
+                  ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      _mediaController.nowPlaying.value!.stringPosition
-                          .toString(),
+                      nowPlaying.stringPosition.toString(),
                       style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade700,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white.withOpacity(0.4),
                       ),
                     ),
-
                     Text(
-                      _mediaController.nowPlaying.value!.stringDuration
-                          .toString(),
+                      nowPlaying.stringDuration.toString(),
                       style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade700,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white.withOpacity(0.4),
                       ),
                     ),
                   ],
@@ -328,58 +324,50 @@ class _MediaScreenViewState extends State<MediaScreenView> {
             return const SizedBox.shrink();
           }
         }),
-
-        const SizedBox(height: 5),
       ],
     );
   }
 
   Widget _buildPlaybackControls(bool isEnabled) {
-    var color =
-        isEnabled
-            ? Theme.of(context).colorScheme.onSurface.withAlpha(1000)
-            : Theme.of(context).colorScheme.onSurface.withAlpha(100);
+    final colorScheme = Theme.of(context).colorScheme;
+    final color = isEnabled ? Colors.white : Colors.white24;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         IconButton(
-          icon: Icon(Icons.skip_previous, size: 36, color: color),
-          onPressed: () {
-            if (isEnabled) {
-              _mediaController.sendMediaCommand(MediaActions.mediaPrevious);
-            }
-          },
+          icon: Icon(Icons.skip_previous_rounded, size: 40, color: color),
+          onPressed: isEnabled ? () => _mediaController.sendMediaCommand(MediaActions.mediaPrevious) : null,
         ),
-
-        const SizedBox(width: 16),
-
+        const SizedBox(width: 24),
         Obx(
-          () => IconButton(
-            icon: Icon(
-              _mediaController.nowPlaying.value!.isPlaying
-                  ? Icons.pause_circle_filled
-                  : Icons.play_circle_filled,
-              size: 48,
-              color: color,
+          () => Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: colorScheme.primary.withOpacity(0.2),
+              border: Border.all(color: colorScheme.primary.withOpacity(0.5), width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: colorScheme.primary.withOpacity(0.2),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                ),
+              ],
             ),
-            onPressed: () {
-              if (isEnabled) {
-                _mediaController.sendMediaCommand(MediaActions.mediaPlayPause);
-              }
-            },
+            child: IconButton(
+              icon: Icon(
+                _mediaController.nowPlaying.value!.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                size: 48,
+                color: isEnabled ? colorScheme.primary : Colors.white24,
+              ),
+              onPressed: isEnabled ? () => _mediaController.sendMediaCommand(MediaActions.mediaPlayPause) : null,
+            ),
           ),
         ),
-
-        const SizedBox(width: 16),
-
+        const SizedBox(width: 24),
         IconButton(
-          icon: Icon(Icons.skip_next, size: 36, color: color),
-          onPressed: () {
-            if (isEnabled) {
-              _mediaController.sendMediaCommand(MediaActions.mediaNext);
-            }
-          },
+          icon: Icon(Icons.skip_next_rounded, size: 40, color: color),
+          onPressed: isEnabled ? () => _mediaController.sendMediaCommand(MediaActions.mediaNext) : null,
         ),
       ],
     );
