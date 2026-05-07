@@ -25,21 +25,13 @@
 ```bash
 git clone https://github.com/pasichDev/linqora.git
 cd linqora/LinqoraHost
-go build -o linqorahost ./cmd/
+go build -o linqora ./cmd/linqora_cli.go
 ```
 
 ### First run (auto-generates TLS certificate)
 
 ```bash
-./linqorahost
-```
-
-The server starts on port **8070** with TLS enabled. On first launch it generates a self-signed certificate under `./certificates/`.
-
-### Flags
-
-```
-./linqorahost [flags]
+./linqora serve [flags]
 
 Flags:
   -p, --port int     Listening port (default 8070)
@@ -57,19 +49,19 @@ These commands do **not** start the server — they only read/modify the config.
 ### List authorised devices
 
 ```bash
-./linqorahost device-list
+./linqora auth list
 ```
 
 ### Revoke a device
 
 ```bash
-./linqorahost device-revoke <device-id>
+./linqora auth revoke <device-id>
 ```
 
 ### Generate a shared secret (HMAC authentication)
 
 ```bash
-./linqorahost gen-secret
+./linqora auth gen-secret
 ```
 
 This writes a 32-byte random secret to `~/.config/linqora/linqora_config.json` and prints it. Enter the same secret in the Linqora Remote app under **Settings → Shared Secret**.

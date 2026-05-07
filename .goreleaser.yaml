@@ -1,7 +1,8 @@
 version: 2
 project_name: linqora-host
 builds:
-  - main: ./LinqoraHost/cmd/linqora_cli.go
+  - dir: LinqoraHost
+    main: ./cmd/linqora_cli.go
     id: "linqora-host"
     binary: linqora
     env:

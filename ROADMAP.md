@@ -27,8 +27,8 @@ This document outlines the development plan and key tasks for the **Linqora** pr
 ## 🚀 Current Focus & TODO
 
 ### 📖 Documentation & UX
-- [/] **Host API Documentation**: Internal GoDoc complete. Need to export to external wiki/site.
-- [ ] **Usage Guide**: Detailed instructions for setup, certificates, and E2EE configuration.
+- [x] **Host API Documentation**: WebSocket protocol and command reference documented in `API.md`.
+- [/] **Usage Guide**: Core setup and CLI usage instructions added to `SETUP.md`.
 - [ ] **Official Website**: Project landing page and documentation hub.
 
 ---

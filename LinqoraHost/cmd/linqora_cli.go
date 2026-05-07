@@ -311,9 +311,9 @@ func runServer(cmd *cobra.Command, args []string) {
 
 	// Print server information
 	fmt.Printf("TLS:         %t\n", enableTLS)
-	fmt.Printf("Хост IP:     %s\n", deviceInfo.IP)
-	fmt.Printf("Порт:        %d\n", cfg.Port)
-	fmt.Printf("ОС:          %s\n", deviceInfo.OS)
+	fmt.Printf("Host IP:     %s\n", deviceInfo.IP)
+	fmt.Printf("Port:        %d\n", cfg.Port)
+	fmt.Printf("OS:          %s\n", deviceInfo.OS)
 	fmt.Println("====================================================")
 
 	// Reinitialise stop primitives for this run
