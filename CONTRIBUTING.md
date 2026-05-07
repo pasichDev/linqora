@@ -19,6 +19,7 @@ Thank you for your interest in contributing to Linqora! Here's how you can help.
 
 - Write unit tests for new functionality
 - Ensure existing tests pass before submitting a PR
+- To run tests for the Go backend: `cd LinqoraHost && go test ./...`
 
 ## Submitting Changes
 

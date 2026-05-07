@@ -37,6 +37,10 @@ The project consists of two main components:
 - 🔊 Media and volume control
 - ⚡ Power management (shutdown, restart, lock)
 - 🔐 Secure device authentication
+- 🛡️ **End-to-End Encryption (AES-256-GCM)** for all communication
+- 🖥️ **Multi-monitor management** (enumeration, primary monitor control)
+- 📂 **Remote file browser** (secure browsing, read/write files)
+- ⌨️ **Powerful CLI** for server management and configuration
 - 🌐 Local network discovery
 - 🔄 WebSocket-based communication
 

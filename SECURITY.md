@@ -15,4 +15,6 @@ Please do not disclose security vulnerabilities publicly until they have been ad
 Linqora implements the following security measures:
 - Local network operation only (no internet exposure required)
 - Device authentication before connection
-- WebSocket with secure protocols where available
+- **End-to-End Encryption (AES-256-GCM)** for all WebSocket payloads
+- **Path-traversal protection** for remote file access
+- Secure certificate handling for local HTTPS/WSS
