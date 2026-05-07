@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:linqoraremote/presentation/widgets/default_card.dart';
+import 'package:linqoraremote/core/themes/lin_styles.dart';
 import 'package:linqoraremote/presentation/widgets/shimmer_effect.dart';
 
 import '../../data/models/host_info.dart';
@@ -23,137 +23,102 @@ class HostInfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return DefaultCard(
+    return LinStyles.glassMorphism(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.computer_rounded,
-                      color: colorScheme.primary,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      host.os,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onSurface,
-                      ),
-                    ),
-                  ],
-                ),
-                Row(
-                  children: [
-                    IconButton(
-                      onPressed: toggleShowHostFull,
-                      icon: Icon(
-                        isExpanded
-                            ? Icons.keyboard_arrow_up
-                            : Icons.keyboard_arrow_down,
-                      ),
-                      style: IconButton.styleFrom(
-                        elevation: 0,
-                        backgroundColor:
-                            Theme.of(context).colorScheme.surfaceContainer,
-                        foregroundColor:
-                            Theme.of(context).colorScheme.onSurface,
-                        padding: const EdgeInsets.all(0),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(0),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.dns_rounded,
+                          color: colorScheme.primary,
+                          size: 20,
                         ),
                       ),
-                    ),
-                    if (isExpanded) ...[
-                      IconButton(
-                        onPressed: refresh,
-                        icon: Icon(Icons.refresh),
-                        style: IconButton.styleFrom(
-                          elevation: 0,
-                          backgroundColor:
-                              Theme.of(context).colorScheme.surfaceContainer,
-                          foregroundColor:
-                              Theme.of(context).colorScheme.onSurface,
-                          padding: const EdgeInsets.all(0),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(0),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          host.os,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
+                  ),
+                ),
+                Row(
+                  children: [
+                    if (isExpanded)
+                      IconButton(
+                        onPressed: refresh,
+                        icon: const Icon(Icons.refresh_rounded, size: 20),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    IconButton(
+                      onPressed: toggleShowHostFull,
+                      icon: Icon(
+                        isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                        size: 28,
+                      ),
+                      color: colorScheme.primary,
+                    ),
                   ],
                 ),
               ],
             ),
-
             if (isExpanded) ...[
-              Column(
-                children: [
-                  const SizedBox(height: 12),
-
-                  Divider(
-                    height: 1,
-                    color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-                  ),
-                  const SizedBox(height: 12),
-
-                  _buildInfoRow(
-                    context,
-                    Icons.developer_board,
-                    'cpu'.tr,
-                    host.cpu.model,
-                    "${host.cpu.frequency} MHz • ${host.cpu.physicalCores}/${host.cpu.logicalCores} ${'cores'.tr}",
-                  ),
-
-                  const SizedBox(height: 12),
-
-
-                  _buildInfoRow(
-                    context,
-                    Icons.memory_outlined,
-                    'ram'.tr,
-                    _formatRamInfo(),
-                    _formatRamUsage(),
-                  ),
-
-
-                  if (host.gpu.model != 'Unknown')
-                    Column(
-                      children: [
-                        const SizedBox(height: 12),
-                        _buildInfoRow(
-                          context,
-                          Icons.developer_board_rounded,
-                          'gpu'.tr,
-                          host.gpu.model,
-                          _formatGpuInfo(),
-                        ),
-                      ],
-                    ),
-
-                  if (host.disks.isNotEmpty)
-                    Column(
-                      children: [
-                        const SizedBox(height: 12),
-                        _buildDisksInfo(context),
-                      ],
-                    ),
-                ],
+              const SizedBox(height: 20),
+              _buildInfoRow(
+                context,
+                Icons.developer_board_rounded,
+                'cpu'.tr,
+                host.cpu.model,
+                "${host.cpu.frequency} MHz • ${host.cpu.physicalCores}/${host.cpu.logicalCores} ${'cores'.tr}",
               ),
+              const SizedBox(height: 16),
+              _buildInfoRow(
+                context,
+                Icons.memory_rounded,
+                'ram'.tr,
+                _formatRamInfo(),
+                _formatRamUsage(),
+              ),
+              if (host.gpu.model != 'Unknown') ...[
+                const SizedBox(height: 16),
+                _buildInfoRow(
+                  context,
+                  Icons.videogame_asset_rounded,
+                  'gpu'.tr,
+                  host.gpu.model,
+                  _formatGpuInfo(),
+                ),
+              ],
+              if (host.disks.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _buildDisksInfo(context),
+              ],
             ],
           ],
         ),
       ),
     );
   }
-
 
   String _formatRamInfo() {
     String info = "${host.ram.total} GB";
@@ -175,16 +140,12 @@ class HostInfoCard extends StatelessWidget {
     return "";
   }
 
-  /// Format GPU information
   String _formatGpuInfo() {
-    String info = "";
-
     if (host.gpu.memory > 0) {
       double gpuMemoryGB = host.gpu.memory / 1024.0;
-      info += "${gpuMemoryGB.toStringAsFixed(1)} GB";
+      return "${gpuMemoryGB.toStringAsFixed(1)} GB";
     }
-
-    return info;
+    return "";
   }
 
   Widget _buildDisksInfo(BuildContext context) {
@@ -196,37 +157,37 @@ class HostInfoCard extends StatelessWidget {
         Row(
           children: [
             Icon(Icons.storage_rounded, color: colorScheme.secondary, size: 18),
-            const SizedBox(width: 8),
+            const SizedBox(width: 12),
             Text(
-              'disk'.tr,
+              'disk'.tr.toUpperCase(),
               style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
                 color: colorScheme.secondary,
+                letterSpacing: 1,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 8),
         ...host.disks.map(
           (disk) => Padding(
-            padding: const EdgeInsets.only(left: 26, bottom: 4),
+            padding: const EdgeInsets.only(left: 30, bottom: 8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   "${disk.name} (${disk.mountPath})",
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
                 Text(
                   "${disk.total} GB • ${'free'.tr}: ${disk.free} GB • ${disk.fileSystem}",
                   style: TextStyle(
                     fontSize: 12,
-                    color: colorScheme.onSurfaceVariant,
+                    color: Colors.white.withOpacity(0.5),
                   ),
                 ),
               ],
@@ -249,28 +210,28 @@ class HostInfoCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, color: colorScheme.secondary, size: 18),
-        const SizedBox(width: 8),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                label,
+                label.toUpperCase(),
                 style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
                   color: colorScheme.secondary,
+                  letterSpacing: 1,
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 4),
               Text(
                 primaryInfo,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.bold,
                 ),
-                maxLines: 3,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
               if (secondaryInfo.isNotEmpty)
@@ -278,7 +239,7 @@ class HostInfoCard extends StatelessWidget {
                   secondaryInfo,
                   style: TextStyle(
                     fontSize: 12,
-                    color: colorScheme.onSurfaceVariant,
+                    color: Colors.white.withOpacity(0.5),
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -296,100 +257,48 @@ class HostInfoCardSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Card(
-      margin: const EdgeInsets.all(16),
-      elevation: 0,
-      color: colorScheme.surfaceContainer,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    return LinStyles.glassMorphism(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Заголовок
             Row(
               children: [
-                ShimmerEffect(
-                  height: 20,
-                  width: 20,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                const SizedBox(width: 8),
-                ShimmerEffect(height: 18, width: 160),
+                ShimmerEffect(height: 36, width: 36, borderRadius: BorderRadius.circular(10)),
+                const SizedBox(width: 12),
+                const ShimmerEffect(height: 20, width: 140),
               ],
             ),
-
-            const SizedBox(height: 12),
-            Divider(
-              height: 1,
-              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-            ),
-            const SizedBox(height: 12),
-
-            // Процессор
-            _buildSkeletonRow(context),
-
-            const SizedBox(height: 12),
-
-            // Память
-            _buildSkeletonRow(context),
-
-            const SizedBox(height: 12),
-
-            // GPU
-            _buildSkeletonRow(context),
-
-            const SizedBox(height: 12),
-
-            // Диски
-            _buildSkeletonRow(context),
-            _buildSkeletonDisk(context),
-            _buildSkeletonDisk(context),
+            const SizedBox(height: 24),
+            _buildSkeletonRow(),
+            const SizedBox(height: 16),
+            _buildSkeletonRow(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSkeletonRow(BuildContext context) {
+  Widget _buildSkeletonRow() {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ShimmerEffect(
-          height: 18,
-          width: 18,
-          borderRadius: BorderRadius.circular(4),
-        ),
-        const SizedBox(width: 8),
+        const ShimmerEffect(height: 18, width: 18, borderRadius: BorderRadius.all(Radius.circular(4))),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: const [
-              ShimmerEffect(height: 12, width: 60),
-              SizedBox(height: 4),
+              ShimmerEffect(height: 10, width: 50),
+              SizedBox(height: 6),
               ShimmerEffect(height: 14, width: 180),
-              SizedBox(height: 2),
+              SizedBox(height: 4),
               ShimmerEffect(height: 12, width: 120),
             ],
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildSkeletonDisk(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 26, top: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          ShimmerEffect(height: 14, width: 160),
-          SizedBox(height: 2),
-          ShimmerEffect(height: 12, width: 200),
-        ],
-      ),
     );
   }
 }
