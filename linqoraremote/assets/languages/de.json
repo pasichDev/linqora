@@ -108,5 +108,16 @@
   "touchpad_hint": "Ziehen zum Bewegen  •  Tippen zum Klicken  •  Halten für Rechtsklick",
   "scroll": "Scrollen",
   "left_click": "Linksklick",
-  "right_click": "Rechtsklick"
+  "right_click": "Rechtsklick",
+  "connect_manually": "Manuell verbinden",
+  "enter_ip_address": "Geräte-IP-Adresse eingeben",
+  "ip_address": "IP-Adresse",
+  "port": "Port",
+  "connect": "Verbinden",
+  "allow_self_signed": "Selbstsignierte Zertifikate zulassen",
+  "allow_self_signed_description": "Ermöglicht die Verbindung zu Hosts mit nicht vertrauenswürdigen TLS-Zertifikaten (für Entwicklung erforderlich)",
+  "scripts": "Skripte",
+  "no_scripts_available": "Keine Skripte auf dem Host verfügbar",
+  "execute": "Ausführen",
+  "exit_code": "Exit-Code"
 }

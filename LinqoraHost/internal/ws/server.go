@@ -316,6 +316,14 @@ func (s *WSServer) handleClientMessage(client *Client, msg *ClientMessage) {
 		s.handleMouseCommand(client, msg)
 	case "script_list":
 		s.handleScriptList(client)
+	case "script_add":
+		s.handleScriptAdd(client, msg)
+	case "script_update":
+		s.handleScriptUpdate(client, msg)
+	case "script_delete":
+		s.handleScriptDelete(client, msg)
+	case "script_stop":
+		s.handleScriptStop(client, msg)
 	case "script_execute":
 		s.handleScriptExecute(client, msg)
 	case "auth_request":
@@ -461,6 +469,59 @@ func (s *WSServer) handleScriptList(client *Client) {
 	})
 }
 
+func (s *WSServer) handleScriptAdd(client *Client, msg *ClientMessage) {
+	var script scheduler.Script
+	if err := json.Unmarshal(msg.Data, &script); err != nil {
+		client.SendError("script_add", "Invalid script data", 400)
+		return
+	}
+	if err := s.scriptManager.Add(script); err != nil {
+		client.SendError("script_add", err.Error(), 500)
+		return
+	}
+	client.SendSuccess("script_add", script)
+}
+
+func (s *WSServer) handleScriptUpdate(client *Client, msg *ClientMessage) {
+	var script scheduler.Script
+	if err := json.Unmarshal(msg.Data, &script); err != nil {
+		client.SendError("script_update", "Invalid script data", 400)
+		return
+	}
+	if err := s.scriptManager.Update(script); err != nil {
+		client.SendError("script_update", err.Error(), 500)
+		return
+	}
+	client.SendSuccess("script_update", script)
+}
+
+func (s *WSServer) handleScriptDelete(client *Client, msg *ClientMessage) {
+	var req struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(msg.Data, &req); err != nil || req.ID == "" {
+		client.SendError("script_delete", "Missing or invalid script id", 400)
+		return
+	}
+	if err := s.scriptManager.Delete(req.ID); err != nil {
+		client.SendError("script_delete", err.Error(), 500)
+		return
+	}
+	client.SendSuccess("script_delete", req)
+}
+
+func (s *WSServer) handleScriptStop(client *Client, msg *ClientMessage) {
+	var req struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(msg.Data, &req); err != nil || req.ID == "" {
+		client.SendError("script_stop", "Missing or invalid script id", 400)
+		return
+	}
+	s.scriptManager.Stop(req.ID)
+	client.SendSuccess("script_stop", req)
+}
+
 func (s *WSServer) handleScriptExecute(client *Client, msg *ClientMessage) {
 	var req struct {
 		ID string `json:"id"`
@@ -471,7 +532,11 @@ func (s *WSServer) handleScriptExecute(client *Client, msg *ClientMessage) {
 	}
 
 	go func() {
-		result, err := s.scriptManager.Execute(req.ID)
+		onOutput := func(chunk scheduler.OutputChunk) {
+			client.SendSuccess("script_output", chunk)
+		}
+
+		result, err := s.scriptManager.Execute(req.ID, onOutput)
 		if err != nil {
 			client.SendError("script_execute", err.Error(), 404)
 			return

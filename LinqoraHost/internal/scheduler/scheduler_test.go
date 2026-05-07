@@ -28,7 +28,7 @@ func TestManagerListReturnsCopy(t *testing.T) {
 
 func TestManagerExecuteUnknown(t *testing.T) {
 	m := NewManagerWithScripts(nil)
-	_, err := m.Execute("does-not-exist")
+	_, err := m.Execute("does-not-exist", nil)
 	if err == nil {
 		t.Fatal("expected error for unknown script id")
 	}
@@ -48,7 +48,7 @@ func TestManagerExecuteSimple(t *testing.T) {
 		{ID: "noop", Name: "No-op", Command: cmd, Args: args},
 	})
 
-	result, err := m.Execute("noop")
+	result, err := m.Execute("noop", nil)
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}

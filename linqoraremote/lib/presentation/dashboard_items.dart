@@ -5,6 +5,7 @@ import 'package:linqoraremote/presentation/widgets/powermanagment_view.dart';
 import 'package:linqoraremote/presentation/widgets/touchpad_view.dart';
 
 import 'widgets/media_view.dart';
+import 'widgets/scripts_view.dart';
 
 class MenuOption {
   final String title;
@@ -34,5 +35,10 @@ final menuOptions = [
     title: 'touchpad'.tr,
     icon: Icons.mouse_outlined,
     view: TouchpadView(),
+  ),
+  MenuOption(
+    title: 'scripts'.tr,
+    icon: Icons.code_rounded,
+    view: const ScriptsView(),
   ),
 ];

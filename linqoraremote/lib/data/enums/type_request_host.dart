@@ -48,8 +48,23 @@ enum TypeMessageWs {
   /// List all server-registered scripts.
   script_list,
 
+  /// Add a new script.
+  script_add,
+
+  /// Update an existing script.
+  script_update,
+
+  /// Delete a script by id.
+  script_delete,
+
   /// Execute a server-registered script by id.
   script_execute,
+
+  /// Stop a running script by id.
+  script_stop,
+
+  /// Real-time output line from a running script.
+  script_output,
 }
 
 /// An extension on the `TypeMessageWs` enum to provide additional functionality.
