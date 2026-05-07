@@ -34,6 +34,7 @@ type Client struct {
 	DeviceID     string
 	lastPingTime time.Time
 	limiter      *clientRateLimiter
+	e2eeKey      []byte
 }
 
 // NewClient creates a new Client instance.
@@ -80,6 +81,13 @@ func (c *Client) SetDeviceName(name string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.DeviceName = name
+}
+
+// SetE2EEKey sets the key used for application-layer encryption.
+func (c *Client) SetE2EEKey(key []byte) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.e2eeKey = key
 }
 
 // GetType returns the message type.
@@ -132,6 +140,23 @@ func (c *Client) StartReadPump(handleMessage func(*ClientMessage), onDisconnect 
 		if err := json.Unmarshal(message, &clientMsg); err != nil {
 			log.Printf("Error unmarshaling message: %v", err)
 			continue
+		}
+
+		// Decrypt payload if E2EE is enabled and message type is "encrypted"
+		if clientMsg.Type == "encrypted" && c.e2eeKey != nil {
+			var cryptoMsg struct {
+				Payload string `json:"payload"`
+			}
+			if err := json.Unmarshal(clientMsg.Data, &cryptoMsg); err == nil {
+				decrypted, err := Decrypt(cryptoMsg.Payload, c.e2eeKey)
+				if err == nil {
+					// Replace original message with decrypted content
+					var innerMsg ClientMessage
+					if err := json.Unmarshal(decrypted, &innerMsg); err == nil {
+						clientMsg = innerMsg
+					}
+				}
+			}
 		}
 
 		// Rate limiting protection
@@ -209,6 +234,21 @@ func (c *Client) StartWritePump() {
 
 // sendMessage queues a message for delivery.
 func (c *Client) sendMessage(message []byte) error {
+	c.mu.Lock()
+	e2eeKey := c.e2eeKey
+	c.mu.Unlock()
+
+	if e2eeKey != nil {
+		encrypted, err := Encrypt(message, e2eeKey)
+		if err == nil {
+			// Wrap in an encrypted message structure
+			envelope := NewSuccessResponse("encrypted", map[string]string{
+				"payload": encrypted,
+			})
+			message, _ = json.Marshal(envelope)
+		}
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 

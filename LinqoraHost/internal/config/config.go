@@ -24,6 +24,8 @@ type ServerConfig struct {
 	// SharedSecret enables HMAC-SHA256 challenge-response authentication.
 	// Empty string = disabled (fallback to manual approval flow).
 	SharedSecret string `json:"shared_secret,omitempty"`
+	// EnableE2EE enables application-layer encryption for WebSocket payloads.
+	EnableE2EE bool `json:"enable_e2ee"`
 }
 
 // DeviceAuth stores information about an authorised device.

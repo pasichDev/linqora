@@ -12,8 +12,10 @@ import (
 	"LinqoraHost/internal/collectors"
 	"LinqoraHost/internal/config"
 	"LinqoraHost/internal/deviceinfo"
+	"LinqoraHost/internal/filebrowser"
 	"LinqoraHost/internal/media"
 	"LinqoraHost/internal/metrics"
+	"LinqoraHost/internal/monitors"
 	"LinqoraHost/internal/mouse"
 	"LinqoraHost/internal/power"
 	"LinqoraHost/internal/privileges"
@@ -175,6 +177,9 @@ func (s *WSServer) handleWSConnection(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := NewClient(conn, r.RemoteAddr)
+	if s.config.EnableE2EE && s.config.SharedSecret != "" {
+		client.SetE2EEKey(DeriveKey(s.config.SharedSecret))
+	}
 
 	s.clientsMutex.Lock()
 	s.clients[client] = true
@@ -298,6 +303,16 @@ func (s *WSServer) handleClientMessage(client *Client, msg *ClientMessage) {
 		s.handleScriptStop(client, msg)
 	case "script_execute":
 		s.handleScriptExecute(client, msg)
+	case "monitor_list":
+		s.handleMonitorList(client)
+	case "monitor_cmd":
+		s.handleMonitorCommand(client, msg)
+	case "file_list":
+		s.handleFileList(client, msg)
+	case "file_read":
+		s.handleFileRead(client, msg)
+	case "file_write":
+		s.handleFileWrite(client, msg)
 	case "auth_request":
 		if s.authManager != nil {
 			s.authManager.HandleAuthRequest(client, msg)
@@ -499,6 +514,111 @@ func (s *WSServer) handleScriptExecute(client *Client, msg *ClientMessage) {
 			"duration_ms": result.Duration,
 		})
 	}()
+}
+
+// handleMonitorList returns all connected monitors and their current settings.
+func (s *WSServer) handleMonitorList(client *Client) {
+	list, err := monitors.GetMonitors()
+	if err != nil {
+		client.SendError("monitor_list", err.Error(), 500)
+		return
+	}
+	client.SendSuccess("monitor_list", map[string]interface{}{
+		"monitors": list,
+	})
+}
+
+// handleMonitorCommand processes changes to monitor resolution or primary status.
+func (s *WSServer) handleMonitorCommand(client *Client, msg *ClientMessage) {
+	var data struct {
+		Action    string `json:"action"` // "set_resolution", "set_primary"
+		MonitorID string `json:"monitor_id"`
+		Width     int    `json:"width"`
+		Height    int    `json:"height"`
+		Rate      int    `json:"rate"`
+	}
+	if err := json.Unmarshal(msg.Data, &data); err != nil {
+		client.SendError("monitor_cmd", "Invalid format", 400)
+		return
+	}
+
+	var err error
+	switch data.Action {
+	case "set_resolution":
+		err = monitors.SetResolution(data.MonitorID, data.Width, data.Height, data.Rate)
+	case "set_primary":
+		err = monitors.SetPrimary(data.MonitorID)
+	default:
+		client.SendError("monitor_cmd", "Unknown action", 400)
+		return
+	}
+
+	if err != nil {
+		client.SendError("monitor_cmd", err.Error(), 500)
+		return
+	}
+
+	client.SendSuccess("monitor_cmd", map[string]interface{}{"status": "ok"})
+}
+
+// handleFileList lists directory contents.
+func (s *WSServer) handleFileList(client *Client, msg *ClientMessage) {
+	var data struct {
+		Path string `json:"path"`
+	}
+	json.Unmarshal(msg.Data, &data)
+	if data.Path == "" {
+		data.Path = filebrowser.GetHomeDir()
+	}
+
+	list, err := filebrowser.ListDir(data.Path)
+	if err != nil {
+		client.SendError("file_list", err.Error(), 500)
+		return
+	}
+
+	client.SendSuccess("file_list", map[string]interface{}{
+		"path":  data.Path,
+		"files": list,
+	})
+}
+
+// handleFileRead reads a file and sends it to the client.
+func (s *WSServer) handleFileRead(client *Client, msg *ClientMessage) {
+	var data struct {
+		Path string `json:"path"`
+	}
+	json.Unmarshal(msg.Data, &data)
+
+	content, err := filebrowser.ReadFile(data.Path)
+	if err != nil {
+		client.SendError("file_read", err.Error(), 500)
+		return
+	}
+
+	client.SendSuccess("file_read", map[string]interface{}{
+		"path":    data.Path,
+		"content": content, // JSON marshal will base64 encode this
+	})
+}
+
+// handleFileWrite saves a file from the client.
+func (s *WSServer) handleFileWrite(client *Client, msg *ClientMessage) {
+	var data struct {
+		Path    string `json:"path"`
+		Content []byte `json:"content"`
+	}
+	if err := json.Unmarshal(msg.Data, &data); err != nil {
+		client.SendError("file_write", "Invalid format", 400)
+		return
+	}
+
+	if err := filebrowser.WriteFile(data.Path, data.Content); err != nil {
+		client.SendError("file_write", err.Error(), 500)
+		return
+	}
+
+	client.SendSuccess("file_write", map[string]interface{}{"status": "ok"})
 }
 
 // handleMouseCommand performs cursor movement or button clicks.

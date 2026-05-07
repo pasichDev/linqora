@@ -12,6 +12,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -38,14 +39,79 @@ var (
 
 	rootCmd = &cobra.Command{
 		Use:   "linqorahost",
-		Short: "Linqora Host is a server that provides API endpoints for Linqora Remote.",
-		Long:  `Linqora is a comprehensive system for monitoring and future remote control of computers through a mobile application. The project consists of two main components: Linqora Host and Linqora Remote.`,
+		Short: "Linqora Host is a server and management tool for Linqora Remote.",
+		Long:  `Linqora is a comprehensive system for monitoring and remote control of computers.`,
+	}
+
+	serveCmd = &cobra.Command{
+		Use:   "serve",
+		Short: "Start the Linqora Host WebSocket server",
 		Run:   runServer,
+	}
+
+	authCmd = &cobra.Command{
+		Use:   "auth",
+		Short: "Manage authorized devices and security",
+	}
+
+	configCmd = &cobra.Command{
+		Use:   "config",
+		Short: "Manage server configuration",
 	}
 )
 
+var configShowCmd = &cobra.Command{
+	Use:   "show",
+	Short: "Display current configuration",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadConfig()
+		if err != nil {
+			return err
+		}
+		data, _ := json.MarshalIndent(cfg, "", "  ")
+		fmt.Println(string(data))
+		return nil
+	},
+}
+
+var configSetCmd = &cobra.Command{
+	Use:   "set <key> <value>",
+	Short: "Update a configuration value",
+	Long:  "Supported keys: port, e2ee (true/false), shared_secret",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		key := strings.ToLower(args[0])
+		value := args[1]
+
+		cfg, err := config.LoadConfig()
+		if err != nil {
+			return err
+		}
+
+		switch key {
+		case "port":
+			p, err := fmt.Sscanf(value, "%d", &cfg.Port)
+			if err != nil || p != 1 {
+				return fmt.Errorf("invalid port: %s", value)
+			}
+		case "e2ee":
+			cfg.EnableE2EE = (value == "true" || value == "1" || value == "yes")
+		case "shared_secret":
+			cfg.SharedSecret = value
+		default:
+			return fmt.Errorf("unsupported configuration key: %s", key)
+		}
+
+		if err := cfg.SaveConfig(); err != nil {
+			return err
+		}
+		fmt.Printf("Config %s updated to %s\n", key, value)
+		return nil
+	},
+}
+
 var deviceListCmd = &cobra.Command{
-	Use:   "device-list",
+	Use:   "list",
 	Short: "List all authorized devices",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.LoadConfig()
@@ -66,7 +132,7 @@ var deviceListCmd = &cobra.Command{
 }
 
 var deviceRevokeCmd = &cobra.Command{
-	Use:   "device-revoke <device-id>",
+	Use:   "revoke <device-id>",
 	Short: "Revoke authorization for a device",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -89,7 +155,7 @@ var deviceRevokeCmd = &cobra.Command{
 
 var genSecretCmd = &cobra.Command{
 	Use:   "gen-secret",
-	Short: "Generate a new shared secret and write it to config",
+	Short: "Generate a new shared secret",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		buf := make([]byte, 32)
 		if _, err := rand.Read(buf); err != nil {
@@ -106,20 +172,27 @@ var genSecretCmd = &cobra.Command{
 			return fmt.Errorf("failed to save config: %w", err)
 		}
 
-		fmt.Printf("New shared secret written to config:\n%s\n\nEnter this secret in the Linqora Remote app to enable HMAC authentication.\n", secret)
+		fmt.Printf("New shared secret written to config:\n%s\n", secret)
 		return nil
 	},
 }
 
 func init() {
-	rootCmd.Flags().IntVarP(&port, "port", "p", 8070, "Port for LinqoraHost server")
-	rootCmd.Flags().BoolP("notls", "s", false, "Disable TLS/SSL for LinqoraHost server")
-	rootCmd.Flags().String("cert", "./certificates/dev_cert.pem", "Path to the TLS certificate file")
-	rootCmd.Flags().String("key", "./certificates/dev_key.pem", "Path to the TLS key file")
+	serveCmd.Flags().IntVarP(&port, "port", "p", 0, "Port for LinqoraHost server (overrides config)")
+	serveCmd.Flags().BoolP("notls", "s", false, "Disable TLS/SSL for LinqoraHost server")
+	serveCmd.Flags().String("cert", "./certificates/dev_cert.pem", "Path to the TLS certificate file")
+	serveCmd.Flags().String("key", "./certificates/dev_key.pem", "Path to the TLS key file")
 
-	rootCmd.AddCommand(deviceListCmd)
-	rootCmd.AddCommand(deviceRevokeCmd)
-	rootCmd.AddCommand(genSecretCmd)
+	authCmd.AddCommand(deviceListCmd)
+	authCmd.AddCommand(deviceRevokeCmd)
+	authCmd.AddCommand(genSecretCmd)
+
+	configCmd.AddCommand(configShowCmd)
+	configCmd.AddCommand(configSetCmd)
+
+	rootCmd.AddCommand(serveCmd)
+	rootCmd.AddCommand(authCmd)
+	rootCmd.AddCommand(configCmd)
 }
 
 // safeCloseStop closes stopCh exactly once; subsequent calls are no-ops.
