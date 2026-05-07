@@ -13,10 +13,8 @@ class AnimatedAuroraBackground extends StatelessWidget {
       body: Stack(
         children: [
           // Background Base
-          Container(
-            color: const Color(0xFF0A0C10),
-          ),
-          
+          Container(color: const Color(0xFF0A0C10)),
+
           // Aurora Blobs
           _AuroraBlob(
             color: const Color(0xFF00E5FF).withOpacity(0.15),
@@ -36,7 +34,7 @@ class AnimatedAuroraBackground extends StatelessWidget {
             initialOffset: const Offset(100, 600),
             duration: 12.seconds,
           ),
-          
+
           // Content
           child,
         ],
@@ -63,32 +61,33 @@ class _AuroraBlob extends StatelessWidget {
     return Positioned(
       left: initialOffset.dx,
       top: initialOffset.dy,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [
-              color,
-              color.withOpacity(0),
-            ],
-          ),
-        ),
-      )
-      .animate(onPlay: (controller) => controller.repeat(reverse: true))
-      .move(
-        begin: Offset.zero,
-        end: Offset(Random().nextDouble() * 100 - 50, Random().nextDouble() * 100 - 50),
-        duration: duration,
-        curve: Curves.easeInOut,
-      )
-      .scale(
-        begin: const Offset(1, 1),
-        end: const Offset(1.2, 1.2),
-        duration: duration,
-        curve: Curves.easeInOut,
-      ),
+      child:
+          Container(
+                width: size,
+                height: size,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [color, color.withOpacity(0)],
+                  ),
+                ),
+              )
+              .animate(onPlay: (controller) => controller.repeat(reverse: true))
+              .move(
+                begin: Offset.zero,
+                end: Offset(
+                  Random().nextDouble() * 100 - 50,
+                  Random().nextDouble() * 100 - 50,
+                ),
+                duration: duration,
+                curve: Curves.easeInOut,
+              )
+              .scale(
+                begin: const Offset(1, 1),
+                end: const Offset(1.2, 1.2),
+                duration: duration,
+                curve: Curves.easeInOut,
+              ),
     );
   }
 }

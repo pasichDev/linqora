@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	modUser32Mouse   = windows.NewLazySystemDLL("user32.dll")
-	procMouseEvent   = modUser32Mouse.NewProc("mouse_event")
+	modUser32Mouse = windows.NewLazySystemDLL("user32.dll")
+	procMouseEvent = modUser32Mouse.NewProc("mouse_event")
 )
 
 const (

@@ -30,7 +30,6 @@ class AuthResponseHandler {
       AuthStatusCode.unsupportedVersion: 'auth_unsupported_version'.tr,
     };
 
-
     return authMessages[code] ?? 'Unknown authorization error';
   }
 

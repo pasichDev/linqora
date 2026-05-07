@@ -1,6 +1,6 @@
 module LinqoraHost
 
-go 1.25.0
+go 1.24
 
 require (
 	github.com/gorilla/websocket v1.5.3

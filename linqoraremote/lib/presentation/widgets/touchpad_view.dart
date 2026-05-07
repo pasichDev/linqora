@@ -136,7 +136,9 @@ class _TouchpadViewState extends State<TouchpadView> {
         return Card(
           elevation: 0,
           color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           child: GestureDetector(
             onVerticalDragUpdate: (d) {
               _scrollAccum += d.delta.dy;

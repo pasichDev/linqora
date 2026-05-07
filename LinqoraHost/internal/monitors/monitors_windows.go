@@ -69,11 +69,11 @@ func platformGetMonitors() ([]MonitorInfo, error) {
 		}
 
 		deviceName := syscall.UTF16ToString(info.Device[:])
-		
+
 		var dm devModeW
 		dm.Size = uint16(unsafe.Sizeof(dm))
 		ret, _, _ = procEnumDisplaySettings.Call(uintptr(unsafe.Pointer(&info.Device[0])), 0xFFFFFFFF, uintptr(unsafe.Pointer(&dm)))
-		
+
 		isPrimary := (info.Flags & 1) != 0
 
 		monitors = append(monitors, MonitorInfo{

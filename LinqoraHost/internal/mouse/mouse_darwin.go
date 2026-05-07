@@ -14,9 +14,9 @@ func jxa(script string) error {
 }
 
 const (
-	kCGEventMouseMoved    = 5
-	kCGEventLeftMouseDown = 1
-	kCGEventLeftMouseUp   = 2
+	kCGEventMouseMoved     = 5
+	kCGEventLeftMouseDown  = 1
+	kCGEventLeftMouseUp    = 2
 	kCGEventRightMouseDown = 3
 	kCGEventRightMouseUp   = 4
 	kCGEventOtherMouseDown = 25

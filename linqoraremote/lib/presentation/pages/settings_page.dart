@@ -37,13 +37,25 @@ class SettingsPage extends GetView<SettingsController> {
         body: ListView(
           padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 20.0),
           children: [
-            const SponsorCard().animate().fadeIn(duration: 400.ms).slideX(begin: -0.1),
+            const SponsorCard()
+                .animate()
+                .fadeIn(duration: 400.ms)
+                .slideX(begin: -0.1),
             const SizedBox(height: 24),
-            _buildThemeSection(context).animate().fadeIn(delay: 100.ms, duration: 400.ms).slideY(begin: 0.1),
+            _buildThemeSection(context)
+                .animate()
+                .fadeIn(delay: 100.ms, duration: 400.ms)
+                .slideY(begin: 0.1),
             const SizedBox(height: 24),
-            _buildConnectionSection(context).animate().fadeIn(delay: 200.ms, duration: 400.ms).slideY(begin: 0.1),
+            _buildConnectionSection(context)
+                .animate()
+                .fadeIn(delay: 200.ms, duration: 400.ms)
+                .slideY(begin: 0.1),
             const SizedBox(height: 24),
-            _buildAboutSection(context).animate().fadeIn(delay: 300.ms, duration: 400.ms).slideY(begin: 0.1),
+            _buildAboutSection(context)
+                .animate()
+                .fadeIn(delay: 300.ms, duration: 400.ms)
+                .slideY(begin: 0.1),
             const SizedBox(height: 40),
           ],
         ),
@@ -53,10 +65,7 @@ class SettingsPage extends GetView<SettingsController> {
 
   Widget _buildGlassSection(BuildContext context, {required Widget child}) {
     return LinStyles.glassMorphism(
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: child,
-      ),
+      child: Padding(padding: const EdgeInsets.all(20.0), child: child),
     );
   }
 
@@ -134,9 +143,13 @@ class SettingsPage extends GetView<SettingsController> {
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          color: isSelected ? colorScheme.primary.withOpacity(0.15) : Colors.white.withOpacity(0.05),
+          color: isSelected
+              ? colorScheme.primary.withOpacity(0.15)
+              : Colors.white.withOpacity(0.05),
           border: Border.all(
-            color: isSelected ? colorScheme.primary : Colors.white.withOpacity(0.1),
+            color: isSelected
+                ? colorScheme.primary
+                : Colors.white.withOpacity(0.1),
             width: 2,
           ),
           boxShadow: isSelected
@@ -145,7 +158,7 @@ class SettingsPage extends GetView<SettingsController> {
                     color: colorScheme.primary.withOpacity(0.3),
                     blurRadius: 15,
                     spreadRadius: -5,
-                  )
+                  ),
                 ]
               : [],
         ),
@@ -154,7 +167,9 @@ class SettingsPage extends GetView<SettingsController> {
             Icon(
               icon,
               size: 28,
-              color: isSelected ? colorScheme.primary : Colors.white.withOpacity(0.5),
+              color: isSelected
+                  ? colorScheme.primary
+                  : Colors.white.withOpacity(0.5),
             ),
             const SizedBox(height: 12),
             Text(
@@ -163,7 +178,9 @@ class SettingsPage extends GetView<SettingsController> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-                color: isSelected ? colorScheme.primary : Colors.white.withOpacity(0.7),
+                color: isSelected
+                    ? colorScheme.primary
+                    : Colors.white.withOpacity(0.7),
               ),
             ),
           ],
@@ -190,7 +207,9 @@ class SettingsPage extends GetView<SettingsController> {
                   subtitle: 'notification_description'.tr,
                   value: controller.enableNotifications.value,
                   onChanged: (value) => controller.toggleNotifications(value),
-                  showBadge: !controller.notificationPermissionGranted.value && controller.enableNotifications.value,
+                  showBadge:
+                      !controller.notificationPermissionGranted.value &&
+                      controller.enableNotifications.value,
                 ),
               ),
               const Divider(height: 32, color: Colors.white10),
@@ -238,20 +257,32 @@ class SettingsPage extends GetView<SettingsController> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   if (showBadge) ...[
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.orange.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.orange.withOpacity(0.5)),
+                        border: Border.all(
+                          color: Colors.orange.withOpacity(0.5),
+                        ),
                       ),
                       child: Text(
                         'required_permission'.tr,
-                        style: const TextStyle(fontSize: 10, color: Colors.orange, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.orange,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],
@@ -260,7 +291,10 @@ class SettingsPage extends GetView<SettingsController> {
               const SizedBox(height: 4),
               Text(
                 subtitle,
-                style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.5)),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.white.withOpacity(0.5),
+                ),
               ),
             ],
           ),
@@ -292,7 +326,9 @@ class SettingsPage extends GetView<SettingsController> {
                     height: 56,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primary.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: SvgPicture.asset(
@@ -310,11 +346,20 @@ class SettingsPage extends GetView<SettingsController> {
                       children: [
                         const Text(
                           appName,
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 1),
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1,
+                          ),
                         ),
                         Text(
-                          'app_version_text'.trParams({'version': controller.appVersion.value}),
-                          style: TextStyle(color: Colors.white.withOpacity(0.5), fontWeight: FontWeight.w600),
+                          'app_version_text'.trParams({
+                            'version': controller.appVersion.value,
+                          }),
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.5),
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
@@ -362,7 +407,11 @@ class SettingsPage extends GetView<SettingsController> {
         title,
         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
       ),
-      trailing: Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.white.withOpacity(0.3)),
+      trailing: Icon(
+        Icons.arrow_forward_ios_rounded,
+        size: 14,
+        color: Colors.white.withOpacity(0.3),
+      ),
       onTap: onTap,
     );
   }

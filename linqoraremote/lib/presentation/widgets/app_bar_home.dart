@@ -45,7 +45,9 @@ class AppBarHomePage extends StatelessWidget implements PreferredSizeWidget {
                 Obx(() {
                   final device = controller.authDevice.value;
                   return Text(
-                    device != null ? "${device.address}:${device.port}" : 'connecting'.tr,
+                    device != null
+                        ? "${device.address}:${device.port}"
+                        : 'connecting'.tr,
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
@@ -61,7 +63,10 @@ class AppBarHomePage extends StatelessWidget implements PreferredSizeWidget {
       leading: IconButton(
         icon: Obx(
           () => Icon(
-            controller.webSocketProvider.isConnected && controller.selectedMenuIndex.value == -1 ? Icons.power_settings_new_rounded : Icons.arrow_back_ios_new_rounded,
+            controller.webSocketProvider.isConnected &&
+                    controller.selectedMenuIndex.value == -1
+                ? Icons.power_settings_new_rounded
+                : Icons.arrow_back_ios_new_rounded,
             size: 20,
           ),
         ),
@@ -70,9 +75,12 @@ class AppBarHomePage extends StatelessWidget implements PreferredSizeWidget {
             controller.selectMenuItem(-1);
             return;
           }
-          if (controller.webSocketProvider.isConnected && controller.selectedMenuIndex.value == -1) {
+          if (controller.webSocketProvider.isConnected &&
+              controller.selectedMenuIndex.value == -1) {
             await DisconnectConfirmationDialog.show(
-              onConfirm: () => {controller.disconnectFromDevice(isCleaned: true)},
+              onConfirm: () => {
+                controller.disconnectFromDevice(isCleaned: true),
+              },
               onCancel: () => {},
             );
           } else {

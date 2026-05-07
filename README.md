@@ -61,6 +61,10 @@ You can also attach screenshots or images to help us better understand your issu
 
 Currently, this project is developed by a single person. However, a [project roadmap](./ROADMAP.md) is available for those interested in contributing.
 
+- [ROADMAP.md](./ROADMAP.md) — Project roadmap and status
+- [CHANGELOG.md](./CHANGELOG.md) — Detailed list of changes
+- [RELEASES.md](./docs/RELEASES.md) — How we handle versioning and releases
+
 You are welcome to open pull requests and start discussions regarding the project.  
 I will carefully review and respond to every contribution and suggestion.
 

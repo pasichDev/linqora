@@ -8,13 +8,13 @@ import (
 func TestCryptoFlow(t *testing.T) {
 	secret := "super-secret-key"
 	key := DeriveKey(secret)
-	
+
 	if len(key) != 32 {
 		t.Errorf("Expected 32-byte key, got %d", len(key))
 	}
 
 	plainText := []byte("hello linqora e2ee")
-	
+
 	cipherText, err := Encrypt(plainText, key)
 	if err != nil {
 		t.Fatalf("Encryption failed: %v", err)
@@ -37,7 +37,7 @@ func TestCryptoFlow(t *testing.T) {
 func TestDecryptWithWrongKey(t *testing.T) {
 	key1 := DeriveKey("secret1")
 	key2 := DeriveKey("secret2")
-	
+
 	plainText := []byte("confidential data")
 	cipherText, _ := Encrypt(plainText, key1)
 
@@ -53,7 +53,7 @@ func TestDecryptInvalidData(t *testing.T) {
 	if err == nil {
 		t.Error("Decryption of invalid base64 should fail")
 	}
-	
+
 	_, err = Decrypt("YQ==", key) // Valid base64 but too short for GCM
 	if err == nil {
 		t.Error("Decryption of too short data should fail")

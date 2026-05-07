@@ -15,7 +15,8 @@ class ScriptController extends GetxController {
   final RxList<ScriptItem> scripts = <ScriptItem>[].obs;
   final RxList<ScriptItem> filteredScripts = <ScriptItem>[].obs;
   final RxMap<String, bool> executingScripts = <String, bool>{}.obs;
-  final RxMap<String, ScriptExecuteResponse> lastExecutionResults = <String, ScriptExecuteResponse>{}.obs;
+  final RxMap<String, ScriptExecuteResponse> lastExecutionResults =
+      <String, ScriptExecuteResponse>{}.obs;
   final RxMap<String, String> realTimeOutput = <String, String>{}.obs;
   final RxBool isLoadingScripts = false.obs;
   final RxString searchQuery = ''.obs;
@@ -24,10 +25,10 @@ class ScriptController extends GetxController {
   void onInit() {
     super.onInit();
     _setupWebSocketHandlers();
-    
+
     // Auto-filter scripts when list or query changes
     everAll([scripts, searchQuery], (_) => _filterScripts());
-    
+
     fetchScripts();
   }
 
@@ -44,13 +45,34 @@ class ScriptController extends GetxController {
   }
 
   void _setupWebSocketHandlers() {
-    webSocketProvider.registerHandler(TypeMessageWs.script_list.value, _handleScriptList);
-    webSocketProvider.registerHandler(TypeMessageWs.script_execute.value, _handleScriptExecute);
-    webSocketProvider.registerHandler(TypeMessageWs.script_add.value, _handleScriptCU);
-    webSocketProvider.registerHandler(TypeMessageWs.script_update.value, _handleScriptCU);
-    webSocketProvider.registerHandler(TypeMessageWs.script_delete.value, _handleScriptDelete);
-    webSocketProvider.registerHandler(TypeMessageWs.script_stop.value, (data) => AppLogger.debug("Script stopped: $data"));
-    webSocketProvider.registerHandler(TypeMessageWs.script_output.value, _handleScriptOutput);
+    webSocketProvider.registerHandler(
+      TypeMessageWs.script_list.value,
+      _handleScriptList,
+    );
+    webSocketProvider.registerHandler(
+      TypeMessageWs.script_execute.value,
+      _handleScriptExecute,
+    );
+    webSocketProvider.registerHandler(
+      TypeMessageWs.script_add.value,
+      _handleScriptCU,
+    );
+    webSocketProvider.registerHandler(
+      TypeMessageWs.script_update.value,
+      _handleScriptCU,
+    );
+    webSocketProvider.registerHandler(
+      TypeMessageWs.script_delete.value,
+      _handleScriptDelete,
+    );
+    webSocketProvider.registerHandler(
+      TypeMessageWs.script_stop.value,
+      (data) => AppLogger.debug("Script stopped: $data"),
+    );
+    webSocketProvider.registerHandler(
+      TypeMessageWs.script_output.value,
+      _handleScriptOutput,
+    );
   }
 
   void _filterScripts() {
@@ -58,10 +80,14 @@ class ScriptController extends GetxController {
       filteredScripts.assignAll(scripts);
     } else {
       final query = searchQuery.value.toLowerCase();
-      filteredScripts.assignAll(scripts.where((s) =>
-          s.name.toLowerCase().contains(query) ||
-          s.description.toLowerCase().contains(query) ||
-          s.id.toLowerCase().contains(query)));
+      filteredScripts.assignAll(
+        scripts.where(
+          (s) =>
+              s.name.toLowerCase().contains(query) ||
+              s.description.toLowerCase().contains(query) ||
+              s.id.toLowerCase().contains(query),
+        ),
+      );
     }
   }
 
@@ -69,10 +95,15 @@ class ScriptController extends GetxController {
     if (!webSocketProvider.isConnected) return;
     isLoadingScripts.value = true;
     try {
-      webSocketProvider.sendMessage(WsMessage(type: TypeMessageWs.script_list.value));
+      webSocketProvider.sendMessage(
+        WsMessage(type: TypeMessageWs.script_list.value),
+      );
     } catch (e) {
       isLoadingScripts.value = false;
-      AppLogger.release('Error fetching scripts: $e', module: "ScriptController");
+      AppLogger.release(
+        'Error fetching scripts: $e',
+        module: "ScriptController",
+      );
     }
   }
 
@@ -80,7 +111,8 @@ class ScriptController extends GetxController {
     if (!webSocketProvider.isConnected) return;
     try {
       webSocketProvider.sendMessage(
-        WsMessage(type: TypeMessageWs.script_add.value)..setField('data', script.toJson()),
+        WsMessage(type: TypeMessageWs.script_add.value)
+          ..setField('data', script.toJson()),
       );
     } catch (e) {
       AppLogger.release('Error adding script: $e', module: "ScriptController");
@@ -91,10 +123,14 @@ class ScriptController extends GetxController {
     if (!webSocketProvider.isConnected) return;
     try {
       webSocketProvider.sendMessage(
-        WsMessage(type: TypeMessageWs.script_update.value)..setField('data', script.toJson()),
+        WsMessage(type: TypeMessageWs.script_update.value)
+          ..setField('data', script.toJson()),
       );
     } catch (e) {
-      AppLogger.release('Error updating script: $e', module: "ScriptController");
+      AppLogger.release(
+        'Error updating script: $e',
+        module: "ScriptController",
+      );
     }
   }
 
@@ -102,10 +138,14 @@ class ScriptController extends GetxController {
     if (!webSocketProvider.isConnected) return;
     try {
       webSocketProvider.sendMessage(
-        WsMessage(type: TypeMessageWs.script_delete.value)..setField('data', {'id': scriptId}),
+        WsMessage(type: TypeMessageWs.script_delete.value)
+          ..setField('data', {'id': scriptId}),
       );
     } catch (e) {
-      AppLogger.release('Error deleting script: $e', module: "ScriptController");
+      AppLogger.release(
+        'Error deleting script: $e',
+        module: "ScriptController",
+      );
     }
   }
 
@@ -115,11 +155,15 @@ class ScriptController extends GetxController {
     realTimeOutput[scriptId] = ''; // Reset output for new run
     try {
       webSocketProvider.sendMessage(
-        WsMessage(type: TypeMessageWs.script_execute.value)..setField('data', {'id': scriptId}),
+        WsMessage(type: TypeMessageWs.script_execute.value)
+          ..setField('data', {'id': scriptId}),
       );
     } catch (e) {
       executingScripts[scriptId] = false;
-      AppLogger.release('Error executing script $scriptId: $e', module: "ScriptController");
+      AppLogger.release(
+        'Error executing script $scriptId: $e',
+        module: "ScriptController",
+      );
     }
   }
 
@@ -127,10 +171,14 @@ class ScriptController extends GetxController {
     if (!webSocketProvider.isConnected) return;
     try {
       webSocketProvider.sendMessage(
-        WsMessage(type: TypeMessageWs.script_stop.value)..setField('data', {'id': scriptId}),
+        WsMessage(type: TypeMessageWs.script_stop.value)
+          ..setField('data', {'id': scriptId}),
       );
     } catch (e) {
-      AppLogger.release('Error stopping script $scriptId: $e', module: "ScriptController");
+      AppLogger.release(
+        'Error stopping script $scriptId: $e',
+        module: "ScriptController",
+      );
     }
   }
 
@@ -150,7 +198,10 @@ class ScriptController extends GetxController {
         scripts.assignAll(response.data!);
       }
     } catch (e) {
-      AppLogger.release('Error processing script list: $e', module: "ScriptController");
+      AppLogger.release(
+        'Error processing script list: $e',
+        module: "ScriptController",
+      );
     }
   }
 
@@ -188,7 +239,7 @@ class ScriptController extends GetxController {
         final result = response.data!;
         executingScripts[result.id] = false;
         lastExecutionResults[result.id] = result;
-        
+
         // Show notification if it failed in background (e.g. exit code != 0)
         if (result.exitCode != 0) {
           Get.snackbar(
@@ -208,7 +259,10 @@ class ScriptController extends GetxController {
         }
       }
     } catch (e) {
-      AppLogger.release('Error processing script execution result: $e', module: "ScriptController");
+      AppLogger.release(
+        'Error processing script execution result: $e',
+        module: "ScriptController",
+      );
       executingScripts.clear();
     }
   }

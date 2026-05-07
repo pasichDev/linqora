@@ -73,7 +73,9 @@ class HostInfoCard extends StatelessWidget {
                     IconButton(
                       onPressed: toggleShowHostFull,
                       icon: Icon(
-                        isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                        isExpanded
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
                         size: 28,
                       ),
                       color: colorScheme.primary,
@@ -265,7 +267,11 @@ class HostInfoCardSkeleton extends StatelessWidget {
           children: [
             Row(
               children: [
-                ShimmerEffect(height: 36, width: 36, borderRadius: BorderRadius.circular(10)),
+                ShimmerEffect(
+                  height: 36,
+                  width: 36,
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 const SizedBox(width: 12),
                 const ShimmerEffect(height: 20, width: 140),
               ],
@@ -284,7 +290,11 @@ class HostInfoCardSkeleton extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const ShimmerEffect(height: 18, width: 18, borderRadius: BorderRadius.all(Radius.circular(4))),
+        const ShimmerEffect(
+          height: 18,
+          width: 18,
+          borderRadius: BorderRadius.all(Radius.circular(4)),
+        ),
         const SizedBox(width: 12),
         Expanded(
           child: Column(

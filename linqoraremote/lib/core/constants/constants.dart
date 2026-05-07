@@ -12,8 +12,9 @@ import 'settings.dart';
 /// SECURITY: Keep this false in production. Only enable for development/testing
 /// environments where a trusted CA certificate cannot be deployed.
 bool get allowSelfSigned =>
-    GetStorage(SettingsConst.kSettings)
-        .read<bool>(SettingsConst.kAllowSelfSigned) ??
+    GetStorage(
+      SettingsConst.kSettings,
+    ).read<bool>(SettingsConst.kAllowSelfSigned) ??
     false;
 
 /// Controls whether to display error messages for superuser (SU) operations.

@@ -66,10 +66,9 @@ class WsMessage {
   factory WsMessage.fromJson(Map<String, dynamic> json) {
     final type = json['type'] as String;
 
-    final additionalFields =
-        Map<String, dynamic>.from(json)
-          ..remove('type')
-          ..remove('deviceCode');
+    final additionalFields = Map<String, dynamic>.from(json)
+      ..remove('type')
+      ..remove('deviceCode');
 
     return WsMessage(type: type, additionalFields: additionalFields);
   }

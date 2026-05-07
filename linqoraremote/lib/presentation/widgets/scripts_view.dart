@@ -13,7 +13,8 @@ class ScriptsView extends StatefulWidget {
   State<ScriptsView> createState() => _ScriptsViewState();
 }
 
-class _ScriptsViewState extends State<ScriptsView> with SingleTickerProviderStateMixin {
+class _ScriptsViewState extends State<ScriptsView>
+    with SingleTickerProviderStateMixin {
   late final ScriptController _scriptController;
   late final DeviceHomeController _homeController;
   final TextEditingController _searchController = TextEditingController();
@@ -34,9 +35,13 @@ class _ScriptsViewState extends State<ScriptsView> with SingleTickerProviderStat
   void _showScriptDialog([ScriptItem? script]) {
     final idController = TextEditingController(text: script?.id ?? '');
     final nameController = TextEditingController(text: script?.name ?? '');
-    final descController = TextEditingController(text: script?.description ?? '');
+    final descController = TextEditingController(
+      text: script?.description ?? '',
+    );
     final cmdController = TextEditingController(text: script?.command ?? '');
-    final argsController = TextEditingController(text: script?.args.join(', ') ?? '');
+    final argsController = TextEditingController(
+      text: script?.args.join(', ') ?? '',
+    );
 
     Get.dialog(
       Dialog(
@@ -47,7 +52,12 @@ class _ScriptsViewState extends State<ScriptsView> with SingleTickerProviderStat
             color: Colors.black.withOpacity(0.8),
             borderRadius: BorderRadius.circular(28),
             border: Border.all(color: Colors.white10),
-            boxShadow: [BoxShadow(color: Colors.blueAccent.withOpacity(0.1), blurRadius: 20)],
+            boxShadow: [
+              BoxShadow(
+                color: Colors.blueAccent.withOpacity(0.1),
+                blurRadius: 20,
+              ),
+            ],
           ),
           child: SingleChildScrollView(
             child: Column(
@@ -56,7 +66,11 @@ class _ScriptsViewState extends State<ScriptsView> with SingleTickerProviderStat
               children: [
                 Text(
                   script == null ? 'add_script'.tr : 'edit_script'.tr,
-                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 20),
                 _buildField('ID', idController, enabled: script == null),
@@ -70,7 +84,10 @@ class _ScriptsViewState extends State<ScriptsView> with SingleTickerProviderStat
                   children: [
                     TextButton(
                       onPressed: () => Get.back(),
-                      child: Text('cancel'.tr, style: const TextStyle(color: Colors.white60)),
+                      child: Text(
+                        'cancel'.tr,
+                        style: const TextStyle(color: Colors.white60),
+                      ),
                     ),
                     const SizedBox(width: 12),
                     ElevatedButton(
@@ -80,7 +97,11 @@ class _ScriptsViewState extends State<ScriptsView> with SingleTickerProviderStat
                           name: nameController.text,
                           description: descController.text,
                           command: cmdController.text,
-                          args: argsController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
+                          args: argsController.text
+                              .split(',')
+                              .map((e) => e.trim())
+                              .where((e) => e.isNotEmpty)
+                              .toList(),
                         );
                         if (script == null) {
                           _scriptController.addScript(newScript);
@@ -91,7 +112,9 @@ class _ScriptsViewState extends State<ScriptsView> with SingleTickerProviderStat
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blueAccent,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: Text('save'.tr),
                     ),
@@ -105,7 +128,11 @@ class _ScriptsViewState extends State<ScriptsView> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildField(String label, TextEditingController controller, {bool enabled = true}) {
+  Widget _buildField(
+    String label,
+    TextEditingController controller, {
+    bool enabled = true,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: TextField(
@@ -115,8 +142,12 @@ class _ScriptsViewState extends State<ScriptsView> with SingleTickerProviderStat
         decoration: InputDecoration(
           labelText: label,
           labelStyle: const TextStyle(color: Colors.white38),
-          enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white.withOpacity(0.1))),
-          focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.blueAccent)),
+          enabledBorder: UnderlineInputBorder(
+            borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+          ),
+          focusedBorder: const UnderlineInputBorder(
+            borderSide: BorderSide(color: Colors.blueAccent),
+          ),
         ),
       ),
     );
@@ -135,7 +166,10 @@ class _ScriptsViewState extends State<ScriptsView> with SingleTickerProviderStat
         ),
         title: Text(
           'scripts'.tr,
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         actions: [
           IconButton(
@@ -152,7 +186,10 @@ class _ScriptsViewState extends State<ScriptsView> with SingleTickerProviderStat
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
+            ),
             child: TextField(
               controller: _searchController,
               onChanged: (v) => _scriptController.searchQuery.value = v,
@@ -160,7 +197,10 @@ class _ScriptsViewState extends State<ScriptsView> with SingleTickerProviderStat
               decoration: InputDecoration(
                 hintText: 'search_scripts'.tr,
                 hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-                prefixIcon: Icon(Icons.search, color: Colors.white.withOpacity(0.3)),
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: Colors.white.withOpacity(0.3),
+                ),
                 filled: true,
                 fillColor: Colors.white.withOpacity(0.05),
                 border: OutlineInputBorder(
@@ -172,7 +212,8 @@ class _ScriptsViewState extends State<ScriptsView> with SingleTickerProviderStat
           ),
           Expanded(
             child: Obx(() {
-              if (_scriptController.isLoadingScripts.value && _scriptController.scripts.isEmpty) {
+              if (_scriptController.isLoadingScripts.value &&
+                  _scriptController.scripts.isEmpty) {
                 return const LoadingView();
               }
 
@@ -181,11 +222,18 @@ class _ScriptsViewState extends State<ScriptsView> with SingleTickerProviderStat
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.description_outlined, size: 64, color: Colors.white.withOpacity(0.5)),
+                      Icon(
+                        Icons.description_outlined,
+                        size: 64,
+                        color: Colors.white.withOpacity(0.5),
+                      ),
                       const SizedBox(height: 16),
                       Text(
                         'no_scripts_available'.tr,
-                        style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 16),
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.7),
+                          fontSize: 16,
+                        ),
                       ),
                     ],
                   ).animate().fadeIn(),
@@ -209,7 +257,8 @@ class _ScriptsViewState extends State<ScriptsView> with SingleTickerProviderStat
 
   Widget _buildScriptCard(ScriptItem script, int index) {
     return Obx(() {
-      final isExecuting = _scriptController.executingScripts[script.id] ?? false;
+      final isExecuting =
+          _scriptController.executingScripts[script.id] ?? false;
       final lastResult = _scriptController.lastExecutionResults[script.id];
       final rtOutput = _scriptController.realTimeOutput[script.id] ?? '';
 
@@ -225,27 +274,44 @@ class _ScriptsViewState extends State<ScriptsView> with SingleTickerProviderStat
           child: Material(
             color: Colors.transparent,
             child: ExpansionTile(
-              leading: Icon(
-                Icons.terminal,
-                color: isExecuting ? Colors.orange : Colors.blueAccent,
-              ).animate(target: isExecuting ? 1 : 0).shimmer(duration: 1.seconds),
+              leading:
+                  Icon(
+                        Icons.terminal,
+                        color: isExecuting ? Colors.orange : Colors.blueAccent,
+                      )
+                      .animate(target: isExecuting ? 1 : 0)
+                      .shimmer(duration: 1.seconds),
               title: Text(
                 script.name,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               subtitle: Text(
                 script.description,
-                style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.6),
+                  fontSize: 12,
+                ),
               ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.edit, size: 18, color: Colors.white38),
+                    icon: const Icon(
+                      Icons.edit,
+                      size: 18,
+                      color: Colors.white38,
+                    ),
                     onPressed: () => _showScriptDialog(script),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
+                    icon: const Icon(
+                      Icons.delete_outline,
+                      size: 18,
+                      color: Colors.redAccent,
+                    ),
                     onPressed: () => Get.defaultDialog(
                       title: 'delete_script'.tr,
                       middleText: 'confirm_delete'.tr,
@@ -266,25 +332,40 @@ class _ScriptsViewState extends State<ScriptsView> with SingleTickerProviderStat
                       ? SizedBox(
                           width: 80,
                           child: ElevatedButton(
-                            onPressed: () => _scriptController.stopScript(script.id),
+                            onPressed: () =>
+                                _scriptController.stopScript(script.id),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.red.withOpacity(0.2),
                               foregroundColor: Colors.redAccent,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                               padding: EdgeInsets.zero,
                             ),
-                            child: Text('stop'.tr, style: const TextStyle(fontSize: 10)),
+                            child: Text(
+                              'stop'.tr,
+                              style: const TextStyle(fontSize: 10),
+                            ),
                           ),
                         )
                       : ElevatedButton(
-                          onPressed: () => _scriptController.executeScript(script.id),
+                          onPressed: () =>
+                              _scriptController.executeScript(script.id),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.blueAccent.withOpacity(0.2),
                             foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
                           ),
-                          child: Text('execute'.tr, style: const TextStyle(fontSize: 10)),
+                          child: Text(
+                            'execute'.tr,
+                            style: const TextStyle(fontSize: 10),
+                          ),
                         ),
                 ],
               ),
@@ -300,12 +381,22 @@ class _ScriptsViewState extends State<ScriptsView> with SingleTickerProviderStat
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('OUTPUT:', style: TextStyle(color: Colors.blueAccent.withOpacity(0.5), fontSize: 10, fontWeight: FontWeight.bold)),
+                            Text(
+                              'OUTPUT:',
+                              style: TextStyle(
+                                color: Colors.blueAccent.withOpacity(0.5),
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                             if (isExecuting)
                               const SizedBox(
                                 width: 12,
                                 height: 12,
-                                child: CircularProgressIndicator(strokeWidth: 1, color: Colors.blueAccent),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 1,
+                                  color: Colors.blueAccent,
+                                ),
                               ),
                           ],
                         ),
@@ -321,8 +412,14 @@ class _ScriptsViewState extends State<ScriptsView> with SingleTickerProviderStat
                           child: SingleChildScrollView(
                             reverse: true,
                             child: Text(
-                              rtOutput.isEmpty ? 'Waiting for output...'.tr : rtOutput,
-                              style: const TextStyle(color: Colors.white70, fontSize: 10, fontFamily: 'monospace'),
+                              rtOutput.isEmpty
+                                  ? 'Waiting for output...'.tr
+                                  : rtOutput,
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 10,
+                                fontFamily: 'monospace',
+                              ),
                             ),
                           ),
                         ),
@@ -335,13 +432,18 @@ class _ScriptsViewState extends State<ScriptsView> with SingleTickerProviderStat
                             Text(
                               '${'exit_code'.tr}: ${lastResult.exitCode}',
                               style: TextStyle(
-                                color: lastResult.exitCode == 0 ? Colors.green : Colors.red,
+                                color: lastResult.exitCode == 0
+                                    ? Colors.green
+                                    : Colors.red,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             Text(
                               '${lastResult.durationMs} ms',
-                              style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 10),
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.4),
+                                fontSize: 10,
+                              ),
                             ),
                           ],
                         ),

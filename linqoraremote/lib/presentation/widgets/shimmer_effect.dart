@@ -22,7 +22,9 @@ class ShimmerEffect extends StatelessWidget {
       height: height,
       width: width,
       decoration: BoxDecoration(
-        color: baseColor ?? Theme.of(context).colorScheme.onSurface.withOpacity(0.1),
+        color:
+            baseColor ??
+            Theme.of(context).colorScheme.onSurface.withOpacity(0.1),
         borderRadius: borderRadius ?? BorderRadius.circular(4),
       ),
       child: ShaderMask(
@@ -31,7 +33,8 @@ class ShimmerEffect extends StatelessWidget {
           return LinearGradient(
             colors: [
               Colors.transparent,
-              highlightColor ?? Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
+              highlightColor ??
+                  Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
               Colors.transparent,
             ],
             stops: const [0.0, 0.5, 1.0],

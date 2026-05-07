@@ -28,7 +28,8 @@ This document outlines the development plan and key tasks for the **Linqora** pr
 
 ### 📖 Documentation & UX
 - [x] **Host API Documentation**: WebSocket protocol and command reference documented in `API.md`.
-- [/] **Usage Guide**: Core setup and CLI usage instructions added to `SETUP.md`.
+- [x] **Usage Guide**: Core setup and CLI usage instructions added to `SETUP.md`.
+- [x] **Versioning Guide**: Release process and versioning documented in `RELEASES.md`.
 - [ ] **Official Website**: Project landing page and documentation hub.
 
 ---

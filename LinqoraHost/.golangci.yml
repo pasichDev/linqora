@@ -1,0 +1,33 @@
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - revive
+    - gofmt
+    - goimports
+    - misspell
+
+linters-settings:
+  revive:
+    rules:
+      - name: exported
+        arguments:
+          - disableStutteringCheck
+  govet:
+    enable:
+      - shadow
+  gofmt:
+    simplify: true
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0

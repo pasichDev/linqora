@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  backend:
+    name: Backend Check (Go)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: LinqoraHost
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: LinqoraHost/go.sum
+
+      - name: Check Formatting
+        run: |
+          if [ "$(gofmt -l . | wc -l)" -gt 0 ]; then
+            echo "The following files are not formatted:"
+            gofmt -l .
+            exit 1
+          fi
+
+      - name: Golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          working-directory: LinqoraHost
+
+      - name: Run Tests
+        run: go test -v ./...
+
+  frontend:
+    name: Frontend Check (Flutter)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: linqoraremote
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Check Formatting
+        run: flutter format --set-exit-if-changed .
+
+      - name: Analyze Code
+        run: flutter analyze
+
+      - name: Run Tests
+        run: |
+          if [ -d "test" ]; then
+            flutter test
+          else
+            echo "No tests found in linqoraremote/test"
+          fi

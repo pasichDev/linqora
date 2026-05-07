@@ -7,7 +7,11 @@ import '../../data/providers/websocket_provider.dart';
 class DeviceAuthBinding extends Bindings {
   @override
   void dependencies() {
-    Get.put(AuthController(webSocketProvider: Get.put(WebSocketProvider()), mDnsProvider: Get.put(MDnsProvider())));
-
+    Get.put(
+      AuthController(
+        webSocketProvider: Get.put(WebSocketProvider()),
+        mDnsProvider: Get.put(MDnsProvider()),
+      ),
+    );
   }
 }

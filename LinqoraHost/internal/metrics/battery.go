@@ -12,9 +12,9 @@ import (
 // IsPresent is false on desktop machines without a battery.
 type BatteryInfo struct {
 	IsPresent  bool   `json:"isPresent"`
-	Level      int    `json:"level"`      // 0–100 %
+	Level      int    `json:"level"` // 0–100 %
 	IsCharging bool   `json:"isCharging"`
-	Status     string `json:"status"`     // Charging | Discharging | Full | Unknown
+	Status     string `json:"status"` // Charging | Discharging | Full | Unknown
 }
 
 // GetBatteryInfo returns battery information for the current platform.

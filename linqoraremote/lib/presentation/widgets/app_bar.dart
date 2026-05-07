@@ -10,7 +10,7 @@ class AppBarCustom extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      title:  Text(appName),
+      title: Text(appName),
       elevation: 7,
       actions: [
         IconButton(

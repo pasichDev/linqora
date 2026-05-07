@@ -232,12 +232,9 @@ class MDnsProvider {
     List<MdnsDevice> devices,
   ) async {
     try {
-      final srvRecords =
-          await _client!
-              .lookup<SrvResourceRecord>(
-                ResourceRecordQuery.service(serviceName),
-              )
-              .toList();
+      final srvRecords = await _client!
+          .lookup<SrvResourceRecord>(ResourceRecordQuery.service(serviceName))
+          .toList();
 
       if (srvRecords.isEmpty) {
         return;
@@ -245,12 +242,11 @@ class MDnsProvider {
 
       final srv = srvRecords.first;
       final txtData = await _parseTxtRecords(serviceName);
-      final ipAddresses =
-          await _client!
-              .lookup<IPAddressResourceRecord>(
-                ResourceRecordQuery.addressIPv4(srv.target),
-              )
-              .toList();
+      final ipAddresses = await _client!
+          .lookup<IPAddressResourceRecord>(
+            ResourceRecordQuery.addressIPv4(srv.target),
+          )
+          .toList();
 
       if (ipAddresses.isEmpty) {
         AppLogger.debug(
@@ -269,10 +265,9 @@ class MDnsProvider {
       /// Select the best IP address
       final bestIp = _selectBestIpAddress(ipAddresses);
       final device = MdnsDevice(
-        name:
-            txtData['hostname']?.isNotEmpty == true
-                ? txtData['hostname']!
-                : serviceParts,
+        name: txtData['hostname']?.isNotEmpty == true
+            ? txtData['hostname']!
+            : serviceParts,
         address: bestIp.address.address,
         port: srv.port.toString(),
         supportsTLS: txtData['supportsTLS'] == 'true',
@@ -306,24 +301,24 @@ class MDnsProvider {
     if (addresses.isEmpty) return addresses.first;
 
     /// Filter out unwanted addresses (loopback, link-local, docker)
-    final filteredAddresses =
-        addresses.where((record) {
-          final ip = record.address.address;
-          return !ip.startsWith('127.') && // Localhost
-              !ip.startsWith('169.254.') && // Link-local
-              !ip.startsWith('172.17.'); // Docker default
-        }).toList();
+    final filteredAddresses = addresses.where((record) {
+      final ip = record.address.address;
+      return !ip.startsWith('127.') && // Localhost
+          !ip.startsWith('169.254.') && // Link-local
+          !ip.startsWith('172.17.'); // Docker default
+    }).toList();
 
     if (filteredAddresses.isEmpty) return addresses.first;
 
     /// Prefer typical LAN addresses (192.168.x.x or 10.x.x.x)
-    final lanAddresses =
-        filteredAddresses.where((record) {
-          final ip = record.address.address;
-          return ip.startsWith('192.168.') || ip.startsWith('10.');
-        }).toList();
+    final lanAddresses = filteredAddresses.where((record) {
+      final ip = record.address.address;
+      return ip.startsWith('192.168.') || ip.startsWith('10.');
+    }).toList();
 
-    return lanAddresses.isNotEmpty ? lanAddresses.first : filteredAddresses.first;
+    return lanAddresses.isNotEmpty
+        ? lanAddresses.first
+        : filteredAddresses.first;
   }
 
   /// Parses TXT records for a given service name
@@ -331,10 +326,9 @@ class MDnsProvider {
     final Map<String, String> result = {'supportsTLS': 'false', 'hostname': ''};
 
     try {
-      final txtRecords =
-          await _client!
-              .lookup<TxtResourceRecord>(ResourceRecordQuery.text(serviceName))
-              .toList();
+      final txtRecords = await _client!
+          .lookup<TxtResourceRecord>(ResourceRecordQuery.text(serviceName))
+          .toList();
 
       for (final txt in txtRecords) {
         final entries = _parseTxtString(txt.text);

@@ -50,17 +50,22 @@ class _MediaScreenViewState extends State<MediaScreenView> {
         } else {
           return Column(
             children: [
-              if (!_mediaController.capabilities.value!.isControlledByRemote || _mediaController.nowPlaying.value == null)
+              if (!_mediaController.capabilities.value!.isControlledByRemote ||
+                  _mediaController.nowPlaying.value == null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 20),
                   child: MessageBanner(
-                    message: _mediaController.nowPlaying.value == null ? 'info_no_playing_remote'.tr : "error_control_remote".tr,
+                    message: _mediaController.nowPlaying.value == null
+                        ? 'info_no_playing_remote'.tr
+                        : "error_control_remote".tr,
                     isLoading: false,
                   ),
                 ),
               _volumeCard(),
               const SizedBox(height: 20),
-              if (_mediaController.capabilities.value!.isControlledByRemote && _mediaController.nowPlaying.value != null) _mediaCard(),
+              if (_mediaController.capabilities.value!.isControlledByRemote &&
+                  _mediaController.nowPlaying.value != null)
+                _mediaCard(),
             ],
           );
         }
@@ -100,9 +105,13 @@ class _MediaScreenViewState extends State<MediaScreenView> {
                 Obx(
                   () => IconButton(
                     icon: Icon(
-                      _mediaController.isMuted.value ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                      _mediaController.isMuted.value
+                          ? Icons.volume_off_rounded
+                          : Icons.volume_up_rounded,
                       size: 28,
-                      color: _mediaController.isMuted.value ? Colors.redAccent : Colors.white,
+                      color: _mediaController.isMuted.value
+                          ? Colors.redAccent
+                          : Colors.white,
                     ),
                     onPressed: _mediaController.setMuted,
                   ),
@@ -115,8 +124,13 @@ class _MediaScreenViewState extends State<MediaScreenView> {
                         activeTrackColor: Theme.of(context).colorScheme.primary,
                         inactiveTrackColor: Colors.white.withOpacity(0.1),
                         thumbColor: Colors.white,
-                        overlayColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10, elevation: 5),
+                        overlayColor: Theme.of(
+                          context,
+                        ).colorScheme.primary.withOpacity(0.2),
+                        thumbShape: const RoundSliderThumbShape(
+                          enabledThumbRadius: 10,
+                          elevation: 5,
+                        ),
                       ),
                       child: Slider(
                         value: _mediaController.volume.value,
@@ -138,7 +152,10 @@ class _MediaScreenViewState extends State<MediaScreenView> {
                     child: Text(
                       '${_mediaController.volume.value.toInt()}%',
                       textAlign: TextAlign.end,
-                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
                 ),
@@ -200,8 +217,15 @@ class _MediaScreenViewState extends State<MediaScreenView> {
                   Obx(
                     () => !_mediaController.isLoadingMedia.value
                         ? Icon(
-                            _mediaController.nowPlaying.value?.isPlaying ?? false ? Icons.graphic_eq_rounded : Icons.pause_rounded,
-                            color: _mediaController.nowPlaying.value?.isPlaying ?? false ? Colors.greenAccent : Colors.white24,
+                            _mediaController.nowPlaying.value?.isPlaying ??
+                                    false
+                                ? Icons.graphic_eq_rounded
+                                : Icons.pause_rounded,
+                            color:
+                                _mediaController.nowPlaying.value?.isPlaying ??
+                                    false
+                                ? Colors.greenAccent
+                                : Colors.white24,
                             size: 20,
                           )
                         : LoadingAnimationWidget.staggeredDotsWave(
@@ -240,7 +264,11 @@ class _MediaScreenViewState extends State<MediaScreenView> {
         ),
         child: Text(
           label,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white70),
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            color: Colors.white70,
+          ),
         ),
       ),
     );
@@ -284,7 +312,8 @@ class _MediaScreenViewState extends State<MediaScreenView> {
         const SizedBox(height: 32),
         Obx(() {
           final nowPlaying = _mediaController.nowPlaying.value!;
-          if (nowPlaying.duration > 0 && !_mediaController.isLoadingMedia.value) {
+          if (nowPlaying.duration > 0 &&
+              !_mediaController.isLoadingMedia.value) {
             return Column(
               children: [
                 ClipRRect(
@@ -292,7 +321,9 @@ class _MediaScreenViewState extends State<MediaScreenView> {
                   child: LinearProgressIndicator(
                     value: nowPlaying.progress.toDouble(),
                     backgroundColor: Colors.white.withOpacity(0.05),
-                    valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.primary),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Theme.of(context).colorScheme.primary,
+                    ),
                     minHeight: 6,
                   ),
                 ),
@@ -337,7 +368,11 @@ class _MediaScreenViewState extends State<MediaScreenView> {
       children: [
         IconButton(
           icon: Icon(Icons.skip_previous_rounded, size: 40, color: color),
-          onPressed: isEnabled ? () => _mediaController.sendMediaCommand(MediaActions.mediaPrevious) : null,
+          onPressed: isEnabled
+              ? () => _mediaController.sendMediaCommand(
+                  MediaActions.mediaPrevious,
+                )
+              : null,
         ),
         const SizedBox(width: 24),
         Obx(
@@ -345,7 +380,10 @@ class _MediaScreenViewState extends State<MediaScreenView> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: colorScheme.primary.withOpacity(0.2),
-              border: Border.all(color: colorScheme.primary.withOpacity(0.5), width: 2),
+              border: Border.all(
+                color: colorScheme.primary.withOpacity(0.5),
+                width: 2,
+              ),
               boxShadow: [
                 BoxShadow(
                   color: colorScheme.primary.withOpacity(0.2),
@@ -356,18 +394,26 @@ class _MediaScreenViewState extends State<MediaScreenView> {
             ),
             child: IconButton(
               icon: Icon(
-                _mediaController.nowPlaying.value!.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                _mediaController.nowPlaying.value!.isPlaying
+                    ? Icons.pause_rounded
+                    : Icons.play_arrow_rounded,
                 size: 48,
                 color: isEnabled ? colorScheme.primary : Colors.white24,
               ),
-              onPressed: isEnabled ? () => _mediaController.sendMediaCommand(MediaActions.mediaPlayPause) : null,
+              onPressed: isEnabled
+                  ? () => _mediaController.sendMediaCommand(
+                      MediaActions.mediaPlayPause,
+                    )
+                  : null,
             ),
           ),
         ),
         const SizedBox(width: 24),
         IconButton(
           icon: Icon(Icons.skip_next_rounded, size: 40, color: color),
-          onPressed: isEnabled ? () => _mediaController.sendMediaCommand(MediaActions.mediaNext) : null,
+          onPressed: isEnabled
+              ? () => _mediaController.sendMediaCommand(MediaActions.mediaNext)
+              : null,
         ),
       ],
     );
