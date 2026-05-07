@@ -13,7 +13,7 @@ All notable changes to this project will be documented in this file.
 - **Display**: Multi-monitor support with Windows API integration.
 - **Files**: Secure remote file browser with path-traversal protection.
 - **CLI**: Modular command-line interface with `cobra` (serve, config, auth subcommands).
-- **Automation**: GitHub Actions workflow for cross-platform releases.
+- **Automation**: GitHub Actions workflow for cross-platform releases and auto-tagging.
 - **Testing**: Comprehensive unit and integration test suite.
 
 ### Changed

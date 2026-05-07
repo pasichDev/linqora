@@ -35,6 +35,10 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           default_bump: minor
 
+      # Fetch the newly created tag so goreleaser can find it in git history
+      - name: Fetch tags
+        run: git fetch --tags --force
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
         with:
