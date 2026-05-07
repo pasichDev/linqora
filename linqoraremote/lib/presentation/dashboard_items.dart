@@ -34,11 +34,6 @@ final menuOptions = [
     view: PowerManagementView(),
   ),
   MenuOption(
-    title: 'monitors'.tr,
-    icon: Icons.monitor_outlined,
-    view: const MonitorView(),
-  ),
-  MenuOption(
     title: 'touchpad'.tr,
     icon: Icons.mouse_outlined,
     view: TouchpadView(),

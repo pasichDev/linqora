@@ -137,5 +137,17 @@
   "confirm_restart": "Are you sure you want to restart the device?",
   "reconnecting": "Reconnecting",
   "connection_failed": "Connection failed",
-  "retry": "Retry"
+  "retry": "Retry",
+  "files": "File Manager",
+  "home": "Home",
+  "back": "Back",
+  "refresh": "Refresh",
+  "upload": "Upload to Host",
+  "download": "Download from Host",
+  "view": "View",
+  "file_manager": "File Manager",
+  "delete": "Delete",
+  "empty_directory": "Directory is empty",
+  "file_uploaded_success": "File uploaded successfully",
+  "success": "Success"
 }

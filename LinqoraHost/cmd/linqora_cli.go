@@ -183,6 +183,8 @@ func init() {
 	serveCmd.Flags().String("cert", "./certificates/dev_cert.pem", "Path to the TLS certificate file")
 	serveCmd.Flags().String("key", "./certificates/dev_key.pem", "Path to the TLS key file")
 
+	rootCmd.PersistentFlags().Bool("headless", false, "Run in headless server mode without GUI")
+
 	authCmd.AddCommand(deviceListCmd)
 	authCmd.AddCommand(deviceRevokeCmd)
 	authCmd.AddCommand(genSecretCmd)
@@ -370,9 +372,89 @@ func runServer(cmd *cobra.Command, args []string) {
 	gracefulShutdown(cancel)
 }
 
+// StartServerBackground starts the WebSocket server using current config.
+// Used by both --headless mode and the GUI. Returns a cancel func to stop it.
+func StartServerBackground(onStatus func(running bool, ip string, port int)) (context.CancelFunc, error) {
+	deviceInfo := deviceinfo.GetDeviceInfo()
+
+	var err error
+	cfg, err = config.LoadConfig()
+	if err != nil {
+		cfg = config.DefaultConfig()
+	}
+
+	certFile := "./certificates/dev_cert.pem"
+	keyFile := "./certificates/dev_key.pem"
+	enableTLS := true
+
+	if !certutils.UserCertExists(certFile, keyFile) {
+		certExists, _ := certutils.EnsureCertsExist()
+		enableTLS = certExists
+	}
+	enableTLS = certutils.IsValidCertificate(certFile)
+
+	cfg.EnableTLS = enableTLS
+	cfg.CertFile = certFile
+	cfg.KeyFile = keyFile
+	cfg.SaveConfig()
+
+	// Reinitialise stop channel
+	stopCh = make(chan struct{})
+	stopOnce = sync.Once{}
+	authChan = make(chan interfaces.PendingAuthRequest, 10)
+
+	authManager = auth.NewAuthManager(cfg, authChan)
+	consoleHandler = auth.NewConsoleAuthHandler(authManager)
+
+	mdnsServer = mdns.NewMDNSServer(cfg)
+	if err := mdnsServer.Start(); err != nil {
+		return nil, fmt.Errorf("mDNS start failed: %w", err)
+	}
+
+	server := ws.NewWSServer(cfg, authManager)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func() {
+		if err := server.Start(ctx); err != nil {
+			slog.Error("WebSocket server error", "err", err)
+			safeCloseStop()
+		}
+	}()
+
+	if onStatus != nil {
+		onStatus(true, deviceInfo.IP, cfg.Port)
+	}
+
+	return cancel, nil
+}
+
+// StopServer stops the running server gracefully.
+func StopServer(cancel context.CancelFunc) {
+	gracefulShutdown(cancel)
+}
+
 func main() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
+	// If no arguments provided, launch GUI
+	if len(os.Args) == 1 {
+		RunGUI()
+		return
+	}
+
+	// Check for --headless flag specifically
+	for _, arg := range os.Args[1:] {
+		if arg == "--headless" || arg == "-headless" {
+			// Headless: auto-start serve command
+			if err := serveCmd.Execute(); err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+			return
+		}
+	}
+
+	// Otherwise: delegate to cobra (serve, auth, config subcommands)
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)

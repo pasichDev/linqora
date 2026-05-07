@@ -28,6 +28,11 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
   final RxMap deviceInfo = {}.obs;
   final Rxn<HostSystemInfo> hostInfo = Rxn<HostSystemInfo>();
   final Rxn<MdnsDevice> authDevice = Rxn<MdnsDevice>();
+  
+  // New: Reactive AppBar management
+  final RxList<Widget> appBarActions = <Widget>[].obs;
+  final RxnString appBarTitleOverride = RxnString();
+  final Rxn<VoidCallback> onBackPressed = Rxn<VoidCallback>();
 
   DateTime _refreshLastTime = DateTime.now();
 
@@ -250,6 +255,9 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
   /// Method to handle the menu item selection
   void selectMenuItem(int index) {
     selectedMenuIndex.value = index;
+    appBarActions.clear();
+    appBarTitleOverride.value = null;
+    onBackPressed.value = null;
   }
 
   /// Method to handle the menu item selection

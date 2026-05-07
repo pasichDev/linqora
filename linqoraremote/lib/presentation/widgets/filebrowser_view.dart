@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
 import 'package:linqoraremote/data/providers/websocket_provider.dart';
+import 'package:linqoraremote/core/themes/lin_styles.dart';
 import '../controllers/filebrowser_controller.dart';
+import '../controllers/device_home_controller.dart';
 import '../../data/models/file_item.dart';
 
 class FileBrowserView extends StatefulWidget {
@@ -22,6 +24,45 @@ class _FileBrowserViewState extends State<FileBrowserView> {
     _controller = Get.put(
       FileBrowserController(webSocketProvider: Get.find<WebSocketProvider>()),
     );
+    final homeController = Get.find<DeviceHomeController>();
+
+    // Inject actions into Dashboard AppBar
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _updateAppBar(homeController);
+    });
+
+    // Listen to path changes to update AppBar
+    _controller.currentPath.listen((_) => _updateAppBar(homeController));
+  }
+
+  void _updateAppBar(DeviceHomeController homeController) {
+    if (!mounted) return;
+    
+    homeController.appBarActions.assignAll([
+      IconButton(
+        icon: const Icon(Icons.upload_file_rounded, color: Colors.white),
+        onPressed: _controller.uploadFile,
+        tooltip: 'upload'.tr,
+      ),
+      IconButton(
+        icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+        onPressed: _controller.refresh,
+        tooltip: 'refresh'.tr,
+      ),
+    ]);
+
+    homeController.onBackPressed.value = () {
+      if (_controller.pathStack.isEmpty) {
+        homeController.selectMenuItem(-1);
+      } else {
+        _controller.navigateUp();
+      }
+    };
+
+    homeController.appBarTitleOverride.value =
+        _controller.currentPath.value.isEmpty
+            ? 'file_manager'.tr
+            : _controller.currentPath.value.split('/').last;
   }
 
   @override
@@ -34,46 +75,11 @@ class _FileBrowserViewState extends State<FileBrowserView> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _buildPathBar(context),
-        Expanded(child: _buildContent(context)),
-      ],
-    );
+    return _buildContent(context);
   }
 
-  Widget _buildPathBar(BuildContext context) {
-    return Obx(() {
-      final path = _controller.currentPath.value;
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        color: Theme.of(context).colorScheme.surfaceContainer,
-        child: Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-              onPressed: _controller.pathStack.isEmpty
-                  ? null
-                  : () => _controller.navigateUp(),
-              tooltip: 'back'.tr,
-            ),
-            Expanded(
-              child: Text(
-                path.isEmpty ? 'home'.tr : path,
-                style: Theme.of(context).textTheme.bodyMedium,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.refresh, size: 20),
-              onPressed: _controller.refresh,
-              tooltip: 'refresh'.tr,
-            ),
-          ],
-        ),
-      );
-    });
-  }
+
+
 
   Widget _buildContent(BuildContext context) {
     return Obx(() {
@@ -174,15 +180,65 @@ class _FileBrowserViewState extends State<FileBrowserView> {
       },
       onDismissed: (_) => _controller.deleteItem(item),
       child: ListTile(
-        leading: Icon(
-          item.isDir ? Icons.folder : _iconForFile(item.name),
-          color: item.isDir
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.onSurface.withAlpha(180),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color:
+                item.isDir
+                    ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                    : Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            item.isDir ? Icons.folder_rounded : _iconForFile(item.name),
+            color:
+                item.isDir
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.white70,
+          ),
         ),
-        title: Text(item.name, overflow: TextOverflow.ellipsis),
-        subtitle: item.isDir ? null : Text(item.formattedSize),
-        trailing: item.isDir ? const Icon(Icons.chevron_right) : null,
+        title: Text(
+          item.name,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle:
+            item.isDir
+                ? null
+                : Text(
+                  item.formattedSize,
+                  style: TextStyle(color: Colors.white.withOpacity(0.4)),
+                ),
+        trailing:
+            item.isDir
+                ? const Icon(Icons.chevron_right_rounded, color: Colors.white24)
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(
+                          Icons.visibility_rounded,
+                          color: Colors.white38,
+                          size: 20,
+                        ),
+                        onPressed: () => _controller.viewFile(item),
+                        tooltip: 'view'.tr,
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.download_rounded,
+                          color: Colors.white38,
+                          size: 20,
+                        ),
+                        onPressed: () => _controller.downloadFile(item),
+                        tooltip: 'download'.tr,
+                      ),
+                    ],
+                  ),
         onTap: item.isDir ? () => _controller.navigateTo(item) : null,
       ).animate().fadeIn(delay: (index * 20).ms, duration: 300.ms),
     );

@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:linqoraremote/presentation/controllers/script_controller.dart';
 import 'package:linqoraremote/presentation/widgets/loading_view.dart';
+import 'package:linqoraremote/data/models/script_item.dart';
 import '../../core/themes/theme.dart';
 import '../controllers/device_home_controller.dart';
 
@@ -24,6 +25,22 @@ class _ScriptsViewState extends State<ScriptsView>
     super.initState();
     _scriptController = Get.find<ScriptController>();
     _homeController = Get.find<DeviceHomeController>();
+    
+    // Inject actions into Dashboard AppBar
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _homeController.appBarActions.addAll([
+        IconButton(
+          icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+          onPressed: _scriptController.fetchScripts,
+        ),
+        IconButton(
+          icon: const Icon(Icons.add_rounded, color: Colors.white),
+          onPressed: () => _showScriptDialog(),
+        ),
+      ]);
+      
+      _homeController.appBarTitleOverride.value = 'scripts'.tr;
+    });
   }
 
   @override
@@ -155,62 +172,37 @@ class _ScriptsViewState extends State<ScriptsView>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
-          onPressed: () => _homeController.selectMenuItem(-1),
-        ),
-        title: Text(
-          'scripts'.tr,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: _scriptController.fetchScripts,
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showScriptDialog(),
-        backgroundColor: Colors.blueAccent,
-        child: const Icon(Icons.add, color: Colors.white),
-      ).animate().scale(delay: 500.ms),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16.0,
-              vertical: 8.0,
-            ),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (v) => _scriptController.searchQuery.value = v,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'search_scripts'.tr,
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-                prefixIcon: Icon(
-                  Icons.search,
-                  color: Colors.white.withOpacity(0.3),
-                ),
-                filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: TextField(
+            controller: _searchController,
+            onChanged: (v) => _scriptController.searchQuery.value = v,
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+            decoration: InputDecoration(
+              hintText: 'search_scripts'.tr,
+              hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+              prefixIcon: Icon(
+                Icons.search_rounded,
+                color: Colors.white.withOpacity(0.3),
+                size: 20,
+              ),
+              filled: true,
+              fillColor: Colors.white.withOpacity(0.05),
+              contentPadding: const EdgeInsets.symmetric(vertical: 0),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: Colors.white.withOpacity(0.05)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: Colors.white.withOpacity(0.05)),
               ),
             ),
           ),
-          Expanded(
+        ),
+        Expanded(
             child: Obx(() {
               if (_scriptController.isLoadingScripts.value &&
                   _scriptController.scripts.isEmpty) {
@@ -251,6 +243,29 @@ class _ScriptsViewState extends State<ScriptsView>
             }),
           ),
         ],
+      );
+  }
+
+  Widget _buildHeaderButton({
+    required IconData icon,
+    required VoidCallback onTap,
+    required Color color,
+  }) {
+    return Material(
+      color: color.withOpacity(0.1),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: color.withOpacity(0.2)),
+          ),
+          child: Icon(icon, color: Colors.white, size: 20),
+        ),
       ),
     );
   }
@@ -280,7 +295,7 @@ class _ScriptsViewState extends State<ScriptsView>
                         color: isExecuting ? Colors.orange : Colors.blueAccent,
                       )
                       .animate(target: isExecuting ? 1 : 0)
-                      .shimmer(duration: 1.seconds),
+                      .shimmer(duration: const Duration(seconds: 1)),
               title: Text(
                 script.name,
                 style: const TextStyle(
@@ -403,7 +418,7 @@ class _ScriptsViewState extends State<ScriptsView>
                         const SizedBox(height: 8),
                         Container(
                           width: double.infinity,
-                          maxHeight: 200,
+                          constraints: const BoxConstraints(maxHeight: 200),
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             color: Colors.black.withOpacity(0.3),
