@@ -1,11 +1,12 @@
 package metrics
 
 import (
+	"context"
 	"os"
-	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // GPUInfo holds basic GPU identification and memory data.
@@ -31,17 +32,13 @@ func GetGPUInfo() (GPUInfo, error) {
 // ── Linux ────────────────────────────────────────────────────────────────────
 
 func getLinuxGPUInfo() (GPUInfo, error) {
-	// NVIDIA: fastest path.
 	if info, ok := nvidiaGPUInfo(); ok {
 		return info, nil
 	}
-
-	// AMD / Intel: parse lspci.
-	out, err := exec.Command("lspci", "-v").Output()
+	out, err := hiddenCmd("lspci", "-v").Output()
 	if err != nil {
 		return GPUInfo{Model: "Unknown"}, nil
 	}
-
 	for _, line := range strings.Split(string(out), "\n") {
 		if !strings.Contains(line, "VGA") && !strings.Contains(line, "3D controller") {
 			continue
@@ -53,12 +50,11 @@ func getLinuxGPUInfo() (GPUInfo, error) {
 		}
 		return info, nil
 	}
-
 	return GPUInfo{Model: "Unknown"}, nil
 }
 
 func nvidiaGPUInfo() (GPUInfo, bool) {
-	out, err := exec.Command(
+	out, err := hiddenCmd(
 		"nvidia-smi",
 		"--query-gpu=name,memory.total",
 		"--format=csv,noheader",
@@ -93,9 +89,7 @@ func cleanAMDModel(line string) string {
 	m = strings.TrimPrefix(m, "Advanced Micro Devices, Inc. [AMD/ATI] ")
 	m = strings.TrimPrefix(m, "Advanced Micro Devices [AMD/ATI] ")
 	m = strings.TrimPrefix(m, "AMD ")
-
-	// Prefer glxinfo device name when available.
-	if out, err := exec.Command("glxinfo", "-B").Output(); err == nil {
+	if out, err := hiddenCmd("glxinfo", "-B").Output(); err == nil {
 		for _, l := range strings.Split(string(out), "\n") {
 			if strings.HasPrefix(l, "Device: ") {
 				if name := strings.TrimPrefix(l, "Device: "); name != "" {
@@ -110,17 +104,15 @@ func cleanAMDModel(line string) string {
 // ── Windows ──────────────────────────────────────────────────────────────────
 
 func getWindowsGPUInfo() (GPUInfo, error) {
-	out, err := exec.Command(
+	out, err := hiddenCmd(
 		"powershell", "-NoProfile", "-Command",
 		"Get-WmiObject Win32_VideoController | Select-Object Name, AdapterRAM | Format-List",
 	).Output()
 	if err != nil {
 		return GPUInfo{Model: "Unknown"}, nil
 	}
-
 	info := GPUInfo{Model: "Unknown"}
 	s := string(out)
-
 	if parts := strings.SplitN(s, "Name : ", 2); len(parts) == 2 {
 		info.Model = strings.TrimSpace(strings.SplitN(parts[1], "\n", 2)[0])
 	}
@@ -136,13 +128,12 @@ func getWindowsGPUInfo() (GPUInfo, error) {
 // ── macOS ────────────────────────────────────────────────────────────────────
 
 func getMacOSGPUInfo() (GPUInfo, error) {
-	out, err := exec.Command(
+	out, err := hiddenCmd(
 		"system_profiler", "SPDisplaysDataType", "-detailLevel", "mini",
 	).Output()
 	if err != nil {
 		return GPUInfo{Model: "Unknown"}, nil
 	}
-
 	info := GPUInfo{Model: "Unknown"}
 	for _, line := range strings.Split(string(out), "\n") {
 		line = strings.TrimSpace(line)
@@ -167,26 +158,89 @@ func getMacOSGPUInfo() (GPUInfo, error) {
 
 // ── GPU load ─────────────────────────────────────────────────────────────────
 
-// GetGPULoadPercent returns the current GPU utilisation as an integer percentage
-// (0-100). It tries nvidia-smi first; if that is unavailable or fails it
-// returns 0 without an error so callers can treat missing data gracefully.
+// GetGPULoadPercent returns GPU utilisation (0-100).
+// Tries NVIDIA first, then platform-specific fallbacks for AMD/Intel.
 func GetGPULoadPercent() int {
-	out, err := exec.Command(
+	if val, ok := nvidiaGPULoad(); ok {
+		return val
+	}
+	switch runtime.GOOS {
+	case "linux":
+		for _, card := range []string{"card0", "card1", "card2", "card3"} {
+			data, err := os.ReadFile("/sys/class/drm/" + card + "/device/gpu_busy_percent")
+			if err == nil {
+				if val, err := strconv.Atoi(strings.TrimSpace(string(data))); err == nil {
+					return val
+				}
+			}
+		}
+	case "windows":
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		out, err := hiddenCmdCtx(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command",
+			`try { [int][math]::Round(((Get-Counter '\GPU Engine(*engtype_3D*)\Utilization Percentage' -ErrorAction Stop).CounterSamples | Measure-Object -Property CookedValue -Average).Average) } catch { 0 }`).Output()
+		if err == nil {
+			if val, err := strconv.Atoi(strings.TrimSpace(string(out))); err == nil {
+				return val
+			}
+		}
+	}
+	return 0
+}
+
+// GetGPUTemperature returns GPU temperature in Celsius.
+// Supports NVIDIA via nvidia-smi; AMD Linux via hwmon sysfs.
+func GetGPUTemperature() int {
+	// NVIDIA — cross-platform.
+	out, err := hiddenCmd(
+		"nvidia-smi",
+		"--query-gpu=temperature.gpu",
+		"--format=csv,noheader,nounits",
+	).Output()
+	if err == nil && len(out) > 0 {
+		if val, err := strconv.Atoi(strings.TrimSpace(string(out))); err == nil {
+			return val
+		}
+	}
+
+	// AMD on Linux — hwmon sysfs (temp1_input is in millidegrees Celsius).
+	if runtime.GOOS == "linux" {
+		for _, card := range []string{"card0", "card1", "card2", "card3"} {
+			base := "/sys/class/drm/" + card + "/device/hwmon/"
+			entries, err := os.ReadDir(base)
+			if err != nil {
+				continue
+			}
+			for _, e := range entries {
+				data, err := os.ReadFile(base + e.Name() + "/temp1_input")
+				if err != nil {
+					continue
+				}
+				if milli, err := strconv.Atoi(strings.TrimSpace(string(data))); err == nil {
+					return milli / 1000
+				}
+			}
+		}
+	}
+
+	return 0
+}
+
+func nvidiaGPULoad() (int, bool) {
+	out, err := hiddenCmd(
 		"nvidia-smi",
 		"--query-gpu=utilization.gpu",
 		"--format=csv,noheader,nounits",
 	).Output()
 	if err != nil || len(out) == 0 {
-		return 0
+		return 0, false
 	}
 	val, err := strconv.Atoi(strings.TrimSpace(string(out)))
 	if err != nil {
-		return 0
+		return 0, false
 	}
-	return val
+	return val, true
 }
-
-// ── helpers ──────────────────────────────────────────────────────────────────
 
 func extractGPUModel(line string) string {
 	parts := strings.SplitN(line, ": ", 2)

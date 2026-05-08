@@ -14,6 +14,7 @@ type SystemMetrics struct {
 	CPUUMetrics    metrics.CPUMetrics `json:"cpuMetrics"`
 	RamMetrics     metrics.RamMetrics `json:"ramMetrics"`
 	GpuLoadPercent int                `json:"gpuLoadPercent"`
+	GpuTemperature int                `json:"gpuTemperature"`
 	Timestamp      int64              `json:"timestamp"`
 }
 
@@ -127,11 +128,13 @@ func (mc *MetricsCollector) collectMetrics() (*SystemMetrics, error) {
 	}
 
 	gpuLoad := metrics.GetGPULoadPercent()
+	gpuTemp := metrics.GetGPUTemperature()
 
 	result := &SystemMetrics{
 		CPUUMetrics:    cpuMetrics,
 		RamMetrics:     ramMetrics,
 		GpuLoadPercent: gpuLoad,
+		GpuTemperature: gpuTemp,
 		Timestamp:      time.Now().Unix(),
 	}
 

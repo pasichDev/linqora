@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image/color"
 	"log/slog"
+	"os"
 	"sync"
 
 	"fyne.io/fyne/v2"
@@ -18,6 +19,7 @@ import (
 
 	"LinqoraHost/internal/config"
 	"LinqoraHost/internal/deviceinfo"
+	"LinqoraHost/internal/startup"
 )
 
 // ─────────────────────── log writer ───────────────────────
@@ -256,6 +258,26 @@ func buildSettingsTab() fyne.CanvasObject {
 		widget.NewFormItem("", e2eeCheck),
 	)
 
+	// Auto-start on Windows login (registry HKCU Run key).
+	if startup.IsSupported() {
+		enabled, _ := startup.IsEnabled()
+		autoStartCheck := widget.NewCheck("Run at Windows startup (starts minimised to tray)", nil)
+		autoStartCheck.SetChecked(enabled)
+		autoStartCheck.OnChanged = func(v bool) {
+			var err error
+			if v {
+				err = startup.Enable()
+			} else {
+				err = startup.Disable()
+			}
+			if err != nil {
+				statusLbl.SetText("⚠  Startup: " + err.Error())
+				autoStartCheck.SetChecked(!v) // revert
+			}
+		}
+		form.Append("", autoStartCheck)
+	}
+
 	saveBtn := widget.NewButtonWithIcon("Save Settings", theme.DocumentSaveIcon(), func() {
 		var p int
 		if _, err := fmt.Sscanf(portEntry.Text, "%d", &p); err != nil || p < 1 || p > 65535 {
@@ -305,6 +327,15 @@ func buildLogTab() (fyne.CanvasObject, *guiLogWriter) {
 func RunGUI() {
 	hideConsole() // detach from terminal — no black console window
 
+	// --minimized: launched at Windows startup → hide to tray immediately.
+	minimized := false
+	for _, arg := range os.Args[1:] {
+		if arg == "--minimized" {
+			minimized = true
+			break
+		}
+	}
+
 	var err error
 	cfg, err = config.LoadConfig()
 	if err != nil {
@@ -348,5 +379,11 @@ func RunGUI() {
 	}
 
 	w.SetCloseIntercept(func() { w.Hide() })
-	w.ShowAndRun()
+
+	if minimized {
+		// Started at Windows login: stay hidden in tray, don't show the window.
+		a.Run()
+	} else {
+		w.ShowAndRun()
+	}
 }
