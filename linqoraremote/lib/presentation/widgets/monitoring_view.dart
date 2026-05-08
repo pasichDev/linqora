@@ -70,7 +70,7 @@ class _MonitoringViewState extends State<MonitoringView>
               _header(),
               _heroCpuCard(cpu),
               const SizedBox(height: 10),
-              _ramGpuRow(ram),
+              _ramGpuRow(ram, _c.currentGPULoadPercent.value, _c.currentGPUTemperature.value),
               const SizedBox(height: 10),
               _perCoreCard(cpu),
               const SizedBox(height: 10),
@@ -179,10 +179,12 @@ class _MonitoringViewState extends State<MonitoringView>
   // RAM + GPU side-by-side
   // ---------------------------------------------------------------------------
 
-  Widget _ramGpuRow(RAMMetrics? ram) {
+  Widget _ramGpuRow(RAMMetrics? ram, int? gpuLoad, int? gpuTemp) {
     final host = Get.find<DeviceHomeController>().hostInfo.value;
     final totalRam = host?.ram.total ?? 0.0;
     final usedRam = ram?.usage ?? 0.0;
+    final gpuModel = host?.gpu.model ?? '';
+    final gpuMemory = host?.gpu.memory ?? 0;
 
     return Row(
       children: [
@@ -243,7 +245,7 @@ class _MonitoringViewState extends State<MonitoringView>
           ),
         ),
         const SizedBox(width: 10),
-        // GPU card (placeholder — no real GPU stream)
+        // GPU card
         Expanded(
           child: LxGlass(
             padding: const EdgeInsets.all(14),
@@ -252,8 +254,8 @@ class _MonitoringViewState extends State<MonitoringView>
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const [
-                    Text(
+                  children: [
+                    const Text(
                       'GPU',
                       style: TextStyle(
                         fontSize: 11,
@@ -262,36 +264,61 @@ class _MonitoringViewState extends State<MonitoringView>
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    Text(
-                      '—',
-                      style: TextStyle(fontSize: 10, color: lxTextFaint),
-                    ),
+                    if (gpuMemory > 0)
+                      Text(
+                        '${(gpuMemory / 1024).toStringAsFixed(0)} GB',
+                        style: const TextStyle(fontSize: 10, color: lxTextFaint),
+                      )
+                    else if (gpuModel.isNotEmpty && gpuModel != 'Unknown')
+                      Flexible(
+                        child: Text(
+                          gpuModel,
+                          style: const TextStyle(fontSize: 9, color: lxTextFaint),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 RichText(
-                  text: const TextSpan(
+                  text: TextSpan(
                     children: [
                       TextSpan(
-                        text: '—',
-                        style: TextStyle(
+                        text: gpuLoad != null ? '$gpuLoad' : '—',
+                        style: const TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.w600,
                           letterSpacing: -0.8,
                           color: lxText,
                         ),
                       ),
+                      if (gpuLoad != null)
+                        const TextSpan(
+                          text: '%',
+                          style: TextStyle(fontSize: 14, color: lxTextDim),
+                        ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 6),
-                Container(
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: lxGlass2,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
+                gpuLoad != null
+                    ? LxSparkline(
+                        data: _c.gpuLoads,
+                        width: 130,
+                        height: 32,
+                        color: const Color(0xFF9C7CFF),
+                      )
+                    : Container(
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: lxGlass2,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                if (gpuTemp != null && gpuTemp > 0) ...[
+                  const SizedBox(height: 6),
+                  _mini('GPU TEMP', '${gpuTemp}°C'),
+                ],
               ],
             ),
           ),
@@ -436,7 +463,7 @@ class _MonitoringViewState extends State<MonitoringView>
                       ),
                     ),
                     Text(
-                      cpu != null ? '${cpu.temperature}°C' : '--',
+                      (cpu != null && cpu.temperature > 0) ? '${cpu.temperature}°C' : '--',
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,

@@ -52,14 +52,18 @@ class MonitoringController extends GetxController {
   final temperatures = <int>[].obs;
   final cpuLoads = <int>[].obs;
   final ramUsagesPercent = <int>[].obs;
+  final gpuLoads = <int>[].obs;
 
   final currentCPUMetrics = Rx<CPUMetrics?>(null);
   final currentRAMMetrics = Rx<RAMMetrics?>(null);
+  final currentGPULoadPercent = Rx<int?>(null);
+  final currentGPUTemperature = Rx<int?>(null);
 
   // Internal circular buffers — O(1) writes.
   final _tempBuf = _CircularBuffer<int>(maxMetricsCount);
   final _cpuBuf = _CircularBuffer<int>(maxMetricsCount);
   final _ramBuf = _CircularBuffer<int>(maxMetricsCount);
+  final _gpuBuf = _CircularBuffer<int>(maxMetricsCount);
 
   List<int> getTemperatures() => temperatures.toList();
   List<int> getCPULoads() => cpuLoads.toList();
@@ -142,6 +146,19 @@ class MonitoringController extends GetxController {
         ramJson as Map<String, dynamic>,
       );
 
+      final gpuLoad = rawData['gpuLoadPercent'];
+      if (gpuLoad != null) {
+        currentGPULoadPercent.value = (gpuLoad as num).toInt();
+        _gpuBuf.add(currentGPULoadPercent.value!);
+        gpuLoads.value = _gpuBuf.toList();
+      }
+
+      final gpuTemp = rawData['gpuTemperature'];
+      if (gpuTemp != null) {
+        final t = (gpuTemp as num).toInt();
+        if (t > 0) currentGPUTemperature.value = t;
+      }
+
       _updateMetricsArrays(
         currentCPUMetrics.value!.temperature,
         currentCPUMetrics.value!.loadPercent,
@@ -158,13 +175,17 @@ class MonitoringController extends GetxController {
   void _resetMetrics() {
     currentCPUMetrics.value = null;
     currentRAMMetrics.value = null;
+    currentGPULoadPercent.value = null;
+    currentGPUTemperature.value = null;
     _metricsBuffer.clear();
     _tempBuf.clear();
     _cpuBuf.clear();
     _ramBuf.clear();
+    _gpuBuf.clear();
     temperatures.clear();
     cpuLoads.clear();
     ramUsagesPercent.clear();
+    gpuLoads.clear();
   }
 
   /// Appends new samples to the circular buffers, then batch-updates the

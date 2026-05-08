@@ -52,3 +52,4 @@ flutter:
 platforms:
   android:
   ios:
+  windows:

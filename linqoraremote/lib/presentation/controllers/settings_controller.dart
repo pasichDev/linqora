@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
@@ -103,6 +105,10 @@ class SettingsController extends GetxController {
 
   /// Request notification permission
   Future<bool> requestNotificationPermission() async {
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      notificationPermissionGranted.value = true;
+      return true;
+    }
     final status = await Permission.notification.request();
     notificationPermissionGranted.value = status.isGranted;
     return status.isGranted;

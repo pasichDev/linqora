@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:isolate';
 import 'dart:ui';
 
@@ -47,6 +48,7 @@ class BackgroundConnectionService {
 
   /// Sends a message to the background service
   static void reportConnectionState(bool isConnected, {int? latency}) {
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return;
     if (_service == null) return;
 
     try {
@@ -71,6 +73,7 @@ class BackgroundConnectionService {
   /// Initializes the background service and sets up the notification channel.
   /// Gets called when the app starts.
   static Future<void> initializeService() async {
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return;
     final service = FlutterBackgroundService();
     _service = service;
     bool isRunning = await _service!.isRunning();
@@ -127,6 +130,7 @@ class BackgroundConnectionService {
     bool isConnected,
     bool notificationsEnabled,
   ) async {
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return;
     if (_service == null || !(await _service!.isRunning())) return;
 
     _service!.invoke('updateDeviceInfo', {
@@ -143,6 +147,7 @@ class BackgroundConnectionService {
     String deviceAddress,
     bool isConnected,
   ) async {
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return true;
     if (_service == null) {
       await initializeService();
     }
@@ -183,6 +188,7 @@ class BackgroundConnectionService {
   /// If `isPause` is true, timers inside the service are stopped but the service continues to run.
   /// If `isPause` is false, the service is completely stopped.
   static Future<void> stopService({bool isPause = false}) async {
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return;
     try {
       AppLogger.release(
         isPause
@@ -228,6 +234,7 @@ class BackgroundConnectionService {
 
   /// Checks if the background service is running.
   static Future<bool> isRunning() async {
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return false;
     if (_service == null) {
       return false;
     }
