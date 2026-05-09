@@ -99,36 +99,32 @@ func platformGetMediaInfo() (NowPlaying, error) {
 	// PowerShell script to get SMTC info (Windows 10+)
 	script := `
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
-$asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.IsGenericMethod })[0]
-
-function Get-WinRT-Result($task, [type]$type) {
-    $asTask = $asTaskGeneric.MakeGenericMethod($type)
-    $t = $asTask.Invoke($null, @($task))
+$asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
+    $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.IsGenericMethod
+})[0]
+function Await($task, [type]$type) {
+    $m = $asTaskGeneric.MakeGenericMethod($type)
+    $t = $m.Invoke($null, @($task))
     $t.Wait()
-    return $t.Result
+    $t.Result
 }
-
-[Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType=WindowsRuntime] | Out-Null
-$managerTask = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()
-$manager = Get-WinRT-Result $managerTask ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager])
-
-$session = $manager.GetCurrentSession()
-if ($session) {
-    $propsTask = $session.TryGetMediaPropertiesAsync()
-    $props = Get-WinRT-Result $propsTask ([Windows.Media.Control.GlobalSystemMediaTransportControlsProperties])
-    $playback = $session.GetPlaybackInfo()
-    
-    $res = @{
-        title = $props.Title
-        artist = $props.Artist
-        album = $props.AlbumTitle
-        isPlaying = $playback.PlaybackStatus.ToString() -eq 'Playing'
-        application = $session.SourceAppUserModelId
-    }
-    $res | ConvertTo-Json
-} else {
-    "{}"
-}
+[Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager,Windows.Media.Control,ContentType=WindowsRuntime]|Out-Null
+try {
+    $mgr = Await ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()) ` + "`" + `
+        ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager])
+    $session = $mgr.GetCurrentSession()
+    if (-not $session) { '{}'; exit 0 }
+    $props = Await ($session.TryGetMediaPropertiesAsync()) ` + "`" + `
+        ([Windows.Media.Control.GlobalSystemMediaTransportControlsProperties])
+    $pb = $session.GetPlaybackInfo()
+    [PSCustomObject]@{
+        title     = [string]$props.Title
+        artist    = [string]$props.Artist
+        album     = [string]$props.AlbumTitle
+        isPlaying = ($pb.PlaybackStatus.ToString() -eq 'Playing')
+        application = [string]$session.SourceAppUserModelId
+    } | ConvertTo-Json -Compress
+} catch { '{}' }
 `
 	out, err := runPowerShell(script)
 	if err != nil {
