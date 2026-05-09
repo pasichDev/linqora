@@ -85,3 +85,13 @@ func (b *Broadcaster) GetMetricsBroadcaster() func([]byte) {
 func (b *Broadcaster) GetMediaBroadcaster() func([]byte) {
 	return b.BroadcastMedia
 }
+
+// BroadcastClipboard sends the host clipboard text to all clients in the "clipboard" room.
+func (b *Broadcaster) BroadcastClipboard(text []byte) {
+	b.roomManager.SendToRoom("clipboard", "clipboard_update", string(text), nil)
+}
+
+// GetClipboardBroadcaster returns a callback function for broadcasting clipboard updates.
+func (b *Broadcaster) GetClipboardBroadcaster() func([]byte) {
+	return b.BroadcastClipboard
+}

@@ -9,8 +9,14 @@ import (
 )
 
 var (
-	modUser32Mouse = windows.NewLazySystemDLL("user32.dll")
-	procMouseEvent = modUser32Mouse.NewProc("mouse_event")
+	modUser32Mouse   = windows.NewLazySystemDLL("user32.dll")
+	procMouseEvent   = modUser32Mouse.NewProc("mouse_event")
+	procKeybdEvtMse  = modUser32Mouse.NewProc("keybd_event")
+)
+
+const (
+	vkControl         = byte(0x11)
+	keyeventfKeyupMse = uint32(0x0002)
 )
 
 const (
@@ -57,6 +63,10 @@ func platformHandleMouse(cmd MouseCommand) error {
 		sendMouseEvent(mouseeventfLeftup, 0, 0, 0)
 		sendMouseEvent(mouseeventfLeftdown, 0, 0, 0)
 		sendMouseEvent(mouseeventfLeftup, 0, 0, 0)
+	case ActionPinchZoom:
+		procKeybdEvtMse.Call(uintptr(vkControl), 0, 0, 0)
+		sendMouseEvent(mouseeventfWheel, 0, 0, int32(cmd.Delta)*wheelDelta)
+		procKeybdEvtMse.Call(uintptr(vkControl), 0, uintptr(keyeventfKeyupMse), 0)
 	default:
 		return fmt.Errorf("mouse: unknown action %d", cmd.Action)
 	}

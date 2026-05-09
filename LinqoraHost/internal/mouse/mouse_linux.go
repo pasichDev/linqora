@@ -29,6 +29,19 @@ func platformHandleMouse(cmd MouseCommand) error {
 		return exec.Command("xdotool", "click", button).Run()
 	case ActionDoubleClick:
 		return exec.Command("xdotool", "click", "--repeat", "2", "1").Run()
+	case ActionPinchZoom:
+		button := "4"
+		if cmd.Delta < 0 {
+			button = "5"
+		}
+		if err := exec.Command("xdotool", "keydown", "ctrl").Run(); err != nil {
+			return err
+		}
+		if err := exec.Command("xdotool", "click", button).Run(); err != nil {
+			exec.Command("xdotool", "keyup", "ctrl").Run()
+			return err
+		}
+		return exec.Command("xdotool", "keyup", "ctrl").Run()
 	default:
 		return fmt.Errorf("mouse: unknown action %d", cmd.Action)
 	}

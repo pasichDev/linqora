@@ -33,6 +33,7 @@ class AuthController extends GetxController {
   AuthController({required this.webSocketProvider, required this.mDnsProvider});
 
   final RxList<MdnsDevice> discoveredDevices = <MdnsDevice>[].obs;
+  final RxList<MdnsDevice> savedHosts = <MdnsDevice>[].obs;
   final RxInt authTimeoutSeconds = 30.obs;
   final Rxn<MdnsDevice> authDevice = Rxn<MdnsDevice>();
   final Rx<AuthStatus> authStatus = AuthStatus.listDevices.obs;
@@ -45,12 +46,9 @@ class AuthController extends GetxController {
 
   @override
   void onInit() {
-    /// Get the last connected device
     _setupMDnsProvider();
-
-    /// Get the last connected device
     _loadSettingsApp();
-
+    _loadSavedHosts();
     super.onInit();
   }
 
@@ -370,12 +368,51 @@ class AuthController extends GetxController {
     }
   }
 
+  // ─── Saved hosts ──────────────────────────────────────────────────────────
+
+  void _loadSavedHosts() {
+    try {
+      final raw = GetStorage(SettingsConst.kSettings).read<List>(SettingsConst.kSavedHosts);
+      if (raw != null) {
+        savedHosts.assignAll(
+          raw.map((e) => MdnsDevice.fromJson(Map<String, dynamic>.from(e as Map))),
+        );
+      }
+    } catch (e) {
+      AppLogger.release('Error loading saved hosts: $e', module: 'AuthController');
+    }
+  }
+
+  void _persistSavedHost(MdnsDevice device) {
+    try {
+      savedHosts.removeWhere((h) => h.address == device.address && h.port == device.port);
+      savedHosts.insert(0, device);
+      if (savedHosts.length > 5) savedHosts.removeLast();
+      GetStorage(SettingsConst.kSettings).write(
+        SettingsConst.kSavedHosts,
+        savedHosts.map((h) => h.toJson()).toList(),
+      );
+    } catch (e) {
+      AppLogger.release('Error saving host: $e', module: 'AuthController');
+    }
+  }
+
+  void removeSavedHost(int index) {
+    if (index < 0 || index >= savedHosts.length) return;
+    savedHosts.removeAt(index);
+    GetStorage(SettingsConst.kSettings).write(
+      SettingsConst.kSavedHosts,
+      savedHosts.map((h) => h.toJson()).toList(),
+    );
+  }
+
   /// Navigate to the device home screen
   void _navigateToDeviceHome() {
     if (authDevice.value == null) {
       showErrorSnackbar('error'.tr, 'error_no_info_navigate_home'.tr);
       return;
     }
+    _persistSavedHost(authDevice.value!);
     Get.toNamed(
       AppRoutes.DEVICE_HOME,
       arguments: {'device': authDevice.value!.toJson()},

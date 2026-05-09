@@ -75,6 +75,8 @@ class _MonitoringViewState extends State<MonitoringView>
               _perCoreCard(cpu),
               const SizedBox(height: 10),
               _statTiles(cpu),
+              const SizedBox(height: 10),
+              _diskNetRow(),
               const SizedBox(height: 20),
             ],
           ),
@@ -529,6 +531,114 @@ class _MonitoringViewState extends State<MonitoringView>
         ),
       ],
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Disk + Network row
+  // ---------------------------------------------------------------------------
+
+  Widget _diskNetRow() {
+    return Row(
+      children: [
+        Expanded(
+          child: LxGlass(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: lxGlass2,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.storage_rounded, size: 12, color: lxAccent),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'DISK',
+                      style: TextStyle(fontSize: 10, color: lxTextFaint, letterSpacing: 1),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Obx(() => _ioRow('R', _c.diskReadBps.value)),
+                const SizedBox(height: 2),
+                Obx(() => _ioRow('W', _c.diskWriteBps.value)),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: LxGlass(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: lxGlass2,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.wifi_rounded, size: 12, color: Color(0xFF7C9CFF)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'NET',
+                      style: TextStyle(fontSize: 10, color: lxTextFaint, letterSpacing: 1),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Obx(() => _ioRow('↑', _c.netSentBps.value)),
+                const SizedBox(height: 2),
+                Obx(() => _ioRow('↓', _c.netRecvBps.value)),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _ioRow(String label, int bps) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 14,
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 10, color: lxTextFaint),
+          ),
+        ),
+        Text(
+          _formatBps(bps),
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: lxText,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatBps(int bps) {
+    if (bps < 1024) return '$bps B/s';
+    if (bps < 1024 * 1024) return '${(bps / 1024).toStringAsFixed(0)} KB/s';
+    return '${(bps / (1024 * 1024)).toStringAsFixed(1)} MB/s';
   }
 
   // ---------------------------------------------------------------------------

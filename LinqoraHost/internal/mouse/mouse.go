@@ -10,6 +10,7 @@ const (
 	ActionMiddleClick MouseAction = 3
 	ActionScroll      MouseAction = 4
 	ActionDoubleClick MouseAction = 5
+	ActionPinchZoom   MouseAction = 6
 )
 
 // MouseCommand is the payload received from the client.

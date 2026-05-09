@@ -5,6 +5,8 @@ class ScriptItem {
   final String command;
   final List<String> args;
   final String? workDir;
+  // Schedule: "", "@daily", "@hourly", "@every 30m", "09:00", etc.
+  final String? schedule;
 
   ScriptItem({
     required this.id,
@@ -13,6 +15,7 @@ class ScriptItem {
     required this.command,
     this.args = const [],
     this.workDir,
+    this.schedule,
   });
 
   factory ScriptItem.fromJson(Map<String, dynamic> json) {
@@ -23,6 +26,7 @@ class ScriptItem {
       command: json['command'] as String? ?? '',
       args: (json['args'] as List?)?.map((e) => e as String).toList() ?? [],
       workDir: json['work_dir'] as String?,
+      schedule: json['schedule'] as String?,
     );
   }
 
@@ -33,7 +37,8 @@ class ScriptItem {
       'description': description,
       'command': command,
       'args': args,
-      'work_dir': workDir,
+      if (workDir != null && workDir!.isNotEmpty) 'work_dir': workDir,
+      if (schedule != null && schedule!.isNotEmpty) 'schedule': schedule,
     };
   }
 }
