@@ -34,6 +34,38 @@ class ScriptController extends GetxController {
     fetchScripts();
   }
 
+  // ─── Terminal state ───────────────────────────────────────────────────────
+  final terminalOutput = <String>[].obs;
+  final terminalRunning = false.obs;
+
+  void runShellCommand(String cmd) {
+    if (cmd.trim().isEmpty || !webSocketProvider.isConnected) return;
+    terminalRunning.value = true;
+    terminalOutput.add('> $cmd');
+    webSocketProvider.registerHandler('shell_exec', _onShellResult);
+    webSocketProvider.sendMessage(
+      WsMessage(type: 'shell_exec')..setField('data', {'command': cmd}),
+    );
+  }
+
+  void _onShellResult(Map<String, dynamic> data) {
+    terminalRunning.value = false;
+    webSocketProvider.removeHandler('shell_exec');
+    if (data['status'] == 'error') {
+      terminalOutput.add('[error] ${data['message'] ?? 'unknown'}');
+      return;
+    }
+    final out = (data['data']?['output'] as String? ?? '').trimRight();
+    final code = data['data']?['exit_code'] as int? ?? 0;
+    if (out.isNotEmpty) terminalOutput.addAll(out.split('\n'));
+    terminalOutput.add('[exit $code]');
+    if (terminalOutput.length > 500) {
+      terminalOutput.removeRange(0, terminalOutput.length - 500);
+    }
+  }
+
+  void clearTerminal() => terminalOutput.clear();
+
   @override
   void onClose() {
     webSocketProvider.removeHandler(TypeMessageWs.script_list.value);
@@ -43,6 +75,7 @@ class ScriptController extends GetxController {
     webSocketProvider.removeHandler(TypeMessageWs.script_delete.value);
     webSocketProvider.removeHandler(TypeMessageWs.script_stop.value);
     webSocketProvider.removeHandler(TypeMessageWs.script_output.value);
+    webSocketProvider.removeHandler('shell_exec');
     super.onClose();
   }
 

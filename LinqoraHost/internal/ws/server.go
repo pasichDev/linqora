@@ -7,8 +7,11 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"os/exec"
 	"runtime"
+	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"LinqoraHost/internal/capabilities"
@@ -402,6 +405,8 @@ func (s *WSServer) handleClientMessage(client *Client, msg *ClientMessage) {
 		s.handleStartupSet(client, msg)
 	case "battery_alert_config":
 		s.handleBatteryAlertConfig(client, msg)
+	case "shell_exec":
+		s.handleShellExec(client, msg)
 	case "auth_request":
 		if s.authManager != nil {
 			s.authManager.HandleAuthRequest(client, msg)
@@ -953,6 +958,50 @@ func (s *WSServer) handleBatteryAlertConfig(client *Client, msg *ClientMessage) 
 	client.SendSuccess("battery_alert_config", map[string]interface{}{
 		"threshold": req.Threshold,
 	})
+}
+
+// handleShellExec runs an arbitrary shell command and returns combined output.
+func (s *WSServer) handleShellExec(client *Client, msg *ClientMessage) {
+	var data map[string]interface{}
+	if err := json.Unmarshal(msg.Data, &data); err != nil {
+		client.SendError("shell_exec", "Invalid format", 400)
+		return
+	}
+
+	go func() {
+		rawCmd, _ := data["command"].(string)
+		if rawCmd == "" {
+			client.SendError("shell_exec", "command is required", 400)
+			return
+		}
+		parts := strings.Fields(rawCmd)
+		if len(parts) == 0 {
+			client.SendError("shell_exec", "empty command", 400)
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		var cmd *exec.Cmd
+		if runtime.GOOS == "windows" {
+			cmd = exec.CommandContext(ctx, "cmd", append([]string{"/C"}, parts...)...)
+			cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+		} else {
+			cmd = exec.CommandContext(ctx, "sh", "-c", rawCmd)
+		}
+		out, err := cmd.CombinedOutput()
+		exitCode := 0
+		if err != nil {
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				exitCode = exitErr.ExitCode()
+			} else {
+				exitCode = -1
+			}
+		}
+		client.SendSuccess("shell_exec", map[string]interface{}{
+			"output":    string(out),
+			"exit_code": exitCode,
+		})
+	}()
 }
 
 // ── REST helpers ──────────────────────────────────────────────────────────────
