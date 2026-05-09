@@ -1,3 +1,12 @@
 
-
 .claude
+
+# Build output binaries
+build/linqora
+build/linqora.exe
+build/linqorahost
+build/linqorahost.exe
+
+# Dev TLS certificates
+LinqoraHost/certificates/dev_cert.pem
+LinqoraHost/certificates/dev_key.pem
