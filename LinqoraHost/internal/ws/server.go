@@ -5,22 +5,28 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"runtime"
 	"sync"
 	"time"
 
+	"LinqoraHost/internal/capabilities"
+	"LinqoraHost/internal/clipboard"
 	"LinqoraHost/internal/collectors"
 	"LinqoraHost/internal/config"
 	"LinqoraHost/internal/deviceinfo"
 	"LinqoraHost/internal/filebrowser"
+	"LinqoraHost/internal/keyboard"
 	"LinqoraHost/internal/media"
 	"LinqoraHost/internal/metrics"
 	"LinqoraHost/internal/monitors"
 	"LinqoraHost/internal/mouse"
 	"LinqoraHost/internal/power"
 	"LinqoraHost/internal/privileges"
+	"LinqoraHost/internal/process"
 	"LinqoraHost/internal/scheduler"
+	"LinqoraHost/internal/startup"
 
 	"LinqoraHost/internal/interfaces"
 
@@ -31,17 +37,18 @@ import (
 // WSServer represents the primary WebSocket server coordinating communication
 // between the host and remote clients.
 type WSServer struct {
-	config        *config.ServerConfig
-	httpServer    *http.Server
-	roomManager   *RoomManager
-	broadcaster   *Broadcaster
-	clients       map[*Client]bool
-	clientsMutex  sync.Mutex
-	upgrader      websocket.Upgrader
-	authManager   interfaces.AuthManagerInterface
-	scriptManager *scheduler.Manager
-	ctx           context.Context
-	cancel        context.CancelFunc
+	config                *config.ServerConfig
+	httpServer            *http.Server
+	roomManager           *RoomManager
+	broadcaster           *Broadcaster
+	clients               map[*Client]bool
+	clientsMutex          sync.Mutex
+	upgrader              websocket.Upgrader
+	authManager           interfaces.AuthManagerInterface
+	scriptManager         *scheduler.Manager
+	batteryAlertCollector *collectors.BatteryAlertCollector
+	ctx                   context.Context
+	cancel                context.CancelFunc
 }
 
 // NewWSServer initialises a new WebSocket server with the provided configuration.
@@ -67,16 +74,24 @@ func NewWSServer(config *config.ServerConfig, authManager interfaces.AuthManager
 		cancel: cancel,
 	}
 
+	server.scriptManager.SeedDefaults()
+
 	broadcaster := NewBroadcaster(roomManager)
 	server.broadcaster = broadcaster
 
 	// Initialise collectors
 	metricsCollector := collectors.NewMetricsCollector(broadcaster.GetMetricsBroadcaster())
 	mediaCollector := collectors.NewMediaCollector(broadcaster.GetMediaBroadcaster())
+	clipboardCollector := collectors.NewClipboardCollector(broadcaster.GetClipboardBroadcaster())
 
 	// Register collector manager
-	collectorManager := collectors.NewCollectorManager(metricsCollector, mediaCollector)
+	collectorManager := collectors.NewCollectorManager(metricsCollector, mediaCollector, clipboardCollector)
 	roomManager.AddRoomListener(collectorManager)
+
+	// Initialise and start the battery alert collector (always active, not room-based).
+	batteryAlertCollector := collectors.NewBatteryAlertCollector(server.broadcastToAll)
+	server.batteryAlertCollector = batteryAlertCollector
+	batteryAlertCollector.Start()
 
 	// Start inactivity monitoring
 	server.StartInactiveClientsMonitor()
@@ -84,7 +99,43 @@ func NewWSServer(config *config.ServerConfig, authManager interfaces.AuthManager
 	// Start the lock-state monitor
 	power.StartLockStateMonitor(ctx)
 
+	// Start cron loop: fires scheduled scripts and broadcasts results to all clients.
+	server.scriptManager.StartCronLoop(ctx, func(scriptID string) {
+		slog.Info("Cron trigger", "script", scriptID)
+		result, err := server.scriptManager.Execute(scriptID, func(chunk scheduler.OutputChunk) {
+			server.broadcastToAll("script_output", chunk)
+		})
+		if err != nil {
+			slog.Error("Scheduled script failed", "script", scriptID, "err", err)
+			return
+		}
+		server.broadcastToAll("script_execute", map[string]interface{}{
+			"id":          result.ID,
+			"exit_code":   result.ExitCode,
+			"stdout":      result.Stdout,
+			"stderr":      result.Stderr,
+			"duration_ms": result.Duration,
+			"triggered":   "schedule",
+		})
+	})
+
 	return server
+}
+
+// broadcastToAll sends a message to every connected client regardless of room membership.
+func (s *WSServer) broadcastToAll(msgType string, data interface{}) {
+	s.clientsMutex.Lock()
+	snapshot := make([]*Client, 0, len(s.clients))
+	for client := range s.clients {
+		if !client.IsClosed() {
+			snapshot = append(snapshot, client)
+		}
+	}
+	s.clientsMutex.Unlock()
+
+	for _, client := range snapshot {
+		client.SendSuccess(msgType, data) //nolint:errcheck
+	}
 }
 
 // Start begins listening for incoming WebSocket connections.
@@ -93,6 +144,18 @@ func (s *WSServer) Start(parentCtx context.Context) error {
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		s.handleWSConnection(w, r)
 	})
+
+	// REST API endpoints.
+	mux.HandleFunc("/api/v1/info", s.restInfo)
+	mux.HandleFunc("/api/v1/processes", s.restProcesses)
+	mux.HandleFunc("/api/v1/processes/kill", s.restKillProcess)
+	mux.HandleFunc("/api/v1/qr", s.restQR)
+	mux.HandleFunc("/api/v1/metrics", s.restMetrics)
+	mux.HandleFunc("/api/v1/scripts", s.restScripts)
+	mux.HandleFunc("/api/v1/scripts/execute", s.restScriptExecute)
+	mux.HandleFunc("/api/v1/media", s.restMedia)
+	mux.HandleFunc("/api/v1/power", s.restPower)
+	mux.HandleFunc("/api/v1/keyboard/type", s.restKeyboardType)
 
 	s.httpServer = &http.Server{
 		Addr:    fmt.Sprintf(":%d", s.config.Port),
@@ -319,6 +382,26 @@ func (s *WSServer) handleClientMessage(client *Client, msg *ClientMessage) {
 		s.handleFileRead(client, msg)
 	case "file_write":
 		s.handleFileWrite(client, msg)
+	case "keyboard":
+		s.handleKeyboardCommand(client, msg)
+	case "keyboard_type":
+		s.handleKeyboardTypeCommand(client, msg)
+	case "platform_caps":
+		s.handlePlatformCaps(client)
+	case "clipboard_set":
+		s.handleClipboardSet(client, msg)
+	case "display_cmd":
+		s.handleDisplayCommand(client, msg)
+	case "process_list":
+		s.handleProcessList(client)
+	case "process_kill":
+		s.handleProcessKill(client, msg)
+	case "startup_list":
+		s.handleStartupList(client)
+	case "startup_set":
+		s.handleStartupSet(client, msg)
+	case "battery_alert_config":
+		s.handleBatteryAlertConfig(client, msg)
 	case "auth_request":
 		if s.authManager != nil {
 			s.authManager.HandleAuthRequest(client, msg)
@@ -692,6 +775,310 @@ func (s *WSServer) handleMouseCommand(client *Client, msg *ClientMessage) {
 	}
 }
 
+// handleKeyboardCommand sends a keystroke (with optional modifiers) to the OS.
+func (s *WSServer) handleKeyboardCommand(client *Client, msg *ClientMessage) {
+	var cmd keyboard.KeyCommand
+	if err := json.Unmarshal(msg.Data, &cmd); err != nil {
+		client.SendError("keyboard", "Invalid format", 400)
+		return
+	}
+	if !keyboard.ValidKey(cmd.Key) {
+		client.SendError("keyboard", fmt.Sprintf("Unknown key: %s", cmd.Key), 400)
+		return
+	}
+	if err := keyboard.HandleKeyCommand(cmd); err != nil {
+		client.SendError("keyboard", err.Error(), 500)
+		return
+	}
+	client.SendSuccess("keyboard", map[string]interface{}{"key": cmd.Key})
+}
+
+// handleKeyboardTypeCommand injects a text string as Unicode keystrokes.
+func (s *WSServer) handleKeyboardTypeCommand(client *Client, msg *ClientMessage) {
+	var data struct {
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal(msg.Data, &data); err != nil || data.Text == "" {
+		client.SendError("keyboard_type", "text field required", 400)
+		return
+	}
+	if len([]rune(data.Text)) > 1000 {
+		client.SendError("keyboard_type", "text exceeds 1000 characters", 400)
+		return
+	}
+	if err := keyboard.TypeText(data.Text); err != nil {
+		client.SendError("keyboard_type", err.Error(), 500)
+		return
+	}
+	client.SendSuccess("keyboard_type", map[string]interface{}{"status": "ok"})
+}
+
+// handlePlatformCaps returns the capability flags and platform name for the host.
+func (s *WSServer) handlePlatformCaps(client *Client) {
+	client.SendSuccess("platform_caps", map[string]interface{}{
+		"platform": capabilities.Platform(),
+		"features": capabilities.Get(),
+	})
+}
+
+// handleClipboardSet writes text received from the phone to the host clipboard.
+func (s *WSServer) handleClipboardSet(client *Client, msg *ClientMessage) {
+	var data struct {
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal(msg.Data, &data); err != nil {
+		client.SendError("clipboard_set", "Invalid format", 400)
+		return
+	}
+	if err := clipboard.Set(data.Text); err != nil {
+		client.SendError("clipboard_set", err.Error(), 500)
+		return
+	}
+	client.SendSuccess("clipboard_set", map[string]interface{}{"status": "ok"})
+}
+
+// handleDisplayCommand routes sleep/wake/brightness commands to the monitors package.
+func (s *WSServer) handleDisplayCommand(client *Client, msg *ClientMessage) {
+	var data struct {
+		Action     string `json:"action"`     // "sleep", "wake", "brightness"
+		Brightness int    `json:"brightness"` // 0-100, used when action == "brightness"
+	}
+	if err := json.Unmarshal(msg.Data, &data); err != nil {
+		client.SendError("display_cmd", "Invalid format", 400)
+		return
+	}
+
+	var err error
+	switch data.Action {
+	case "sleep":
+		err = monitors.SleepDisplay()
+	case "wake":
+		err = monitors.WakeDisplay()
+	case "brightness":
+		err = monitors.SetBrightness(data.Brightness)
+	default:
+		client.SendError("display_cmd", "Unknown action", 400)
+		return
+	}
+
+	if err != nil {
+		client.SendError("display_cmd", err.Error(), 500)
+		return
+	}
+	client.SendSuccess("display_cmd", map[string]interface{}{"status": "ok"})
+}
+
+// ── Process management ────────────────────────────────────────────────────────
+
+// handleProcessList returns a snapshot of all running processes.
+func (s *WSServer) handleProcessList(client *Client) {
+	procs, err := process.List()
+	if err != nil {
+		client.SendError("process_list", err.Error(), 500)
+		return
+	}
+	client.SendSuccess("process_list", map[string]interface{}{
+		"processes": procs,
+	})
+}
+
+// handleProcessKill terminates the process with the requested PID.
+func (s *WSServer) handleProcessKill(client *Client, msg *ClientMessage) {
+	var req struct {
+		PID int32 `json:"pid"`
+	}
+	if err := json.Unmarshal(msg.Data, &req); err != nil || req.PID == 0 {
+		client.SendError("process_kill", "Invalid PID", 400)
+		return
+	}
+	if err := process.Kill(req.PID); err != nil {
+		client.SendError("process_kill", err.Error(), 500)
+		return
+	}
+	client.SendSuccess("process_kill", map[string]interface{}{"pid": req.PID})
+}
+
+// ── Startup management ────────────────────────────────────────────────────────
+
+// handleStartupList returns all startup entries visible to the current user.
+func (s *WSServer) handleStartupList(client *Client) {
+	entries, err := startup.ListEntries()
+	if err != nil {
+		client.SendError("startup_list", err.Error(), 500)
+		return
+	}
+	client.SendSuccess("startup_list", map[string]interface{}{
+		"entries": entries,
+	})
+}
+
+// handleStartupSet enables or disables a startup entry by name.
+func (s *WSServer) handleStartupSet(client *Client, msg *ClientMessage) {
+	var req struct {
+		Name    string `json:"name"`
+		Enabled bool   `json:"enabled"`
+	}
+	if err := json.Unmarshal(msg.Data, &req); err != nil || req.Name == "" {
+		client.SendError("startup_set", "Invalid request", 400)
+		return
+	}
+	if err := startup.SetEntry(req.Name, req.Enabled); err != nil {
+		client.SendError("startup_set", err.Error(), 500)
+		return
+	}
+	client.SendSuccess("startup_set", map[string]interface{}{
+		"name":    req.Name,
+		"enabled": req.Enabled,
+	})
+}
+
+// ── Battery alert config ──────────────────────────────────────────────────────
+
+// handleBatteryAlertConfig updates the battery alert threshold.
+func (s *WSServer) handleBatteryAlertConfig(client *Client, msg *ClientMessage) {
+	var req struct {
+		Threshold int `json:"threshold"`
+	}
+	if err := json.Unmarshal(msg.Data, &req); err != nil {
+		client.SendError("battery_alert_config", "Invalid format", 400)
+		return
+	}
+	if req.Threshold < 0 || req.Threshold > 100 {
+		client.SendError("battery_alert_config", "Threshold must be 0–100", 400)
+		return
+	}
+	if s.batteryAlertCollector != nil {
+		s.batteryAlertCollector.SetThreshold(req.Threshold)
+	}
+	client.SendSuccess("battery_alert_config", map[string]interface{}{
+		"threshold": req.Threshold,
+	})
+}
+
+// ── REST helpers ──────────────────────────────────────────────────────────────
+
+// getLANIP returns the first non-loopback IPv4 address of this machine.
+func getLANIP() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ""
+	}
+	for _, addr := range addrs {
+		ipNet, ok := addr.(*net.IPNet)
+		if !ok {
+			continue
+		}
+		ip := ipNet.IP.To4()
+		if ip == nil || ip.IsLoopback() {
+			continue
+		}
+		return ip.String()
+	}
+	return ""
+}
+
+// restAuth checks the Authorization: Bearer header against the shared secret.
+// If no shared secret is configured, the request is allowed (dev mode).
+func (s *WSServer) restAuth(r *http.Request) bool {
+	if s.config.SharedSecret == "" {
+		return true
+	}
+	header := r.Header.Get("Authorization")
+	if len(header) > 7 && header[:7] == "Bearer " {
+		return header[7:] == s.config.SharedSecret
+	}
+	return false
+}
+
+// restWriteJSON serialises v as JSON and writes it to w with the given status code.
+func restWriteJSON(w http.ResponseWriter, status int, v interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(v) //nolint:errcheck
+}
+
+// restInfo returns basic host information.
+func (s *WSServer) restInfo(w http.ResponseWriter, r *http.Request) {
+	if !s.restAuth(r) {
+		restWriteJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	if r.Method != http.MethodGet {
+		restWriteJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	devInfo := deviceinfo.GetDeviceInfo()
+	restWriteJSON(w, http.StatusOK, map[string]interface{}{
+		"hostname": devInfo.Hostname,
+		"os":       devInfo.OS,
+		"port":     s.config.Port,
+	})
+}
+
+// restProcesses handles GET /api/v1/processes — returns the process list.
+func (s *WSServer) restProcesses(w http.ResponseWriter, r *http.Request) {
+	if !s.restAuth(r) {
+		restWriteJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	if r.Method != http.MethodGet {
+		restWriteJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	procs, err := process.List()
+	if err != nil {
+		restWriteJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	restWriteJSON(w, http.StatusOK, map[string]interface{}{"processes": procs})
+}
+
+// restKillProcess handles POST /api/v1/processes/kill — kills a process by PID.
+func (s *WSServer) restKillProcess(w http.ResponseWriter, r *http.Request) {
+	if !s.restAuth(r) {
+		restWriteJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	if r.Method != http.MethodPost {
+		restWriteJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	var req struct {
+		PID int32 `json:"pid"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.PID == 0 {
+		restWriteJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid pid"})
+		return
+	}
+	if err := process.Kill(req.PID); err != nil {
+		restWriteJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	restWriteJSON(w, http.StatusOK, map[string]interface{}{"pid": req.PID, "status": "killed"})
+}
+
+// restQR handles GET /api/v1/qr — returns a deep-link URL for client pairing.
+func (s *WSServer) restQR(w http.ResponseWriter, r *http.Request) {
+	if !s.restAuth(r) {
+		restWriteJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	if r.Method != http.MethodGet {
+		restWriteJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	devInfo := deviceinfo.GetDeviceInfo()
+	host := getLANIP()
+	if host == "" {
+		host = devInfo.Hostname
+	}
+	url := fmt.Sprintf("linqora://%s:%d", host, s.config.Port)
+	restWriteJSON(w, http.StatusOK, map[string]interface{}{
+		"url": url,
+		"tls": s.config.EnableTLS,
+	})
+}
+
 // handlePowerCommand executes system power actions like Lock, Restart, or Shutdown.
 func (s *WSServer) handlePowerCommand(client *Client, msg *ClientMessage) {
 	var powerCmd power.PowerCommand
@@ -748,4 +1135,158 @@ func (s *WSServer) handlePowerCommand(client *Client, msg *ClientMessage) {
 			slog.Error("Power action failed", "err", err)
 		}
 	}()
+}
+
+// ── Extended REST API ──────────────────────────────────────────────────────────
+
+// restMetrics handles GET /api/v1/metrics — current system performance snapshot.
+func (s *WSServer) restMetrics(w http.ResponseWriter, r *http.Request) {
+	if !s.restAuth(r) {
+		restWriteJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	if r.Method != http.MethodGet {
+		restWriteJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	cpuMetrics, _ := metrics.GetCPUMetrics()
+	ramMetrics, _ := metrics.GetRamMetrics()
+	batteryInfo, _ := metrics.GetBatteryInfo()
+	restWriteJSON(w, http.StatusOK, map[string]interface{}{
+		"cpu":         cpuMetrics,
+		"ram":         ramMetrics,
+		"gpu_load":    metrics.GetGPULoadPercent(),
+		"gpu_temp":    metrics.GetGPUTemperature(),
+		"battery":     batteryInfo,
+	})
+}
+
+// restScripts handles GET /api/v1/scripts — list all registered scripts.
+func (s *WSServer) restScripts(w http.ResponseWriter, r *http.Request) {
+	if !s.restAuth(r) {
+		restWriteJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	if r.Method != http.MethodGet {
+		restWriteJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	restWriteJSON(w, http.StatusOK, map[string]interface{}{"scripts": s.scriptManager.List()})
+}
+
+// restScriptExecute handles POST /api/v1/scripts/execute — run a script and return output.
+// Body: {"id": "script-id"}
+func (s *WSServer) restScriptExecute(w http.ResponseWriter, r *http.Request) {
+	if !s.restAuth(r) {
+		restWriteJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	if r.Method != http.MethodPost {
+		restWriteJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	var req struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ID == "" {
+		restWriteJSON(w, http.StatusBadRequest, map[string]string{"error": "id required"})
+		return
+	}
+	result, err := s.scriptManager.Execute(req.ID, nil)
+	if err != nil {
+		restWriteJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	restWriteJSON(w, http.StatusOK, result)
+}
+
+// restMedia handles POST /api/v1/media — send a media or volume command.
+// Body: {"action": <int>, "value": <int>}  (see media.MediaCommand)
+func (s *WSServer) restMedia(w http.ResponseWriter, r *http.Request) {
+	if !s.restAuth(r) {
+		restWriteJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	if r.Method != http.MethodPost {
+		restWriteJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	var cmd media.MediaCommand
+	if err := json.NewDecoder(r.Body).Decode(&cmd); err != nil {
+		restWriteJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
+		return
+	}
+	if err := media.HandleMediaCommand(cmd); err != nil {
+		restWriteJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	restWriteJSON(w, http.StatusOK, map[string]interface{}{"status": "ok"})
+}
+
+// restPower handles POST /api/v1/power — trigger a power action.
+// Body: {"action": "shutdown"|"restart"|"lock"|"sleep"}
+func (s *WSServer) restPower(w http.ResponseWriter, r *http.Request) {
+	if !s.restAuth(r) {
+		restWriteJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	if r.Method != http.MethodPost {
+		restWriteJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	var req struct {
+		Action string `json:"action"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Action == "" {
+		restWriteJSON(w, http.StatusBadRequest, map[string]string{"error": "action required"})
+		return
+	}
+	actionMap := map[string]power.Action{
+		"shutdown": power.Shutdown,
+		"restart":  power.Restart,
+		"lock":     power.Lock,
+		"sleep":    power.Sleep,
+	}
+	action, ok := actionMap[req.Action]
+	if !ok {
+		restWriteJSON(w, http.StatusBadRequest, map[string]string{
+			"error": fmt.Sprintf("unknown action %q, valid: shutdown|restart|lock|sleep", req.Action),
+		})
+		return
+	}
+	go func() {
+		if err := power.ExecutePowerAction(action); err != nil {
+			slog.Error("REST power action failed", "action", req.Action, "err", err)
+		}
+	}()
+	restWriteJSON(w, http.StatusAccepted, map[string]interface{}{"status": "accepted", "action": req.Action})
+}
+
+// restKeyboardType handles POST /api/v1/keyboard/type — inject text as keystrokes.
+// Body: {"text": "hello world"}
+func (s *WSServer) restKeyboardType(w http.ResponseWriter, r *http.Request) {
+	if !s.restAuth(r) {
+		restWriteJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	if r.Method != http.MethodPost {
+		restWriteJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	var req struct {
+		Text string `json:"text"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Text == "" {
+		restWriteJSON(w, http.StatusBadRequest, map[string]string{"error": "text required"})
+		return
+	}
+	if len([]rune(req.Text)) > 1000 {
+		restWriteJSON(w, http.StatusBadRequest, map[string]string{"error": "text exceeds 1000 characters"})
+		return
+	}
+	if err := keyboard.TypeText(req.Text); err != nil {
+		restWriteJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	restWriteJSON(w, http.StatusOK, map[string]interface{}{"status": "ok"})
 }
