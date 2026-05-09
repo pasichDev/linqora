@@ -30,6 +30,7 @@ import (
 	"LinqoraHost/internal/process"
 	"LinqoraHost/internal/scheduler"
 	"LinqoraHost/internal/startup"
+	"LinqoraHost/internal/version"
 
 	"LinqoraHost/internal/interfaces"
 
@@ -818,11 +819,13 @@ func (s *WSServer) handleKeyboardTypeCommand(client *Client, msg *ClientMessage)
 	client.SendSuccess("keyboard_type", map[string]interface{}{"status": "ok"})
 }
 
-// handlePlatformCaps returns the capability flags and platform name for the host.
+// handlePlatformCaps returns the capability flags, platform name, and API version for the host.
 func (s *WSServer) handlePlatformCaps(client *Client) {
 	client.SendSuccess("platform_caps", map[string]interface{}{
-		"platform": capabilities.Platform(),
-		"features": capabilities.Get(),
+		"platform":    capabilities.Platform(),
+		"features":    capabilities.Get(),
+		"api_version": version.API,
+		"app_version": version.App,
 	})
 }
 
