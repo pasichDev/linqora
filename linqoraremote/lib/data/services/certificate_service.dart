@@ -1,62 +1,50 @@
 import 'dart:io';
-
 import 'package:crypto/crypto.dart';
 import 'package:get_storage/get_storage.dart';
-
 import '../../core/constants/settings.dart';
 
-/// TOFU (Trust On First Use) certificate pinning for TLS connections.
-///
-/// On the first connection to a host the server's certificate fingerprint is
-/// stored locally.  Subsequent connections verify the fingerprint matches.
-/// This catches certificate swaps on the local network (e.g. MITM via ARP
-/// spoofing) even when using self-signed certificates.
-///
-/// Fingerprints are stored under [SettingsConst.kSettings] in GetStorage.
-/// The storage is not encrypted, but cert fingerprints are public values so
-/// confidentiality is not required — only integrity matters.
+/// Synchronous TOFU pinning — caller supplies the trust-prompt callbacks.
+/// [onFirstPin]: called when there is no stored pin yet; return true to accept.
+/// [onMismatch]: called when the stored pin does not match; return true to re-pin.
 class CertificateService {
   static const _prefix = 'cert_pin_';
-
   static String _key(String host) => '$_prefix$host';
 
-  /// Called from [HttpClient.badCertificateCallback] for self-signed certs.
-  ///
-  /// Returns `true` (accept) when:
-  /// - No fingerprint has been pinned yet → stores the fingerprint and accepts.
-  /// - The stored fingerprint matches the presented certificate.
-  ///
-  /// Returns `false` (reject) when the fingerprint has changed since first use.
+  /// Plug in a UI-prompt function before connecting.
+  static bool Function(String host, String fingerprint)? onFirstPin;
+  static bool Function(String host, String storedFp, String newFp)? onMismatch;
+
   static bool verifyOrPin(X509Certificate cert, String host) {
     final storage = GetStorage(SettingsConst.kSettings);
     final key = _key(host);
     final fingerprint = _fingerprint(cert);
-
     final pinned = storage.read<String>(key);
+
     if (pinned == null || pinned.isEmpty) {
-      storage.write(key, fingerprint);
-      return true;
+      final accept = onFirstPin?.call(host, fingerprint) ?? true;
+      if (accept) storage.write(key, fingerprint);
+      return accept;
     }
 
-    return pinned == fingerprint;
+    if (pinned == fingerprint) return true;
+
+    final repin = onMismatch?.call(host, pinned, fingerprint) ?? false;
+    if (repin) storage.write(key, fingerprint);
+    return repin;
   }
 
-  /// Removes the stored pin for [host], allowing re-pinning on the next
-  /// connection.  Call this when the user explicitly re-establishes trust
-  /// (e.g., after the server regenerates its TLS certificate).
   static Future<void> clearPin(String host) async {
-    final storage = GetStorage(SettingsConst.kSettings);
-    await storage.remove(_key(host));
+    await GetStorage(SettingsConst.kSettings).remove(_key(host));
   }
 
-  /// Returns the SHA-256 fingerprint of [cert]'s DER-encoded bytes as a
-  /// lowercase hex string.
-  static String _fingerprint(X509Certificate cert) {
-    return sha256.convert(cert.der).toString();
-  }
+  static String? pinnedFingerprint(String host) =>
+      GetStorage(SettingsConst.kSettings).read<String>(_key(host));
 
-  /// Returns the stored fingerprint for [host], or `null` if none.
-  static String? pinnedFingerprint(String host) {
-    return GetStorage(SettingsConst.kSettings).read<String>(_key(host));
+  static String _fingerprint(X509Certificate cert) =>
+      sha256.convert(cert.der).toString();
+
+  static String shortFingerprint(String fullHex) {
+    if (fullHex.length < 16) return fullHex;
+    return '${fullHex.substring(0, 16)}…${fullHex.substring(fullHex.length - 16)}';
   }
 }
