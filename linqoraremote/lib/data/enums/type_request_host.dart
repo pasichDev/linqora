@@ -86,6 +86,42 @@ enum TypeMessageWs {
 
   /// Set a monitor as the primary display.
   monitor_set_primary,
+
+  /// Send a keystroke (with optional modifiers) to the host.
+  keyboard,
+
+  /// Write text to the host clipboard.
+  clipboard_set,
+
+  /// Host clipboard text pushed to the phone (server→client broadcast).
+  clipboard_update,
+
+  /// Sleep, wake, or set brightness of the host display.
+  display_cmd,
+
+  /// Request the list of running processes.
+  process_list,
+
+  /// Kill a process by PID.
+  process_kill,
+
+  /// Request the list of startup entries.
+  startup_list,
+
+  /// Enable or disable a startup entry by name.
+  startup_set,
+
+  /// Configure the battery alert threshold.
+  battery_alert_config,
+
+  /// Server-pushed notification: host battery is low.
+  battery_alert,
+
+  /// Type a string of text on the host (Unicode, up to 1000 chars).
+  keyboard_type,
+
+  /// Request platform capability flags from the host.
+  platform_caps,
 }
 
 /// An extension on the `TypeMessageWs` enum to provide additional functionality.

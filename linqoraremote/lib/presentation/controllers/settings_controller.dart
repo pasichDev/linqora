@@ -11,6 +11,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/utils/app_logger.dart';
 import '../../core/utils/device_info.dart';
+import '../../data/models/discovered_service.dart';
 
 class SettingsController extends GetxController {
   final _storage = GetStorage(SettingsConst.kSettings);
@@ -21,6 +22,7 @@ class SettingsController extends GetxController {
   final RxBool allowSelfSigned = false.obs;
   final RxBool notificationPermissionGranted = false.obs;
   final RxString appVersion = ''.obs;
+  final savedHosts = <MdnsDevice>[].obs;
 
   final FlutterLocalNotificationsPlugin notificationsPlugin =
       FlutterLocalNotificationsPlugin();
@@ -31,6 +33,9 @@ class SettingsController extends GetxController {
 
     /// Load the settings from storage
     loadSettings();
+
+    /// Load saved hosts
+    _loadSavedHosts();
 
     /// Initialize the notifications plugin
     checkNotificationPermission();
@@ -166,6 +171,40 @@ class SettingsController extends GetxController {
   Future<void> toggleAllowSelfSigned(bool value) async {
     allowSelfSigned.value = value;
     await _storage.write(SettingsConst.kAllowSelfSigned, value);
+  }
+
+  void _loadSavedHosts() {
+    try {
+      final raw = _storage.read<List>(SettingsConst.kSavedHosts);
+      if (raw != null) {
+        savedHosts.value = raw
+            .map((e) => MdnsDevice.fromJson(Map<String, dynamic>.from(e as Map)))
+            .toList();
+      }
+    } catch (e) {
+      AppLogger.release('Error loading saved hosts: $e', module: 'SettingsController');
+    }
+  }
+
+  void addSavedHost(MdnsDevice device) {
+    savedHosts.removeWhere(
+      (h) => h.address == device.address && h.port == device.port,
+    );
+    savedHosts.insert(0, device);
+    if (savedHosts.length > 5) savedHosts.removeLast();
+    _storage.write(
+      SettingsConst.kSavedHosts,
+      savedHosts.map((h) => h.toJson()).toList(),
+    );
+  }
+
+  void removeSavedHost(int index) {
+    if (index < 0 || index >= savedHosts.length) return;
+    savedHosts.removeAt(index);
+    _storage.write(
+      SettingsConst.kSavedHosts,
+      savedHosts.map((h) => h.toJson()).toList(),
+    );
   }
 
   /// Get the theme mode from string

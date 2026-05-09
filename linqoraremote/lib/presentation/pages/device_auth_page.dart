@@ -6,10 +6,12 @@ import 'package:linqoraremote/presentation/widgets/lx_background.dart';
 import 'package:linqoraremote/presentation/widgets/lx_glass.dart';
 import 'package:linqoraremote/core/themes/lx_theme.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../core/constants/names.dart';
 import '../../core/constants/urls.dart';
 import '../../core/utils/launch_url.dart';
+import '../../data/models/discovered_service.dart';
 import '../../routes/app_routes.dart';
 
 class DeviceAuthPage extends StatefulWidget {
@@ -370,7 +372,10 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
 
   Widget _buildDeviceList() {
     return Obx(() {
-      if (authController.discoveredDevices.isEmpty) {
+      final discovered = authController.discoveredDevices;
+      final saved = authController.savedHosts;
+
+      if (discovered.isEmpty && saved.isEmpty) {
         return Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -400,79 +405,137 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
         );
       }
 
-      return ListView.builder(
-        itemCount: authController.discoveredDevices.length,
+      return ListView(
         padding: const EdgeInsets.symmetric(vertical: 10),
-        itemBuilder: (context, index) {
-          final device = authController.discoveredDevices[index];
-          final isTLS = device.supportsTLS;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: LxGlass(
-              onTap: () => authController.connectToDevice(device),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: isTLS
-                          ? const Color(0x1A00E5FF)
-                          : const Color(0x1AFFB547),
-                      borderRadius: BorderRadius.circular(lxRadiusInner),
-                      border: Border.all(
-                        color: isTLS
-                            ? const Color(0x4D00E5FF)
-                            : const Color(0x4DFFB547),
-                      ),
-                    ),
-                    child: Icon(
-                      isTLS
-                          ? Icons.computer_rounded
-                          : Icons.warning_amber_rounded,
-                      size: 18,
-                      color: isTLS ? lxAccent : lxAmber,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          device.name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
-                            color: lxText,
-                          ),
-                        ),
-                        Text(
-                          '${device.address}:${device.port}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: lxTextDim,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    size: 18,
-                    color: lxTextGhost,
-                  ),
-                ],
+        children: [
+          // ── Saved hosts ──────────────────────────────────────────
+          if (saved.isNotEmpty) ...[
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Text(
+                'RECENT',
+                style: TextStyle(
+                  fontSize: 10,
+                  letterSpacing: 1.4,
+                  color: lxTextFaint,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
-          ).animate().fadeIn(delay: (index * 80).ms).slideX(begin: 0.15);
-        },
+            ...saved.asMap().entries.map((e) {
+              final idx = e.key;
+              final device = e.value;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _buildDeviceRow(
+                  device: device,
+                  animIndex: idx,
+                  trailing: GestureDetector(
+                    onTap: () => authController.removeSavedHost(idx),
+                    child: const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Icon(Icons.close_rounded, size: 14, color: lxTextFaint),
+                    ),
+                  ),
+                ),
+              );
+            }),
+            if (discovered.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'DISCOVERED',
+                  style: TextStyle(
+                    fontSize: 10,
+                    letterSpacing: 1.4,
+                    color: lxTextFaint,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ],
+          // ── Discovered devices ───────────────────────────────────
+          ...discovered.asMap().entries.map((e) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _buildDeviceRow(device: e.value, animIndex: e.key + saved.length),
+          )),
+        ],
       );
     });
+  }
+
+  Widget _buildDeviceRow({
+    required MdnsDevice device,
+    required int animIndex,
+    Widget? trailing,
+  }) {
+    final isTLS = device.supportsTLS;
+    return LxGlass(
+      onTap: () => authController.connectToDevice(device),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: isTLS ? const Color(0x1A00E5FF) : const Color(0x1AFFB547),
+              borderRadius: BorderRadius.circular(lxRadiusInner),
+              border: Border.all(
+                color: isTLS ? const Color(0x4D00E5FF) : const Color(0x4DFFB547),
+              ),
+            ),
+            child: Icon(
+              isTLS ? Icons.computer_rounded : Icons.warning_amber_rounded,
+              size: 18,
+              color: isTLS ? lxAccent : lxAmber,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  device.name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                    color: lxText,
+                  ),
+                ),
+                Text(
+                  '${device.address}:${device.port}',
+                  style: const TextStyle(fontSize: 12, color: lxTextDim),
+                ),
+              ],
+            ),
+          ),
+          trailing ??
+              const Icon(Icons.chevron_right_rounded, size: 18, color: lxTextGhost),
+        ],
+      ),
+    ).animate().fadeIn(delay: (animIndex * 80).ms).slideX(begin: 0.15);
+  }
+
+  void _showQrScanner() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _QrScanSheet(authController: authController),
+    );
+  }
+
+  void _showManualConnect() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _ManualConnectSheet(authController: authController),
+    );
   }
 
   Widget _buildActionButton() {
@@ -484,31 +547,375 @@ class _DeviceAuthPageState extends State<DeviceAuthPage> {
             authController.authStatus.value == AuthStatus.pendingAuth) {
           return const SizedBox.shrink();
         }
-        return SizedBox(
-          width: double.infinity,
-          child: LxGlass(
-            accent: true,
-            onTap: authController.startDiscovery,
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Secondary connect methods
+            Row(
               children: [
-                const Icon(Icons.refresh_rounded, size: 18, color: lxAccent),
-                const SizedBox(width: 8),
+                Expanded(
+                  child: LxGlass(
+                    onTap: _showQrScanner,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.qr_code_scanner_rounded,
+                            size: 16, color: lxAccent),
+                        SizedBox(width: 6),
+                        Text(
+                          'SCAN QR',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: lxText,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: LxGlass(
+                    onTap: _showManualConnect,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.keyboard_rounded,
+                            size: 16, color: lxAmber),
+                        SizedBox(width: 6),
+                        Text(
+                          'MANUAL',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: lxText,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.3),
+            const SizedBox(height: 10),
+            // Primary auto-discover button
+            SizedBox(
+              width: double.infinity,
+              child: LxGlass(
+                accent: true,
+                onTap: authController.startDiscovery,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.radar_rounded, size: 18, color: lxAccent),
+                    const SizedBox(width: 8),
+                    Text(
+                      'update'.tr.toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: lxAccent,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.2),
+          ],
+        );
+      }),
+    );
+  }
+}
+
+// ─── QR scanner bottom sheet ─────────────────────────────────────────────────
+
+class _QrScanSheet extends StatefulWidget {
+  final AuthController authController;
+  const _QrScanSheet({required this.authController});
+  @override
+  State<_QrScanSheet> createState() => _QrScanSheetState();
+}
+
+class _QrScanSheetState extends State<_QrScanSheet> {
+  final _scanCtrl = MobileScannerController();
+  bool _handled = false;
+
+  void _onDetect(BarcodeCapture cap) {
+    if (_handled) return;
+    final raw = cap.barcodes.firstOrNull?.rawValue;
+    if (raw == null) return;
+    final uri = Uri.tryParse(raw);
+    if (uri == null || !['linqora', 'linqoras'].contains(uri.scheme)) return;
+    _handled = true;
+    final ip = uri.host;
+    final port = uri.hasPort ? uri.port.toString() : '8070';
+    // linqora:// = TLS on (host default), linqoras:// same treatment
+    const tls = true;
+    _scanCtrl.dispose();
+    if (mounted) Navigator.of(context).pop();
+    widget.authController.connectToDeviceByIp(ip, port, tls: tls);
+  }
+
+  @override
+  void dispose() {
+    _scanCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.75,
+      decoration: BoxDecoration(
+        color: lxBg,
+        border: Border(top: BorderSide(color: lxHairline)),
+        borderRadius:
+            const BorderRadius.vertical(top: Radius.circular(lxRadiusModal)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 12, bottom: 4),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: lxTextGhost,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: Row(
+              children: [
+                Icon(Icons.qr_code_scanner_rounded, size: 18, color: lxAccent),
+                SizedBox(width: 10),
                 Text(
-                  'update'.tr.toUpperCase(),
-                  style: const TextStyle(
-                    fontSize: 13,
+                  'Scan QR Code',
+                  style: TextStyle(
+                    fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: lxAccent,
-                    letterSpacing: 1.0,
+                    color: lxText,
                   ),
                 ),
               ],
             ),
           ),
-        );
-      }),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+            child: Text(
+              'Open LinqoraHost on your PC and tap the QR icon in the GUI window.',
+              style: TextStyle(fontSize: 13, color: lxTextDim),
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(lxRadiusCard),
+                child: MobileScanner(
+                  controller: _scanCtrl,
+                  onDetect: _onDetect,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Manual IP entry bottom sheet ────────────────────────────────────────────
+
+class _ManualConnectSheet extends StatefulWidget {
+  final AuthController authController;
+  const _ManualConnectSheet({required this.authController});
+  @override
+  State<_ManualConnectSheet> createState() => _ManualConnectSheetState();
+}
+
+class _ManualConnectSheetState extends State<_ManualConnectSheet> {
+  final _ipCtrl   = TextEditingController();
+  final _portCtrl = TextEditingController(text: '8070');
+  bool _tls = true;
+
+  @override
+  void dispose() {
+    _ipCtrl.dispose();
+    _portCtrl.dispose();
+    super.dispose();
+  }
+
+  void _connect() {
+    final ip = _ipCtrl.text.trim();
+    if (ip.isEmpty) return;
+    final port =
+        _portCtrl.text.trim().isEmpty ? '8070' : _portCtrl.text.trim();
+    Navigator.of(context).pop();
+    widget.authController.connectToDeviceByIp(ip, port, tls: _tls);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+        decoration: BoxDecoration(
+          color: lxBg,
+          border: Border(top: BorderSide(color: lxHairline)),
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(lxRadiusModal),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: lxTextGhost,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Row(
+              children: [
+                Icon(Icons.keyboard_rounded, size: 18, color: lxAmber),
+                SizedBox(width: 10),
+                Text(
+                  'Connect Manually',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: lxText,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _LxTextField(
+              controller: _ipCtrl,
+              label: 'IP ADDRESS',
+              hint: '192.168.1.100',
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 12),
+            _LxTextField(
+              controller: _portCtrl,
+              label: 'PORT',
+              hint: '8070',
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 16),
+            LxGlass(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Row(
+                children: [
+                  const Icon(Icons.lock_outline_rounded,
+                      size: 16, color: lxTextDim),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'Secure connection (TLS)',
+                      style: TextStyle(fontSize: 13, color: lxText),
+                    ),
+                  ),
+                  Switch(
+                    value: _tls,
+                    onChanged: (v) => setState(() => _tls = v),
+                    activeThumbColor: lxAccent,
+                    activeTrackColor: const Color(0x4D00E5FF),
+                    inactiveThumbColor: lxTextDim,
+                    inactiveTrackColor: lxTextGhost,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: LxGlass(
+                accent: true,
+                onTap: _connect,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                child: const Text(
+                  'CONNECT',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: lxAccent,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Reusable styled text field ───────────────────────────────────────────────
+
+class _LxTextField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label, hint;
+  final TextInputType? keyboardType;
+
+  const _LxTextField({
+    required this.controller,
+    required this.label,
+    required this.hint,
+    this.keyboardType,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            letterSpacing: 1.2,
+            color: lxTextFaint,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 6),
+        LxGlass(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          child: TextField(
+            controller: controller,
+            keyboardType: keyboardType,
+            style: const TextStyle(color: lxText, fontSize: 15),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: const TextStyle(color: lxTextGhost, fontSize: 15),
+              border: InputBorder.none,
+              isDense: true,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

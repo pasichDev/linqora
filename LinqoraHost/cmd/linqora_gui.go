@@ -1,3 +1,5 @@
+//go:build !cli
+
 package main
 
 import (
@@ -16,10 +18,12 @@ import (
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	qrcode "github.com/skip2/go-qrcode"
 
 	"LinqoraHost/internal/config"
 	"LinqoraHost/internal/deviceinfo"
 	"LinqoraHost/internal/startup"
+	"LinqoraHost/internal/updater"
 )
 
 // ─────────────────────── log writer ───────────────────────
@@ -84,6 +88,47 @@ func watchAuth(win fyne.Window) {
 			return
 		}
 	}
+}
+
+// ─────────────────────── QR code dialog ───────────────────────
+
+// showQRDialog generates a QR code for the server's pairing URL and shows it
+// in a dialog. The URL encodes linqora://ip:port so the app can scan to connect.
+func showQRDialog(win fyne.Window) {
+	ip := deviceinfo.GetDeviceInfo().IP
+	if ip == "" || ip == "Unknown IP" {
+		dialog.ShowInformation("Network unavailable", "No LAN IP found. Connect to a network first.", win)
+		return
+	}
+	url := fmt.Sprintf("linqora://%s:%d", ip, cfg.Port)
+
+	qr, err := qrcode.New(url, qrcode.High)
+	if err != nil {
+		dialog.ShowError(err, win)
+		return
+	}
+	qr.BackgroundColor = color.White
+	qr.ForegroundColor = color.Black
+
+	img := qr.Image(280)
+	canvasImg := canvas.NewImageFromImage(img)
+	canvasImg.FillMode = canvas.ImageFillOriginal
+	canvasImg.SetMinSize(fyne.NewSize(280, 280))
+
+	urlLbl := widget.NewLabel(url)
+	urlLbl.Alignment = fyne.TextAlignCenter
+
+	hintLbl := widget.NewLabel("Scan with the Linqora app to connect")
+	hintLbl.Alignment = fyne.TextAlignCenter
+
+	content := container.NewVBox(
+		container.NewCenter(canvasImg),
+		widget.NewSeparator(),
+		container.NewCenter(urlLbl),
+		container.NewCenter(hintLbl),
+	)
+
+	dialog.ShowCustom("Scan to Connect", "Close", content, win)
 }
 
 // ─────────────────────── server tab ───────────────────────
@@ -166,11 +211,23 @@ func buildServerTab(win fyne.Window) fyne.CanvasObject {
 	})
 	toggleBtn.Importance = widget.HighImportance
 
+	qrBtn := widget.NewButtonWithIcon("Scan QR to Connect", theme.ComputerIcon(), func() {
+		guiCancelMu.Lock()
+		running := guiRunning
+		guiCancelMu.Unlock()
+		if !running {
+			dialog.ShowInformation("Server not running", "Start the server first to show the QR code.", win)
+			return
+		}
+		showQRDialog(win)
+	})
+
 	return container.NewPadded(container.NewVBox(
 		container.NewCenter(statusDot),
 		widget.NewSeparator(),
 		infoCard,
 		container.NewPadded(toggleBtn),
+		container.NewPadded(qrBtn),
 	))
 }
 
@@ -235,7 +292,7 @@ func buildDevicesTab() fyne.CanvasObject {
 
 // ─────────────────────── settings tab ───────────────────────
 
-func buildSettingsTab() fyne.CanvasObject {
+func buildSettingsTab(win fyne.Window) fyne.CanvasObject {
 	portEntry := widget.NewEntry()
 	portEntry.SetText(fmt.Sprintf("%d", cfg.Port))
 
@@ -296,11 +353,48 @@ func buildSettingsTab() fyne.CanvasObject {
 	})
 	saveBtn.Importance = widget.HighImportance
 
+	updateBtn := widget.NewButtonWithIcon("Check for Updates", theme.DownloadIcon(), func() {
+		statusLbl.SetText("Checking for updates…")
+		go func() {
+			rel, err := updater.CheckLatest()
+			fyne.Do(func() {
+				if err != nil {
+					statusLbl.SetText("⚠  Update check failed: " + err.Error())
+					return
+				}
+				current := AppVersion
+				if rel.TagName == "" {
+					statusLbl.SetText("⚠  No release info returned")
+					return
+				}
+				if current == "dev" || rel.TagName != current {
+					msg := fmt.Sprintf(
+						"A new version is available!\n\nCurrent:  %s\nLatest:     %s\n\nVisit the releases page to download.",
+						current, rel.TagName,
+					)
+					dialog.ShowInformation("Update Available", msg, win)
+					statusLbl.SetText("Latest: " + rel.TagName)
+				} else {
+					statusLbl.SetText("✓  You are on the latest version (" + current + ")")
+				}
+			})
+		}()
+	})
+
+	versionLbl := widget.NewLabelWithStyle(
+		"LinqoraHost "+AppVersion,
+		fyne.TextAlignCenter,
+		fyne.TextStyle{Italic: true},
+	)
+
 	return container.NewPadded(container.NewVBox(
 		form,
 		widget.NewSeparator(),
 		saveBtn,
+		updateBtn,
 		statusLbl,
+		widget.NewSeparator(),
+		versionLbl,
 	))
 }
 
@@ -357,7 +451,7 @@ func RunGUI() {
 	tabs := container.NewAppTabs(
 		container.NewTabItem("Server", buildServerTab(w)),
 		container.NewTabItem("Devices", buildDevicesTab()),
-		container.NewTabItem("Settings", buildSettingsTab()),
+		container.NewTabItem("Settings", buildSettingsTab(w)),
 		container.NewTabItem("Log", logContent),
 	)
 	tabs.SetTabLocation(container.TabLocationTop)

@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	MDNSType   = "_linqora"
+	MDNSType   = "_linqora._tcp"
 	MDNSDomain = "local"
 )
 

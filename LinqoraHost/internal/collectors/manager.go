@@ -13,21 +13,24 @@ const (
 
 // CollectorManager coordinates the lifecycle of data collectors based on active room participation.
 type CollectorManager struct {
-	metricsCollector *MetricsCollector
-	mediaCollector   *MediaCollector
-	activeRooms      map[string]int // Tracks active client counts per room
-	mu               sync.Mutex
+	metricsCollector   *MetricsCollector
+	mediaCollector     *MediaCollector
+	clipboardCollector *ClipboardCollector
+	activeRooms        map[string]int // Tracks active client counts per room
+	mu                 sync.Mutex
 }
 
 // NewCollectorManager initializes the manager with the required collector instances.
 func NewCollectorManager(
 	metricsCollector *MetricsCollector,
 	mediaCollector *MediaCollector,
+	clipboardCollector *ClipboardCollector,
 ) *CollectorManager {
 	return &CollectorManager{
-		metricsCollector: metricsCollector,
-		mediaCollector:   mediaCollector,
-		activeRooms:      make(map[string]int),
+		metricsCollector:   metricsCollector,
+		mediaCollector:     mediaCollector,
+		clipboardCollector: clipboardCollector,
+		activeRooms:        make(map[string]int),
 	}
 }
 
@@ -50,6 +53,11 @@ func (cm *CollectorManager) OnFirstClientJoined(roomName string) {
 			slog.Info("Starting media collector because first client joined media room")
 			cm.mediaCollector.Start()
 		}
+	case "clipboard":
+		if !cm.clipboardCollector.IsRunning() {
+			slog.Info("Starting clipboard collector because first client joined clipboard room")
+			cm.clipboardCollector.Start()
+		}
 	}
 }
 
@@ -71,6 +79,11 @@ func (cm *CollectorManager) OnLastClientLeft(roomName string) {
 		if cm.mediaCollector.IsRunning() {
 			slog.Info("Stopping media collector because last client left media room")
 			cm.mediaCollector.Stop()
+		}
+	case "clipboard":
+		if cm.clipboardCollector.IsRunning() {
+			slog.Info("Stopping clipboard collector because last client left clipboard room")
+			cm.clipboardCollector.Stop()
 		}
 	}
 }

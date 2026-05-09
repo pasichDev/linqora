@@ -73,6 +73,11 @@ class MyApp extends StatelessWidget {
 
   final settingsController = Get.put(SettingsController());
 
+  bool get _onboardingDone =>
+      GetStorage(SettingsConst.kSettings)
+          .read<bool>(SettingsConst.kOnboardingComplete) ??
+      false;
+
   @override
   Widget build(BuildContext context) {
     return Obx(
@@ -88,7 +93,7 @@ class MyApp extends StatelessWidget {
           colorScheme: MaterialTheme.darkScheme(),
         ),
         themeMode: settingsController.themeMode.value,
-        initialRoute: AppRoutes.DEVICE_AUTH,
+        initialRoute: _onboardingDone ? AppRoutes.DEVICE_AUTH : AppRoutes.ONBOARDING,
         getPages: AppRoutes().routes,
         defaultTransition: Transition.cupertino,
         translations: GetxMultilanguageHelperTranslation(),

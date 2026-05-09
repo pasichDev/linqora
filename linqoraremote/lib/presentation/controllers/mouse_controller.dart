@@ -8,6 +8,7 @@ enum MouseAction {
   middleClick, // 3
   scroll, // 4
   doubleClick, // 5
+  pinchZoom, // 6
 }
 
 class MouseController extends GetxController {
@@ -15,12 +16,12 @@ class MouseController extends GetxController {
 
   MouseController({required this.webSocketProvider});
 
-  // Throttle move events to ~30 fps to stay within server rate limits.
-  static const _moveInterval = Duration(milliseconds: 33);
+  // Throttle move events to ~60 fps to stay within server rate limits.
+  static const _moveInterval = Duration(milliseconds: 16);
   DateTime _lastMove = DateTime.fromMillisecondsSinceEpoch(0);
 
   // Sensitivity multiplier applied to raw pan deltas.
-  final RxDouble sensitivity = 1.5.obs;
+  final RxDouble sensitivity = 2.0.obs;
 
   void moveMouse(double dx, double dy) {
     final now = DateTime.now();
@@ -40,6 +41,8 @@ class MouseController extends GetxController {
   void doubleClick() => _send(MouseAction.doubleClick);
 
   void scroll(int delta) => _send(MouseAction.scroll, delta: delta);
+
+  void pinchZoom(int direction) => _send(MouseAction.pinchZoom, delta: direction);
 
   void _send(MouseAction action, {int dx = 0, int dy = 0, int delta = 0}) {
     if (!webSocketProvider.isReadyForCommand()) return;

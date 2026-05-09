@@ -3,7 +3,7 @@ description: "Tool for intelligent interaction with a computer"
 
 publish_to: 'https://github.com/pasichDev/linqora'
 
-version: 0.2.0+1
+version: 0.5.0+1
 
 environment:
   sdk: ^3.11.0
@@ -33,6 +33,7 @@ dependencies:
   flutter_secure_storage: ^9.2.2
   crypto: ^3.0.6
   flutter_animate: ^4.5.2
+  mobile_scanner: ^6.0.0
   flutter_blurhash: ^0.9.1
   google_fonts: ^8.1.0
   file_picker: ^8.1.7

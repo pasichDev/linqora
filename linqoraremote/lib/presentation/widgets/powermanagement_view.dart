@@ -165,29 +165,6 @@ class _PowerManagementViewState extends State<PowerManagementView> {
 
             const SizedBox(height: 18),
 
-            // Scheduled section
-            const Text(
-              'SCHEDULED',
-              style: TextStyle(
-                fontSize: 11,
-                letterSpacing: 1.4,
-                color: lxTextFaint,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 8),
-            LxGlass(
-              child: Column(
-                children: [
-                  _scheduleRow('Auto-sleep after', '20 min idle', last: false),
-                  _scheduleRow('Nightly restart', 'Disabled', last: false),
-                  _scheduleRow('Energy profile', 'Balanced', last: true),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 14),
-
             // Disconnect button
             GestureDetector(
               onTap: () => homeCtrl.disconnectFromDevice(isCleaned: true),
@@ -348,39 +325,4 @@ class _PowerManagementViewState extends State<PowerManagementView> {
     );
   }
 
-  Widget _scheduleRow(String title, String detail, {required bool last}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        border: last
-            ? null
-            : const Border(
-                bottom: BorderSide(color: lxHairline, width: 1),
-              ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          Text(
-            detail,
-            style: const TextStyle(fontSize: 12, color: lxTextDim),
-          ),
-          const SizedBox(width: 6),
-          const Icon(
-            Icons.chevron_right_rounded,
-            size: 11,
-            color: lxTextGhost,
-          ),
-        ],
-      ),
-    );
-  }
 }

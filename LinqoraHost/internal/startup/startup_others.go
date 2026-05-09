@@ -1,4 +1,4 @@
-//go:build !windows
+//go:build !windows && !linux && !darwin
 
 package startup
 
@@ -10,3 +10,5 @@ func isSupported() bool            { return false }
 func isEnabled() (bool, error)     { return false, errNotSupported }
 func enable() error                { return errNotSupported }
 func disable() error               { return errNotSupported }
+func listEntries() ([]Entry, error) { return nil, errNotSupported }
+func setEntry(_ string, _ bool) error { return errNotSupported }

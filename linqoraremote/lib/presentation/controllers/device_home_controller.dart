@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:linqoraremote/data/enums/type_request_host.dart';
@@ -17,6 +19,7 @@ import '../../data/models/server_response.dart';
 import '../../data/providers/websocket_provider.dart'
     show WebSocketProvider, ReconnectState;
 import '../../services/permissions_service.dart';
+import 'settings_controller.dart';
 
 class DeviceHomeController extends GetxController with WidgetsBindingObserver {
   final WebSocketProvider webSocketProvider;
@@ -61,6 +64,7 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
   void onClose() {
     WidgetsBinding.instance.removeObserver(this);
     webSocketProvider.removeHandler(TypeMessageWs.host_info.value);
+    webSocketProvider.removeHandler(TypeMessageWs.battery_alert.value);
     BackgroundConnectionService.removeMessageHandler(
       _handleBackgroundServiceMessage,
     );
@@ -165,6 +169,9 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
           GetStorage(
             SettingsConst.kSettings,
           ).write(SettingsConst.kLastConnect, authDevice.value!.toJson());
+          try {
+            Get.find<SettingsController>().addSavedHost(authDevice.value!);
+          } catch (_) {}
         } catch (e) {
           AppLogger.release(
             'Error parse device data: ${args['device']}',
@@ -190,6 +197,11 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
     webSocketProvider.registerHandler(
       TypeMessageWs.host_info.value,
       _handleSystemInfo,
+    );
+
+    webSocketProvider.registerHandler(
+      TypeMessageWs.battery_alert.value,
+      _handleBatteryAlert,
     );
 
     _requestSystemInfo();
@@ -266,6 +278,58 @@ class DeviceHomeController extends GetxController with WidgetsBindingObserver {
       SettingsConst.kSettings,
     ).write(SettingsConst.kShowHostInfo, !showHostFull.value);
     showHostFull.value = !showHostFull.value;
+  }
+
+  void _handleBatteryAlert(Map<String, dynamic> data) {
+    try {
+      final settingsCtrl = Get.find<SettingsController>();
+      if (!settingsCtrl.enableNotifications.value) return;
+      final payload = data['data'] as Map<String, dynamic>?;
+      final percent = (payload?['percent'] as num?)?.toInt() ?? 0;
+      _showBatteryNotification(percent);
+    } catch (e) {
+      AppLogger.release('Battery alert error: $e', module: 'DeviceHomeController');
+    }
+  }
+
+  Future<void> _showBatteryNotification(int percent) async {
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return;
+    try {
+      final plugin = FlutterLocalNotificationsPlugin();
+      const channel = AndroidNotificationChannel(
+        'linqora_battery',
+        'Battery Alerts',
+        description: 'Low battery alerts from the host computer',
+        importance: Importance.high,
+      );
+      await plugin
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(channel);
+      await plugin.initialize(
+        const InitializationSettings(
+          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+          iOS: DarwinInitializationSettings(),
+        ),
+      );
+      await plugin.show(
+        42,
+        'Host Battery Low',
+        'Battery is at $percent% — consider plugging in.',
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'linqora_battery',
+            'Battery Alerts',
+            channelDescription: 'Low battery alerts from the host computer',
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+      );
+    } catch (e) {
+      AppLogger.release('Notification error: $e', module: 'DeviceHomeController');
+    }
   }
 
   /// Disconnect from the device

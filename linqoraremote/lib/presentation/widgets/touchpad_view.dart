@@ -22,9 +22,14 @@ class _TouchpadViewState extends State<TouchpadView>
   final List<_Ripple> _ripples = [];
   Offset _pointerPos = const Offset(0.5, 0.5); // normalised 0-1
 
-  // Scroll accumulator for the centre scroll button
+  // Scroll accumulator for the centre scroll button and two-finger scroll.
   double _scrollAccum = 0;
   static const _notchThreshold = 40.0;
+
+  // Two-finger gesture tracking.
+  double _prevScale = 1.0;
+  DateTime _lastPinch = DateTime.fromMillisecondsSinceEpoch(0);
+  static const _pinchThrottle = Duration(milliseconds: 100);
 
   @override
   void initState() {
@@ -90,18 +95,53 @@ class _TouchpadViewState extends State<TouchpadView>
 
   Widget _touchSurface() {
     return GestureDetector(
-      onPanUpdate: (d) {
-        _mouse.moveMouse(d.delta.dx, d.delta.dy);
-        setState(() {
-          final box = context.findRenderObject() as RenderBox?;
-          if (box != null) {
-            final local = box.globalToLocal(d.globalPosition);
-            _pointerPos = Offset(
-              (local.dx / box.size.width).clamp(0.0, 1.0),
-              (local.dy / box.size.height).clamp(0.0, 1.0),
-            );
+      onScaleStart: (_) {
+        _prevScale = 1.0;
+      },
+      onScaleUpdate: (d) {
+        if (d.pointerCount == 1) {
+          // Single finger — move cursor.
+          _mouse.moveMouse(d.focalPointDelta.dx, d.focalPointDelta.dy);
+          setState(() {
+            final box = context.findRenderObject() as RenderBox?;
+            if (box != null) {
+              final local = box.globalToLocal(d.focalPoint);
+              _pointerPos = Offset(
+                (local.dx / box.size.width).clamp(0.0, 1.0),
+                (local.dy / box.size.height).clamp(0.0, 1.0),
+              );
+            }
+          });
+        } else {
+          final scaleDeviation = (d.scale - 1.0).abs();
+          if (scaleDeviation < 0.05) {
+            // Two-finger pan — scroll.
+            _scrollAccum += d.focalPointDelta.dy;
+            while (_scrollAccum >= _notchThreshold) {
+              HapticFeedback.selectionClick();
+              _mouse.scroll(-1);
+              _scrollAccum -= _notchThreshold;
+            }
+            while (_scrollAccum <= -_notchThreshold) {
+              HapticFeedback.selectionClick();
+              _mouse.scroll(1);
+              _scrollAccum += _notchThreshold;
+            }
+          } else {
+            // Pinch gesture — zoom, throttled to 100ms.
+            final now = DateTime.now();
+            if (now.difference(_lastPinch) >= _pinchThrottle) {
+              _lastPinch = now;
+              final direction = d.scale > _prevScale ? 1 : -1;
+              _mouse.pinchZoom(direction);
+            }
+            _prevScale = d.scale;
           }
-        });
+        }
+      },
+      onScaleEnd: (_) {
+        _scrollAccum = 0;
+        _prevScale = 1.0;
       },
       onTap: () {
         HapticFeedback.lightImpact();
@@ -174,7 +214,7 @@ class _TouchpadViewState extends State<TouchpadView>
               top: 16,
               left: 16,
               child: Text(
-                'DRAG · TAP · TWO-FINGER SCROLL',
+                'DRAG · TAP · 2F SCROLL · PINCH ZOOM',
                 style: TextStyle(
                   fontSize: 9,
                   color: lxTextFaint,
@@ -321,8 +361,8 @@ class _TouchpadViewState extends State<TouchpadView>
               child: Slider(
                 value: _mouse.sensitivity.value,
                 min: 0.5,
-                max: 4.0,
-                divisions: 14,
+                max: 8.0,
+                divisions: 30,
                 onChanged: (v) => _mouse.sensitivity.value = v,
               ),
             ),

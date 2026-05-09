@@ -84,6 +84,13 @@ $.CFRelease(_u1);`,
 			kCGEventLeftMouseDown, kCGMouseButtonLeft, kCGHIDEventTap,
 			kCGEventLeftMouseUp, kCGMouseButtonLeft, kCGHIDEventTap)
 		return jxa(script)
+	case ActionPinchZoom:
+		// Ctrl+scroll simulates pinch zoom universally (browser zoom, map zoom, etc.)
+		return jxa(fmt.Sprintf(`ObjC.import('CoreGraphics');
+var _s = $.CGEventCreateScrollWheelEvent(null, 0, 1, %d);
+$.CGEventSetFlags(_s, 0x40000); // kCGEventFlagMaskControl
+$.CGEventPost(%d, _s);
+$.CFRelease(_s);`, cmd.Delta*3, kCGHIDEventTap))
 	default:
 		return fmt.Errorf("mouse: unknown action %d", cmd.Action)
 	}

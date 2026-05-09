@@ -7,6 +7,9 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+
+	"github.com/shirou/gopsutil/v4/disk"
+	gopsnet "github.com/shirou/gopsutil/v4/net"
 )
 
 // SystemMetrics represents a snapshot of the system's performance metrics.
@@ -15,16 +18,25 @@ type SystemMetrics struct {
 	RamMetrics     metrics.RamMetrics `json:"ramMetrics"`
 	GpuLoadPercent int                `json:"gpuLoadPercent"`
 	GpuTemperature int                `json:"gpuTemperature"`
+	DiskReadBps    uint64             `json:"diskReadBps"`
+	DiskWriteBps   uint64             `json:"diskWriteBps"`
+	NetSentBps     uint64             `json:"netSentBps"`
+	NetRecvBps     uint64             `json:"netRecvBps"`
 	Timestamp      int64              `json:"timestamp"`
 }
 
 // MetricsCollector periodically gathers and broadcasts system performance data.
 type MetricsCollector struct {
-	broadcaster func([]byte)
-	ctx         context.Context
-	cancel      context.CancelFunc
-	isRunning   bool
-	mu          sync.Mutex
+	broadcaster  func([]byte)
+	ctx          context.Context
+	cancel       context.CancelFunc
+	isRunning    bool
+	mu           sync.Mutex
+	prevDiskRead  uint64
+	prevDiskWrite uint64
+	prevNetSent   uint64
+	prevNetRecv   uint64
+	prevTime      time.Time
 }
 
 // NewMetricsCollector creates a new collector instance with the specified broadcast function.
@@ -115,7 +127,7 @@ func (mc *MetricsCollector) collectAndSend() {
 	mc.broadcaster(metricsJSON)
 }
 
-// collectMetrics retrieves CPU, RAM, and GPU performance data.
+// collectMetrics retrieves CPU, RAM, GPU, disk I/O, and network performance data.
 func (mc *MetricsCollector) collectMetrics() (*SystemMetrics, error) {
 	cpuMetrics, err := metrics.GetCPUMetrics()
 	if err != nil {
@@ -130,12 +142,71 @@ func (mc *MetricsCollector) collectMetrics() (*SystemMetrics, error) {
 	gpuLoad := metrics.GetGPULoadPercent()
 	gpuTemp := metrics.GetGPUTemperature()
 
+	now := time.Now()
+	var diskReadBps, diskWriteBps, netSentBps, netRecvBps uint64
+
+	// Compute disk I/O per-second deltas.
+	if diskCounters, err := disk.IOCounters(); err == nil {
+		var totalRead, totalWrite uint64
+		for _, c := range diskCounters {
+			totalRead += c.ReadBytes
+			totalWrite += c.WriteBytes
+		}
+		mc.mu.Lock()
+		if !mc.prevTime.IsZero() {
+			elapsed := now.Sub(mc.prevTime).Seconds()
+			if elapsed > 0 {
+				if totalRead >= mc.prevDiskRead {
+					diskReadBps = uint64(float64(totalRead-mc.prevDiskRead) / elapsed)
+				}
+				if totalWrite >= mc.prevDiskWrite {
+					diskWriteBps = uint64(float64(totalWrite-mc.prevDiskWrite) / elapsed)
+				}
+			}
+		}
+		mc.prevDiskRead = totalRead
+		mc.prevDiskWrite = totalWrite
+		mc.mu.Unlock()
+	}
+
+	// Compute network I/O per-second deltas.
+	if netCounters, err := gopsnet.IOCounters(false); err == nil && len(netCounters) > 0 {
+		var totalSent, totalRecv uint64
+		for _, c := range netCounters {
+			totalSent += c.BytesSent
+			totalRecv += c.BytesRecv
+		}
+		mc.mu.Lock()
+		if !mc.prevTime.IsZero() {
+			elapsed := now.Sub(mc.prevTime).Seconds()
+			if elapsed > 0 {
+				if totalSent >= mc.prevNetSent {
+					netSentBps = uint64(float64(totalSent-mc.prevNetSent) / elapsed)
+				}
+				if totalRecv >= mc.prevNetRecv {
+					netRecvBps = uint64(float64(totalRecv-mc.prevNetRecv) / elapsed)
+				}
+			}
+		}
+		mc.prevNetSent = totalSent
+		mc.prevNetRecv = totalRecv
+		mc.mu.Unlock()
+	}
+
+	mc.mu.Lock()
+	mc.prevTime = now
+	mc.mu.Unlock()
+
 	result := &SystemMetrics{
 		CPUUMetrics:    cpuMetrics,
 		RamMetrics:     ramMetrics,
 		GpuLoadPercent: gpuLoad,
 		GpuTemperature: gpuTemp,
-		Timestamp:      time.Now().Unix(),
+		DiskReadBps:    diskReadBps,
+		DiskWriteBps:   diskWriteBps,
+		NetSentBps:     netSentBps,
+		NetRecvBps:     netRecvBps,
+		Timestamp:      now.Unix(),
 	}
 
 	return result, nil

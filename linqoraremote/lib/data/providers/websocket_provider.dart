@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/material.dart' show Color, Colors;
 import 'package:get/get.dart';
 import 'package:linqoraremote/services/background_service.dart';
 import 'package:web_socket_channel/io.dart';
@@ -89,6 +90,28 @@ class WebSocketProvider {
         '${device.supportsTLS ? 'wss' : 'ws'}://${device.address}:${device.port}/ws';
     AppLogger.release('Connecting to $wsUrl', module: "WebSocketProvider");
     reconnectState.value = ReconnectState.connecting;
+
+    // Wire TOFU UI callbacks for self-signed certs.
+    CertificateService.onFirstPin = (host, fp) {
+      Get.snackbar(
+        'Certificate Trusted',
+        'Pinned fingerprint for $host:\n${CertificateService.shortFingerprint(fp)}',
+        duration: const Duration(seconds: 6),
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return true;
+    };
+    CertificateService.onMismatch = (host, oldFp, newFp) {
+      Get.snackbar(
+        'Certificate Changed!',
+        'The certificate for $host has changed. Clear the pin in Settings to reconnect.',
+        backgroundColor: const Color(0xFFB00020),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 10),
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return false;
+    };
 
     try {
       await _establishConnection(
@@ -193,17 +216,7 @@ class WebSocketProvider {
     bool allowSelfSigned,
   ) async {
     if (supportsTLS) {
-      try {
-        await _establishTLSConnection(wsUrl, allowSelfSigned);
-      } catch (e) {
-        AppLogger.release(
-          'TLS connection error: $e. Attempting a normal connection...',
-          module: "WebSocketProvider",
-        );
-        // Fallback to non-TLS connection
-        final fallbackUrl = wsUrl.replaceFirst('wss://', 'ws://');
-        await _establishStandardConnection(fallbackUrl);
-      }
+      await _establishTLSConnection(wsUrl, allowSelfSigned);
     } else {
       await _establishStandardConnection(wsUrl);
     }

@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Pre-commit hook: auto-format + lint for Go and Flutter.
+# Install once (project root): git config core.hooksPath .githooks
+set -uo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
+
+GO_STAGED=$(printf '%s\n' "$STAGED" | grep '\.go$' || true)
+DART_STAGED=$(printf '%s\n' "$STAGED" | grep '\.dart$' || true)
+
+fail=0
+
+# ── Go ────────────────────────────────────────────────────────────────────────
+if [ -n "$GO_STAGED" ]; then
+  echo "[pre-commit] Go: formatting..."
+  cd "$ROOT/LinqoraHost"
+
+  # Auto-format staged .go files and re-stage
+  while IFS= read -r rel; do
+    local_path="${rel#LinqoraHost/}"
+    [ -f "$local_path" ] || continue
+    gofmt -w "$local_path"
+    git add "$ROOT/$rel"
+  done < <(printf '%s\n' "$GO_STAGED" | grep '^LinqoraHost/')
+
+  echo "[pre-commit] Go: vet..."
+  if ! go vet ./... 2>&1; then
+    echo "[pre-commit] ✗ go vet failed — fix errors above before committing."
+    fail=1
+  fi
+
+  cd "$ROOT"
+fi
+
+# ── Flutter / Dart ────────────────────────────────────────────────────────────
+if [ -n "$DART_STAGED" ]; then
+  echo "[pre-commit] Dart: formatting..."
+  cd "$ROOT/linqoraremote"
+
+  # Auto-format and re-stage changed dart files
+  dart format --line-length 100 lib/ > /dev/null 2>&1 || true
+  while IFS= read -r rel; do
+    [ -f "$ROOT/$rel" ] && git add "$ROOT/$rel"
+  done < <(printf '%s\n' "$DART_STAGED")
+
+  echo "[pre-commit] Flutter: analyze..."
+  # --no-fatal-infos: only errors and warnings cause non-zero exit
+  if ! flutter analyze --no-fatal-infos --no-pub 2>&1; then
+    echo "[pre-commit] ✗ flutter analyze failed — fix errors above before committing."
+    fail=1
+  fi
+
+  cd "$ROOT"
+fi
+
+if [ "$fail" -eq 1 ]; then
+  exit 1
+fi
+
+echo "[pre-commit] ✓ All checks passed."

@@ -10,7 +10,9 @@ import 'package:linqoraremote/presentation/widgets/animated_aurora_background.da
 
 import '../../core/constants/urls.dart';
 import '../../core/utils/launch_url.dart';
+import '../../data/models/discovered_service.dart';
 import '../../generated/assets.dart';
+import '../../routes/app_routes.dart';
 import '../widgets/settings/section_header.dart';
 
 class SettingsPage extends GetView<SettingsController> {
@@ -51,6 +53,13 @@ class SettingsPage extends GetView<SettingsController> {
                 .animate()
                 .fadeIn(delay: 200.ms, duration: 400.ms)
                 .slideY(begin: 0.1),
+            const SizedBox(height: 24),
+            Obx(() => controller.savedHosts.isEmpty
+                ? const SizedBox.shrink()
+                : _buildRecentHostsSection(context)
+                    .animate()
+                    .fadeIn(delay: 250.ms, duration: 400.ms)
+                    .slideY(begin: 0.1)),
             const SizedBox(height: 24),
             _buildAboutSection(context)
                 .animate()
@@ -303,6 +312,107 @@ class SettingsPage extends GetView<SettingsController> {
           value: value,
           onChanged: onChanged,
           activeColor: Theme.of(context).colorScheme.primary,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecentHostsSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionHeader(title: 'Recent Connections', icon: Icons.history_rounded),
+        const SizedBox(height: 12),
+        _buildGlassSection(
+          context,
+          child: Column(
+            children: List.generate(controller.savedHosts.length, (i) {
+              final host = controller.savedHosts[i];
+              return Padding(
+                padding: EdgeInsets.only(bottom: i < controller.savedHosts.length - 1 ? 12 : 0),
+                child: _buildRecentHostTile(context, host, i),
+              );
+            }),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecentHostTile(BuildContext context, MdnsDevice host, int index) {
+    return Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+            ),
+          ),
+          child: Icon(
+            Icons.computer_rounded,
+            size: 18,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                host.name,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+              Text(
+                '${host.address}:${host.port}',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.white.withOpacity(0.5),
+                ),
+              ),
+            ],
+          ),
+        ),
+        GestureDetector(
+          onTap: () => Get.toNamed(
+            AppRoutes.DEVICE_AUTH,
+            arguments: {'device': host.toJson()},
+          ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+              ),
+            ),
+            child: Text(
+              'Connect',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: () => controller.removeSavedHost(index),
+          child: Icon(
+            Icons.close_rounded,
+            size: 16,
+            color: Colors.white.withOpacity(0.3),
+          ),
         ),
       ],
     );

@@ -32,7 +32,19 @@
       "Bash(flutter create *)",
       "Bash(flutter build *)",
       "PowerShell(ls \"C:\\\\Users\\\\pasichdev\\\\AndroidStudioProjects\\\\linqora\\\\LinqoraHost\\\\linqorahost.exe\"; \\(Get-Item \"C:\\\\Users\\\\pasichdev\\\\AndroidStudioProjects\\\\linqora\\\\LinqoraHost\\\\linqorahost.exe\"\\).LastWriteTime)",
-      "Bash(Select-Object Name, Length, LastWriteTime)"
+      "Bash(Select-Object Name, Length, LastWriteTime)",
+      "Bash(xargs grep -l \"keyboard\\\\|clipboard\\\\|display\")",
+      "Skill(code-review:code-review)",
+      "Bash(grep -v \"^//\")",
+      "PowerShell(flutter analyze *)",
+      "Bash(xargs grep -l \"TODO\\\\|FIXME\\\\|NotImplemented\\\\|throw\\\\|// stub\")",
+      "Bash(xargs grep -l \"view\\\\|View\\\\|screen\\\\|Screen\\\\|controller\\\\|Controller\")",
+      "PowerShell(New-Item *)",
+      "Bash(xargs cat)",
+      "Bash(git commit *)",
+      "Bash(Select-String -NotMatch \"TestFileOperations\")",
+      "PowerShell(go test *)",
+      "PowerShell(git *)"
     ]
   }
 }

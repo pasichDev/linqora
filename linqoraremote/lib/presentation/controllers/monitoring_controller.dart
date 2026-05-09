@@ -59,6 +59,11 @@ class MonitoringController extends GetxController {
   final currentGPULoadPercent = Rx<int?>(null);
   final currentGPUTemperature = Rx<int?>(null);
 
+  final diskReadBps = 0.obs;
+  final diskWriteBps = 0.obs;
+  final netSentBps = 0.obs;
+  final netRecvBps = 0.obs;
+
   // Internal circular buffers — O(1) writes.
   final _tempBuf = _CircularBuffer<int>(maxMetricsCount);
   final _cpuBuf = _CircularBuffer<int>(maxMetricsCount);
@@ -73,9 +78,9 @@ class MonitoringController extends GetxController {
   RAMMetrics? getCurrentRAMMetrics() => currentRAMMetrics.value;
 
   bool get hasEnoughMetricsData =>
-      temperatures.length > 5 &&
-      cpuLoads.length > 5 &&
-      ramUsagesPercent.length > 5;
+      temperatures.isNotEmpty &&
+      cpuLoads.isNotEmpty &&
+      ramUsagesPercent.isNotEmpty;
 
   @override
   void onInit() {
@@ -95,42 +100,10 @@ class MonitoringController extends GetxController {
     super.onClose();
   }
 
-  // Buffer for incoming metrics to provide smooth, delayed updates.
-  final List<({DateTime timestamp, Map<String, dynamic> data})> _metricsBuffer = [];
-  
   void _handleMetricsUpdate(Map<String, dynamic> data) {
     final rawData = data['data'];
     if (rawData == null || rawData is! Map<String, dynamic>) return;
-
-    // Add to buffer with current timestamp
-    _metricsBuffer.add((timestamp: DateTime.now(), data: rawData));
-    
-    // Start processing timer if not already running
-    _startBufferTimer();
-  }
-
-  bool _isTimerRunning = false;
-  void _startBufferTimer() {
-    if (_isTimerRunning) return;
-    _isTimerRunning = true;
-    
-    // Check buffer every 500ms
-    Stream.periodic(const Duration(milliseconds: 500)).listen((_) {
-      _processBuffer();
-    });
-  }
-
-  void _processBuffer() {
-    if (_metricsBuffer.isEmpty) return;
-
-    final now = DateTime.now();
-    final delay = const Duration(seconds: 3);
-
-    // Process all metrics that have reached the delay threshold
-    while (_metricsBuffer.isNotEmpty && now.difference(_metricsBuffer.first.timestamp) >= delay) {
-      final entry = _metricsBuffer.removeAt(0);
-      _applyMetrics(entry.data);
-    }
+    _applyMetrics(rawData);
   }
 
   void _applyMetrics(Map<String, dynamic> rawData) {
@@ -159,6 +132,15 @@ class MonitoringController extends GetxController {
         if (t > 0) currentGPUTemperature.value = t;
       }
 
+      final dr = rawData['diskReadBps'];
+      if (dr != null) diskReadBps.value = (dr as num).toInt();
+      final dw = rawData['diskWriteBps'];
+      if (dw != null) diskWriteBps.value = (dw as num).toInt();
+      final ns = rawData['netSentBps'];
+      if (ns != null) netSentBps.value = (ns as num).toInt();
+      final nr = rawData['netRecvBps'];
+      if (nr != null) netRecvBps.value = (nr as num).toInt();
+
       _updateMetricsArrays(
         currentCPUMetrics.value!.temperature,
         currentCPUMetrics.value!.loadPercent,
@@ -177,7 +159,10 @@ class MonitoringController extends GetxController {
     currentRAMMetrics.value = null;
     currentGPULoadPercent.value = null;
     currentGPUTemperature.value = null;
-    _metricsBuffer.clear();
+    diskReadBps.value = 0;
+    diskWriteBps.value = 0;
+    netSentBps.value = 0;
+    netRecvBps.value = 0;
     _tempBuf.clear();
     _cpuBuf.clear();
     _ramBuf.clear();

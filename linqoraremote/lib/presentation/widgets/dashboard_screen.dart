@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:linqoraremote/core/themes/lx_theme.dart';
 import 'package:linqoraremote/presentation/controllers/monitoring_controller.dart';
+import 'package:linqoraremote/presentation/controllers/platform_caps_controller.dart';
 import 'package:linqoraremote/presentation/widgets/lx_glass.dart';
 import 'package:linqoraremote/presentation/widgets/lx_ring.dart';
 import 'package:linqoraremote/presentation/widgets/lx_sparkline.dart';
@@ -42,6 +43,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Returns the filtered list of menu options based on platform capabilities.
+  /// Falls back to showing all options when caps haven't loaded yet.
+  List<MenuOption> get _visibleOptions {
+    PlatformCapsController? caps;
+    try {
+      caps = Get.find<PlatformCapsController>();
+    } catch (_) {}
+    if (caps == null || caps.features.isEmpty) return menuOptions;
+    return menuOptions.where((opt) {
+      if (opt.requiredCap == null) return true;
+      return caps!.has(opt.requiredCap!);
+    }).toList();
   }
 
   // Tab index <-> menu index mapping helpers
@@ -189,39 +204,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             const SizedBox(height: 20),
             // --- Connection header ---
-            const Text(
-              'CONNECTED TO',
-              style: TextStyle(
-                fontSize: 11,
-                letterSpacing: 1.4,
-                color: lxTextFaint,
-                fontWeight: FontWeight.w500,
+            GestureDetector(
+              onTap: () => Get.toNamed(AppRoutes.PC_INFO),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'CONNECTED TO',
+                    style: TextStyle(
+                      fontSize: 11,
+                      letterSpacing: 1.4,
+                      color: lxTextFaint,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Obx(() => Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            _homeController.hostInfo.value?.hostname ?? 'LINQORA',
+                            style: const TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.6,
+                              color: lxText,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '· ${_homeController.hostInfo.value?.kernelVersion ?? ''}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: lxTextDim,
+                            ),
+                          ),
+                          const Spacer(),
+                          const Icon(
+                            Icons.chevron_right_rounded,
+                            size: 16,
+                            color: lxTextFaint,
+                          ),
+                        ],
+                      )),
+                ],
               ),
             ),
-            const SizedBox(height: 4),
-            Obx(() => Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(
-                      _homeController.hostInfo.value?.hostname ?? 'LINQORA',
-                      style: const TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.6,
-                        color: lxText,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '· ${_homeController.hostInfo.value?.kernelVersion ?? ''}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: lxTextDim,
-                      ),
-                    ),
-                  ],
-                )),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -302,7 +331,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               final cpu = mc?.currentCPUMetrics.value;
               final ram = mc?.currentRAMMetrics.value;
               final cpuVal = cpu?.loadPercent.toDouble() ?? 0.0;
-              final cpuLoads = mc?.cpuLoads.value ?? <int>[];
+              final cpuLoads = mc?.cpuLoads.toList() ?? <int>[];
               return LxGlass(
                 padding: const EdgeInsets.all(14),
                 child: Row(
@@ -366,69 +395,80 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             const SizedBox(height: 10),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final screenWidth = constraints.maxWidth;
-                final cardHeight = 96.0;
-                final cardWidth = (screenWidth - 10) / 2;
-                final ratio = cardWidth / cardHeight;
-                final uptime = _formatUptime(
-                  _homeController.hostInfo.value?.uptime ?? 0,
-                );
-                return GridView.count(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
-                  childAspectRatio: ratio,
-                  children: [
-                    _moduleCard(
-                      icon: Icons.monitor_heart_outlined,
-                      label: 'System',
-                      sub: 'Live metrics',
-                      index: 0,
-                    ),
-                    _moduleCard(
-                      icon: Icons.volume_up_outlined,
-                      label: 'Media',
-                      sub: 'Now playing',
-                      index: 1,
-                    ),
-                    _moduleCard(
-                      icon: Icons.folder_outlined,
-                      label: 'Files',
-                      sub: 'Browse files',
-                      index: 5,
-                    ),
-                    _moduleCard(
-                      icon: Icons.code_rounded,
-                      label: 'Scripts',
-                      sub: 'Run commands',
-                      index: 4,
-                    ),
-                    _moduleCard(
-                      icon: Icons.mouse_outlined,
-                      label: 'Touchpad',
-                      sub: 'Remote input',
-                      index: 3,
-                    ),
-                    _moduleCard(
-                      icon: Icons.power_settings_new_rounded,
-                      label: 'Power',
-                      sub: 'Online · $uptime',
-                      index: 2,
-                      accent: true,
-                    ),
-                  ],
-                );
-              },
-            ),
+            Obx(() {
+              // Reading caps.features triggers a rebuild when capabilities arrive.
+              PlatformCapsController? caps;
+              try {
+                caps = Get.find<PlatformCapsController>();
+              } catch (_) {}
+              caps?.features.isEmpty;
+
+              final visible = _visibleOptions;
+              final uptime = _formatUptime(
+                _homeController.hostInfo.value?.uptime ?? 0,
+              );
+
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  final screenWidth = constraints.maxWidth;
+                  const cardHeight = 96.0;
+                  final cardWidth = (screenWidth - 10) / 2;
+                  final ratio = cardWidth / cardHeight;
+
+                  return GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    childAspectRatio: ratio,
+                    children: visible.map((opt) {
+                      final globalIndex = menuOptions.indexOf(opt);
+                      final isPower = opt.icon == Icons.energy_savings_leaf_outlined;
+                      return _moduleCard(
+                        icon: opt.icon,
+                        label: opt.title,
+                        sub: isPower ? 'Online · $uptime' : _subForOption(opt),
+                        index: globalIndex,
+                        accent: isPower,
+                      );
+                    }).toList(),
+                  );
+                },
+              );
+            }),
             const SizedBox(height: 100),
           ],
         ),
       ),
     );
+  }
+
+  String _subForOption(MenuOption opt) {
+    switch (opt.icon) {
+      case Icons.monitor_heart_outlined:
+        return 'Live metrics';
+      case Icons.volume_up:
+        return 'Now playing';
+      case Icons.folder_outlined:
+        return 'Browse files';
+      case Icons.code_rounded:
+        return 'Run commands';
+      case Icons.mouse_outlined:
+        return 'Remote input';
+      case Icons.keyboard_outlined:
+        return 'Remote keyboard';
+      case Icons.content_paste_outlined:
+        return 'Sync clipboard';
+      case Icons.brightness_medium_outlined:
+        return 'Screen control';
+      case Icons.memory_rounded:
+        return 'Running apps';
+      case Icons.power_settings_new_rounded:
+        return 'Startup apps';
+      default:
+        return '';
+    }
   }
 
   @override
