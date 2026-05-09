@@ -27,6 +27,44 @@ var (
 	procKeybdEvent = modUser32.NewProc("keybd_event")
 )
 
+const volumeTypeDefinition = `
+using System;
+using System.Runtime.InteropServices;
+
+[Guid("5CDF2C82-1510-4914-A4AA-9C22C6702A45"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IAudioEndpointVolume {
+    void _r0(); void _r1(); void _r2();
+    void SetMasterVolumeLevel(float fLevelDB, ref Guid g);
+    void SetMasterVolumeLevelScalar(float fLevel, ref Guid g);
+    void GetMasterVolumeLevel(out float pfLevelDB);
+    void GetMasterVolumeLevelScalar(out float pfLevel);
+}
+[Guid("D666063F-1587-4E43-81F1-B948E807363F"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IMMDevice {
+    void Activate(ref Guid iid, uint ctx, IntPtr p, [MarshalAs(UnmanagedType.IUnknown)] out object ppv);
+    void _skip1(); void _skip2(); void _skip3();
+}
+[Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IMMDeviceEnumerator {
+    void _skip1();
+    void GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice ppEndpoint);
+    void _skip2(); void _skip3(); void _skip4();
+}
+[ComImport,Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
+class MMDeviceEnumeratorCom {}
+public static class Vol {
+    static IAudioEndpointVolume _ep() {
+        var e = (IMMDeviceEnumerator)new MMDeviceEnumeratorCom();
+        IMMDevice dev; e.GetDefaultAudioEndpoint(0,1,out dev);
+        var iid = typeof(IAudioEndpointVolume).GUID;
+        object o; dev.Activate(ref iid,1,IntPtr.Zero,out o);
+        return (IAudioEndpointVolume)o;
+    }
+    public static float Get() { float v; _ep().GetMasterVolumeLevelScalar(out v); return v*100; }
+    public static void Set(float pct) { var g=Guid.Empty; _ep().SetMasterVolumeLevelScalar(pct/100f,ref g); }
+}
+`
+
 // platformHandleMedia executes media and audio commands.
 func platformHandleMedia(command MediaCommand) error {
 	switch command.Action {
@@ -119,15 +157,14 @@ func platformGetAudioCapabilities() (MediaCapabilities, error) {
 	return caps, nil
 }
 
-// getWindowsMasterVolume reads master volume using PowerShell and COM.
+// getWindowsMasterVolume reads master volume using PowerShell with WASAPI C# inline.
 func getWindowsMasterVolume() (int, error) {
-	script := `
-$obj = New-Object -ComObject MMDeviceEnumerator
-$device = $obj.GetDefaultAudioEndpoint(0, 1)
-$iid = [Guid]"5CDF2C82-1510-4914-A4AA-9C22C6702A45"
-$volume = $device.Activate($iid, 3, [IntPtr]::Zero)
-[int]($volume.GetMasterVolumeLevelScalar() * 100)
-`
+	script := fmt.Sprintf(`
+Add-Type -TypeDefinition @'
+%s
+'@ -Language CSharp -ErrorAction Stop
+[int][Vol]::Get()
+`, volumeTypeDefinition)
 	out, err := runPowerShell(script)
 	if err != nil {
 		return 50, err
@@ -137,7 +174,7 @@ $volume = $device.Activate($iid, 3, [IntPtr]::Zero)
 	return vol, nil
 }
 
-// setWindowsMasterVolume sets master volume using PowerShell and COM.
+// setWindowsMasterVolume sets master volume using PowerShell with WASAPI C# inline.
 func setWindowsMasterVolume(value int) error {
 	if value < 0 {
 		value = 0
@@ -145,17 +182,12 @@ func setWindowsMasterVolume(value int) error {
 	if value > 100 {
 		value = 100
 	}
-
-	// Format float with point for PowerShell
-	fVal := float32(value) / 100.0
 	script := fmt.Sprintf(`
-$obj = New-Object -ComObject MMDeviceEnumerator
-$device = $obj.GetDefaultAudioEndpoint(0, 1)
-$iid = [Guid]"5CDF2C82-1510-4914-A4AA-9C22C6702A45"
-$volume = $device.Activate($iid, 3, [IntPtr]::Zero)
-$volume.SetMasterVolumeLevelScalar(%.2f, [Guid]::Empty)
-`, fVal)
-
+Add-Type -TypeDefinition @'
+%s
+'@ -Language CSharp -ErrorAction Stop
+[Vol]::Set(%d)
+`, volumeTypeDefinition, value)
 	_, err := runPowerShell(script)
 	return err
 }
