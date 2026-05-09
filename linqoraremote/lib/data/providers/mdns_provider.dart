@@ -156,7 +156,7 @@ class MDnsProvider {
   Future<void> _performDirectSearch(List<MdnsDevice> devices) async {
     try {
       await for (final ptr in _client!.lookup<PtrResourceRecord>(
-        ResourceRecordQuery.serverPointer('_linqora.local'),
+        ResourceRecordQuery.serverPointer('_linqora._tcp.local'),
       )) {
         AppLogger.debug(
           'Found Linqora service: ${ptr.domainName}',
@@ -380,7 +380,7 @@ class MDnsProvider {
 
   /// Checks if the service type is Linqora
   bool _isLinqoraServiceType(String serviceType) {
-    return serviceType.contains('_linqora');
+    return serviceType.contains('_linqora._tcp');
   }
 
   /// Checks if a device already exists in the list
