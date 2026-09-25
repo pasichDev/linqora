@@ -18,6 +18,14 @@
 
 ---
 
+> [!WARNING]
+> **Archived. Linqora is an experiment and is no longer maintained.**
+> Do not run Linqora Host on a network you do not fully trust. In the default configuration
+> (no shared secret) its REST API is not authenticated: any device on the same network can
+> shut the computer down, kill processes, type keystrokes and run scripts. Device pairing
+> relies on a device id only, and the bundled TLS key is public. The released builds
+> (up to v0.1.6) have these issues and will not be fixed.
+
 <a name="english"></a>
 
 ## About
@@ -36,41 +44,20 @@ The project consists of two main components:
 - 📊 Real-time system resource monitoring
 - 🔊 Media and volume control
 - ⚡ Power management (shutdown, restart, lock)
-- 🔐 Secure device authentication
-- 🛡️ **End-to-End Encryption (AES-256-GCM)** for all communication
+- 🔐 Device pairing with manual approval on the computer (device id only; optional shared secret)
+- 🛡️ Optional AES-256-GCM message encryption (off by default; not supported by the mobile client)
 - 🖥️ **Multi-monitor management** (enumeration, primary monitor control)
-- 📂 **Remote file browser** (secure browsing, read/write files)
+- 📂 **Remote file browser** (read/write files in the home directory)
 - ⌨️ **Powerful CLI** for server management and configuration
 - 🌐 Local network discovery
 - 🔄 WebSocket-based communication
 
-## Support the Project
+## Status
 
-Your support motivates further development of the application.  
-👉 [Learn how to support the project →](./SPONSORS.md)
-
-## Feedback
-
-We highly value your feedback! Please use the following form to send us your thoughts, report bugs, or suggest new features:
-
-👉 [Submit Feedback & Contact Form](https://tally.so/r/np9XlV)
-
-You can also attach screenshots or images to help us better understand your issues or ideas.
-
-## Contributing
-
-Currently, this project is developed by a single person. However, a [project roadmap](./ROADMAP.md) is available for those interested in contributing.
-
-- [ROADMAP.md](./ROADMAP.md) — Project roadmap and status
-- [CHANGELOG.md](./CHANGELOG.md) — Detailed list of changes
-- [RELEASES.md](./docs/RELEASES.md) — How we handle versioning and releases
-
-You are welcome to open pull requests and start discussions regarding the project.  
-I will carefully review and respond to every contribution and suggestion.
-
-Thank you for your interest and support!
+The project is archived: no new releases, fixes or answers to issues. The code stays available
+for reference under the MIT license.
 
 ## License
 
-MIT © [pasichDev](https://github.com/pasichDev)
+MIT © [pasichDev](https://github.com/pasichDev), see [LICENSE](./LICENSE).
 
