@@ -2,19 +2,17 @@
 
 ## Supported Versions
 
-Currently, we provide security updates only for the latest version of Linqora.
+None. Linqora is archived and receives no security updates.
 
-## Reporting a Vulnerability
+## Known issues (will not be fixed)
 
-If you discover a security vulnerability within Linqora, please send an email to [pasichDev@outlook.com](mailto:pasichDev@outlook.com). All security vulnerabilities will be promptly addressed.
+- With no shared secret configured (the default), the REST API under `/api/v1` is not
+  authenticated: any device on the local network can control power, processes, keyboard input,
+  media and scripts.
+- A paired device is recognised by its device id alone; no per-device secret is issued.
+- The TLS certificate and private key shipped with the host are public, and the host falls
+  back to plain `ws://` when the certificate is missing or invalid.
+- The optional AES-256-GCM message encryption is off by default and not implemented in the
+  mobile client.
 
-Please do not disclose security vulnerabilities publicly until they have been addressed by the team.
-
-## Security Measures
-
-Linqora implements the following security measures:
-- Local network operation only (no internet exposure required)
-- Device authentication before connection
-- **End-to-End Encryption (AES-256-GCM)** for all WebSocket payloads
-- **Path-traversal protection** for remote file access
-- Secure certificate handling for local HTTPS/WSS
+Run Linqora only on a network you fully trust, or not at all.
